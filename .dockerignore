@@ -1,0 +1,50 @@
+# Git
+.git
+.github
+.gitignore
+.git-blame-ignore-revs
+
+# Node
+node_modules
+.yarn
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.mypy_cache
+.pytest_cache
+.ruff_cache
+*.egg-info
+
+# Build artifacts
+*.log
+*.pid
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# CI/CD
+.mergify.yml
+.pre-commit-config.yaml
+.releaserc
+.semgrepignore
+sider.yml
+codecov.yml
+cypress
+cypress.config.js
+crowdin.yml
+
+# Docs
+*.md
+!hooks.md
+LICENSE
+CODEOWNERS
+attributions.md
+
+# Docker (avoid recursive context)
+Dockerfile
+docker-compose.yml

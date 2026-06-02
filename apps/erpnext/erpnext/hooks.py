@@ -723,3 +723,14 @@ repost_allowed_doctypes = [
 	"Payment Entry",
 	"Purchase Receipt",
 ]
+
+# ──────────────────────────────────────────────────────────────
+# Exe ERP — GoTrue SSO Authentication
+# Endpoints auto-exposed via @frappe.whitelist(allow_guest=True):
+#   POST /api/method/erpnext.exe_auth.api.gotrue_login
+#   POST /api/method/erpnext.exe_auth.api.admin_token
+#
+# site_config.json requires:
+#   "gotrue_url": "http://gotrue:9999"
+#   "exe_admin_token": "your-secret-token"
+# ──────────────────────────────────────────────────────────────
