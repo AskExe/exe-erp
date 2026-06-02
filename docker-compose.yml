@@ -1,0 +1,155 @@
+# ──────────────────────────────────────────────────────────────
+# Exe ERP — Docker Compose (production)
+# Connects to external exe-db (PostgreSQL) and redis
+# ──────────────────────────────────────────────────────────────
+
+services:
+  # ── First-boot configurator (runs once, creates site) ──────
+  exe-erp-configurator:
+    build: .
+    image: ghcr.io/askexe/exe-erp:v0.1.0
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
+    command: ["echo", "Site configured successfully"]
+    environment:
+      DB_HOST: exe-db
+      DB_PORT: "5432"
+      DB_TYPE: postgres
+      DB_NAME: exe_erp
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      ADMIN_PASSWORD: ${ERP_ADMIN_PASSWORD:-admin}
+      REDIS_CACHE: redis://redis:6379/3
+      REDIS_QUEUE: redis://redis:6379/4
+      REDIS_SOCKETIO: redis://redis:6379/5
+      SITE_NAME: erp.askexe.com
+    volumes:
+      - erp-sites:/home/frappe/frappe-bench/sites
+    networks:
+      - exe-net
+    restart: "no"
+
+  # ── Gunicorn backend ───────────────────────────────────────
+  exe-erp:
+    build: .
+    image: ghcr.io/askexe/exe-erp:v0.1.0
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
+    command:
+      - gunicorn
+      - --bind=0.0.0.0:8000
+      - --workers=4
+      - --timeout=120
+      - --graceful-timeout=30
+      - --worker-tmp-dir=/dev/shm
+      - frappe.app:application
+    environment:
+      DB_HOST: exe-db
+      DB_PORT: "5432"
+      DB_TYPE: postgres
+      DB_NAME: exe_erp
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_CACHE: redis://redis:6379/3
+      REDIS_QUEUE: redis://redis:6379/4
+      REDIS_SOCKETIO: redis://redis:6379/5
+      SITE_NAME: erp.askexe.com
+    ports:
+      - "8069:8000"
+    volumes:
+      - erp-sites:/home/frappe/frappe-bench/sites
+    networks:
+      - exe-net
+    depends_on:
+      exe-erp-configurator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/method/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Socket.io for realtime events ──────────────────────────
+  exe-erp-websocket:
+    build: .
+    image: ghcr.io/askexe/exe-erp:v0.1.0
+    entrypoint: []
+    command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+    environment:
+      REDIS_SOCKETIO: redis://redis:6379/5
+      SITE_NAME: erp.askexe.com
+    ports:
+      - "9069:9000"
+    volumes:
+      - erp-sites:/home/frappe/frappe-bench/sites
+    networks:
+      - exe-net
+    depends_on:
+      exe-erp:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── RQ worker for background jobs ──────────────────────────
+  exe-erp-queue:
+    build: .
+    image: ghcr.io/askexe/exe-erp:v0.1.0
+    entrypoint: []
+    command:
+      - bench
+      - worker
+      - --queue=default,short,long
+    environment:
+      DB_HOST: exe-db
+      DB_PORT: "5432"
+      DB_TYPE: postgres
+      DB_NAME: exe_erp
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_CACHE: redis://redis:6379/3
+      REDIS_QUEUE: redis://redis:6379/4
+      REDIS_SOCKETIO: redis://redis:6379/5
+      SITE_NAME: erp.askexe.com
+    volumes:
+      - erp-sites:/home/frappe/frappe-bench/sites
+    networks:
+      - exe-net
+    depends_on:
+      exe-erp:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Frappe scheduler (cron-like background tasks) ──────────
+  exe-erp-scheduler:
+    build: .
+    image: ghcr.io/askexe/exe-erp:v0.1.0
+    entrypoint: []
+    command:
+      - bench
+      - schedule
+    environment:
+      DB_HOST: exe-db
+      DB_PORT: "5432"
+      DB_TYPE: postgres
+      DB_NAME: exe_erp
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_CACHE: redis://redis:6379/3
+      REDIS_QUEUE: redis://redis:6379/4
+      REDIS_SOCKETIO: redis://redis:6379/5
+      SITE_NAME: erp.askexe.com
+    volumes:
+      - erp-sites:/home/frappe/frappe-bench/sites
+    networks:
+      - exe-net
+    depends_on:
+      exe-erp:
+        condition: service_healthy
+    restart: unless-stopped
+
+# ── Volumes ──────────────────────────────────────────────────
+volumes:
+  erp-sites:
+    name: exe-erp-sites
+
+# ── Networks ─────────────────────────────────────────────────
+# Connect to existing exe-os network (exe-db + redis already running)
+networks:
+  exe-net:
+    external: true
+    name: exe-net
