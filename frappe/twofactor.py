@@ -447,7 +447,7 @@ def reset_otp_secret(user: str):
 			title=_("Enable Two Factor Auth"),
 		)
 
-	otp_issuer = settings.otp_issuer_name or "Frappe Framework"
+	otp_issuer = settings.otp_issuer_name or "Exe ERP"
 	user_email = frappe.get_cached_value("User", user, "email")
 
 	clear_default(user + "_otplogin")

@@ -577,7 +577,7 @@ class EmailAccount(Document):
 				"conf_names": ("always_use_account_name_as_sender_name",),
 				"default": 0,
 			},
-			"name": {"conf_names": ("email_sender_name",), "default": "Frappe"},
+			"name": {"conf_names": ("email_sender_name",), "default": "Exe ERP"},
 			"auth_method": {"conf_names": ("auth_method"), "default": "Basic"},
 			"from_site_config": {"default": True},
 			"no_smtp_authentication": {

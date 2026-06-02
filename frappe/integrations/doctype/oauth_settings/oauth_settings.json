@@ -34,7 +34,7 @@
    "label": "Metadata"
   },
   {
-   "default": "Frappe Framework Application",
+   "default": "Exe ERP",
    "description": "Human-readable name intended for display to the end user.",
    "fieldname": "resource_name",
    "fieldtype": "Data",

@@ -1,0 +1,9 @@
+<svg fill="none" viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Exe ERP">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@700;900&amp;display=swap');
+    </style>
+  </defs>
+  <text x="150" y="55" font-family="'Epilogue', system-ui, sans-serif" font-weight="900" font-size="48" letter-spacing="0.12em" fill="#F5D76E" text-anchor="middle">EXE</text>
+  <text x="150" y="75" font-family="'Epilogue', system-ui, sans-serif" font-weight="700" font-size="16" letter-spacing="0.2em" fill="#A09CAF" text-anchor="middle">ERP</text>
+</svg>

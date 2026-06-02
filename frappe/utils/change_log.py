@@ -376,12 +376,7 @@ def show_update_popup():
 				update_message += f"<div class='new-version-log'>{message}<div class='new-version-links'>{release_links}</div></div>"
 
 	primary_action = None
-	if on_frappecloud():
-		primary_action = {
-			"label": _("Update from Frappe Cloud"),
-			"client_action": "window.open",
-			"args": f"https://frappecloud.com/dashboard/sites/{frappe.local.site}",
-		}
+	# Frappe Cloud update action removed — Exe ERP fork
 
 	if update_message:
 		frappe.msgprint(

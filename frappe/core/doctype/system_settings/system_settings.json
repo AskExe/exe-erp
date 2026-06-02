@@ -372,7 +372,7 @@
    "label": "Expiry time of QR Code Image Page"
   },
   {
-   "default": "Frappe Framework",
+   "default": "Exe ERP",
    "depends_on": "enable_two_factor_auth",
    "fieldname": "otp_issuer_name",
    "fieldtype": "Data",

@@ -1,8 +1,21 @@
 @import "./desk/variables";
 
+/* =====================================================
+   Exe Foundry Bold — Login Page Design System Override
+   Matches CRM (crm.askexe.com/welcome) and Wiki login.
+   Colors: #0F0E1A bg, #1A1832 card, #252340 input,
+           #F5D76E gold CTA, #F0EDE8 text, #A09CAF secondary
+   Typography: Epilogue (headlines), Manrope (body)
+   ===================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@700;900&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;700&display=swap');
+
 body {
+	background-color: #0F0E1A !important;
+	font-family: 'Manrope', system-ui, sans-serif;
+
 	@include media-breakpoint-up(sm) {
-		background-color: var(--bg-light-gray);
+		background-color: #0F0E1A !important;
 	}
 	.page-content-wrapper {
 		min-height: calc(100vh - 220px);
@@ -26,11 +39,11 @@ body {
 .for-email-login {
 	.page-card {
 		padding: 45px 10px;
-		background-color: #fff;
+		background-color: #1A1832;
 		max-width: 400px;
 		margin: 0 auto;
-		border-radius: var(--border-radius-md);
-		border: 1px solid var(--border-color);
+		border-radius: 12px;
+		border: 1px solid #2E2C47;
 
 		form {
 			max-width: 320px;
@@ -46,33 +59,47 @@ body {
 		}
 
 		.page-card-body {
-			::placeholder, /* Chrome, Firefox, Opera, Safari 10.1+ */
+			::placeholder,
 			::-ms-input-placeholder {
-				/* Microsoft Edge */
-				color: var(--text-light);
-				opacity: 1; /* Firefox */
+				color: #A09CAF;
+				opacity: 0.5;
 			}
 
 			input[type="text"],
 			input[type="email"],
 			input[type="password"] {
-				border: none;
-				color: var(--text-color);
-				@include get_textstyle("base", "regular");
-				background-color: var(--control-bg);
+				border: 1px solid #2E2C47;
+				color: #F0EDE8;
+				font-family: 'Manrope', system-ui, sans-serif;
+				font-size: 14px;
+				font-weight: 400;
+				background-color: #252340;
 				margin-bottom: 1rem;
+				border-radius: 8px;
+				padding: 10px 12px 10px 35px;
+				transition: border-color 0.15s, box-shadow 0.15s;
+
+				&:focus {
+					border-color: #F5D76E;
+					box-shadow: 0 0 0 3px rgba(245, 215, 110, 0.15);
+					outline: none;
+					background-color: #252340;
+					color: #F0EDE8;
+				}
 			}
 
 			&.invalid {
 				input[type="text"],
 				input[type="email"],
 				input[type="password"] {
-					border: 1px solid var(--red-500);
+					border: 1px solid #EF4444;
 				}
 			}
 
 			.form-label {
-				@include get_textstyle("base", "regular");
+				color: #A09CAF;
+				font-family: 'Manrope', system-ui, sans-serif;
+				font-size: 13px;
 			}
 
 			.forgot-password-message {
@@ -80,8 +107,12 @@ body {
 				line-height: 1;
 
 				> * {
-					color: var(--text-light);
-					@include get_textstyle("sm", "regular");
+					color: #A09CAF;
+					font-size: 12px;
+
+					&:hover {
+						color: #F5D76E;
+					}
 				}
 			}
 
@@ -91,7 +122,7 @@ body {
 				transform: translateY(-50%);
 				position: absolute;
 				z-index: 2;
-				fill: var(--text-light);
+				fill: #A09CAF;
 			}
 
 			.email-field,
@@ -109,37 +140,36 @@ body {
 					z-index: 2;
 					cursor: pointer;
 					font-size: 12px;
+					color: #A09CAF;
 				}
 			}
 
 			.btn-login-option {
-				@include get_textstyle("base", "medium");
-				color: var(--text-gray-700);
-				background: var(--gray-100);
+				font-family: 'Manrope', system-ui, sans-serif;
+				font-size: 14px;
+				font-weight: 500;
+				color: #F0EDE8;
+				background: #252340;
 				box-shadow: none;
-				border: none;
+				border: 1px solid #2E2C47;
 				display: flex;
 				place-content: center;
-
-				&.btn-salesforce {
-					i {
-						color: var(--blue-400);
-					}
-				}
+				border-radius: 8px;
 
 				img {
 					margin-right: var(--padding-xs);
 				}
 
 				&:hover {
-					border: none;
-					background: var(--gray-300);
+					border-color: #F5D76E;
+					background: #252340;
+					color: #F5D76E;
 				}
 			}
 
 			.social-logins {
 				margin-top: var(--margin-md);
-				@include get_textstyle("base", "regular");
+				color: #A09CAF;
 
 				.social-login-buttons {
 					margin-top: var(--margin-md);
@@ -161,17 +191,50 @@ body {
 
 			.login-divider {
 				margin: var(--margin-md) 0;
+				color: #A09CAF;
 			}
+		}
+	}
+
+	/* Gold CTA button — Exe Foundry Bold */
+	.btn-primary,
+	.btn-login {
+		background-color: #F5D76E !important;
+		color: #0F0E1A !important;
+		border: none !important;
+		font-family: 'Epilogue', system-ui, sans-serif;
+		font-weight: 700;
+		font-size: 14px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		border-radius: 8px;
+		min-height: 42px;
+		transition: background-color 0.15s;
+
+		&:hover {
+			background-color: #E5C75E !important;
+			color: #0F0E1A !important;
+		}
+
+		&:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
 		}
 	}
 
 	.sign-up-message {
 		margin-top: 1rem;
 		margin-bottom: 0;
-		color: var(--text-light);
-		@include get_textstyle("base", "regular");
+		color: #A09CAF;
+		font-family: 'Manrope', system-ui, sans-serif;
+		font-size: 14px;
+
 		a {
-			color: var(--primary);
+			color: #F5D76E;
+
+			&:hover {
+				color: #E5C75E;
+			}
 		}
 	}
 
@@ -205,7 +268,7 @@ body {
 	padding: max(5vh, 30px) 0 14px 0px;
 	margin: 0 auto;
 	text-align: center;
-	font-size: var(--text-xl);
+	font-size: 20px;
 	font-weight: 600;
 
 	img {
@@ -214,9 +277,19 @@ body {
 
 	h4 {
 		margin-top: 1rem;
-		font-size: var(--text-xl);
-		font-weight: var(--weight-semibold);
+		font-family: 'Manrope', system-ui, sans-serif;
+		font-size: 20px;
+		font-weight: 600;
 		letter-spacing: 0.01em;
-		color: var(--text-color);
+		color: #F0EDE8;
+	}
+}
+
+/* Noscript message for dark theme */
+noscript {
+	color: #F0EDE8;
+
+	.text-muted {
+		color: #A09CAF !important;
 	}
 }
