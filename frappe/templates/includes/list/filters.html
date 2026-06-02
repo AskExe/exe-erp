@@ -1,0 +1,24 @@
+<div class="website-list-filters my-4">
+	<div class="row">
+		<div class="col-6">
+			<form class="form-inline form-search" action="/{{ pathname }}">
+				<div class="input-group">
+					<input class="form-control" doctype="text" name="txt"
+						placeholder="Search..." value="{{ txt or '' }}">
+					<div class="input-group-append">
+						<button class="btn btn-light" type="submit">
+						<span class="desktop-search-icon">
+							<svg class="icon icon-xs"><use href="#icon-search"></use></svg>
+						</span>
+						</button>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+	{% if txt %}
+		<div class="filter-message small text-muted">
+			Results filtered by <b>{{ txt }}</b>.
+		</div>
+	{% endif %}
+</div>

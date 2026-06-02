@@ -1,0 +1,32 @@
+.gantt .grid-column:hover {
+	cursor: copy;
+}
+
+.gantt-container .popup-wrapper {
+	min-width: 9rem;
+	border-radius: var(--border-radius);
+	@include get_textstyle("sm", "regular");
+
+	.title {
+		color: white;
+		border-bottom: none;
+		padding-bottom: 0;
+	}
+
+	.subtitle {
+		color: var(--gray-500);
+	}
+
+	.pointer {
+		height: 15px;
+	}
+}
+
+.gantt-modern {
+	height: calc(100vh - 240px);
+	overflow-y: auto;
+
+	.gantt-container {
+		position: relative;
+	}
+}
