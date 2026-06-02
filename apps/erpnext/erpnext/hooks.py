@@ -116,8 +116,14 @@ website_context = {
 	"splash_image": "/assets/erpnext/images/erpnext-logo.svg",
 }
 
+# Exe ERP — GoTrue SSO endpoints
+# Available at /api/method/erpnext.exe_auth.api.gotrue_login
+# and /api/method/erpnext.exe_auth.api.admin_token
+
 # nosemgrep
 website_route_rules = [
+	{"from_route": "/api/auth/gotrue-login", "to_route": "erpnext.exe_auth.api.gotrue_login"},
+	{"from_route": "/api/auth/admin-token", "to_route": "erpnext.exe_auth.api.admin_token"},
 	{"from_route": "/orders", "to_route": "Sales Order"},
 	{
 		"from_route": "/orders/<path:name>",
