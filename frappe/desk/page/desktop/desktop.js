@@ -469,9 +469,9 @@ class DesktopPage {
 			},
 			{
 				icon: "support",
-				label: "Frappe Support",
+				label: "Exe ERP Support",
 				onClick: function () {
-					window.open("https://support.frappe.io/help", "_blank");
+					window.open("https://askexe.com/support", "_blank");
 				},
 			},
 			{

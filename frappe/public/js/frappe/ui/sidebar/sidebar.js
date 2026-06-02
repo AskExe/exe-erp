@@ -118,12 +118,8 @@ frappe.ui.Sidebar = class Sidebar {
 </svg>
 `);
 
-		const title = __("Switch to Frappe CRM");
-		const message = __(
-			"Sales without complexity, lock-in and per-user costs. Try it for free!"
-		);
-		const link =
-			"https://frappe.io/crm?utm_source=crm-sidebar&utm_medium=sidebar&utm_campaign=frappe-ad";
+		// Frappe CRM promotional banner removed — Exe ERP fork
+		return;
 
 		this.promotional_banners.push({ title, message, link, icon });
 	}
@@ -138,10 +134,8 @@ frappe.ui.Sidebar = class Sidebar {
 </svg>
 `);
 
-		const title = __("Switch to Helpdesk");
-		const message = __(
-			"Support without complexity, lock-in and per-user costs. Try it for free!"
-		);
+		// Frappe Helpdesk promotional banner removed — Exe ERP fork
+		return;
 		const link =
 			"https://frappe.io/helpdesk?utm_source=support-sidebar&utm_medium=sidebar&utm_campaign=frappe-ad";
 
