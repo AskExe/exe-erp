@@ -3,11 +3,11 @@ import os
 from . import __version__ as app_version
 
 app_name = "frappe"
-app_title = "Frappe Framework"
-app_publisher = "Frappe Technologies"
-app_description = "Full stack web framework with Python, Javascript, MariaDB, Redis, Node"
-app_license = "MIT"
-app_logo_url = "/assets/frappe/images/frappe-framework-logo.svg"
+app_title = "Exe ERP"
+app_publisher = "AskExe"
+app_description = "Exe ERP — inventory, orders, invoicing"
+app_license = "GPL-3.0"
+app_logo_url = "/assets/frappe/images/exe-erp-logo.svg"
 develop_version = "17.x.x-develop"
 app_home = "/app/build"
 

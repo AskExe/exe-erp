@@ -1,5 +1,5 @@
 {
-  "name": "frappe-framework",
+  "name": "exe-erp",
   "scripts": {
     "build": "node esbuild",
     "production": "node esbuild --production",
@@ -8,12 +8,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/frappe/frappe.git"
+    "url": "git+https://github.com/AskExe/exe-erp.git"
   },
-  "author": "Frappe Technologies Pvt. Ltd.",
-  "license": "MIT",
+  "author": "AskExe",
+  "license": "GPL-3.0",
   "bugs": {
-    "url": "https://github.com/frappe/frappe/issues"
+    "url": "https://github.com/AskExe/exe-erp/issues"
   },
   "engines": {
     "node": ">=24"

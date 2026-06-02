@@ -50,7 +50,7 @@ from .utils.jinja import (
 )
 
 __version__ = "17.0.0-dev"
-__title__ = "Frappe Framework"
+__title__ = "Exe ERP"
 
 if TYPE_CHECKING:  # pragma: no cover
 	from logging import Logger

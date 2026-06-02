@@ -47,7 +47,7 @@ def get_context(context):
 	context["disable_user_pass_login"] = cint(frappe.get_system_settings("disable_user_pass_login"))
 	context["logo"] = get_app_logo()
 	context["app_name"] = (
-		frappe.get_website_settings("app_name") or frappe.get_system_settings("app_name") or _("Frappe")
+		frappe.get_website_settings("app_name") or frappe.get_system_settings("app_name") or _("Exe ERP")
 	)
 
 	signup_form_template = frappe.get_hooks("signup_form_template")
@@ -109,7 +109,7 @@ def get_context(context):
 	context["login_label"] = f" {_('or')} ".join(login_label)
 
 	context["login_with_email_link"] = frappe.get_system_settings("login_with_email_link")
-	context["login_with_frappe_cloud_url"] = None
+	context["login_with_frappe_cloud_url"] = None  # Frappe Cloud removed — Exe ERP fork
 
 	return context
 
@@ -144,7 +144,7 @@ def send_login_link(email: str):
 		link = _generate_temporary_login_link(email, expiry)
 
 		app_name = (
-			frappe.get_website_settings("app_name") or frappe.get_system_settings("app_name") or _("Frappe")
+			frappe.get_website_settings("app_name") or frappe.get_system_settings("app_name") or _("Exe ERP")
 		)
 
 		subject = _("Login To {0}").format(app_name)
