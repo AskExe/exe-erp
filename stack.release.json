@@ -1,0 +1,62 @@
+{
+  "service": "exe-erp",
+  "packageName": "@askexenow/exe-erp",
+  "version": "0.1.0",
+  "components": {
+    "erp": "ghcr.io/askexe/exe-erp:v0.1.0",
+    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.1.0",
+    "erp-queue": "ghcr.io/askexe/exe-erp:v0.1.0",
+    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.1.0"
+  },
+  "stackParticipation": {
+    "required": false,
+    "compatibleStack": ">=0.9.0 <1.0.0",
+    "health": [
+      {
+        "type": "command",
+        "command": "curl -fsS http://localhost:8069/api/method/ping",
+        "description": "Gunicorn API health"
+      },
+      {
+        "type": "command",
+        "command": "docker compose -f /opt/exe-erp/docker-compose.yml exec -T exe-erp-queue redis-cli -u redis://redis:6379/4 ping",
+        "description": "RQ queue Redis connectivity"
+      }
+    ],
+    "migrations": {
+      "command": "docker compose -f /opt/exe-erp/docker-compose.yml exec -T exe-erp bench --site erp.askexe.com migrate",
+      "description": "Run Frappe bench migrations"
+    }
+  },
+  "dependencies": {
+    "exe-db": ">=0.9.7",
+    "redis": ">=7.0"
+  },
+  "environment": {
+    "required": [
+      "POSTGRES_PASSWORD",
+      "ERP_ADMIN_PASSWORD"
+    ],
+    "optional": [
+      "FRAPPE_SENTRY_DSN",
+      "ENABLE_SENTRY_DB_MONITORING",
+      "SENTRY_TRACING_SAMPLE_RATE",
+      "MONITOR_ERROR_URL",
+      "MONITOR_API_KEY",
+      "EXE_BRIDGE_DATABASE_URL"
+    ]
+  },
+  "ports": {
+    "api": 8069,
+    "websocket": 9069
+  },
+  "redis": {
+    "cache": 3,
+    "queue": 4,
+    "socketio": 5
+  },
+  "volumes": [
+    "exe-erp-sites"
+  ],
+  "network": "exe-net"
+}

@@ -360,6 +360,13 @@ doc_events = {
 			"erpnext.support.doctype.service_level_agreement.service_level_agreement.apply",
 			"erpnext.setup.doctype.transaction_deletion_record.transaction_deletion_record.check_for_running_deletion_job",
 		],
+		# Exe Bridge — emit events to raw.raw_events landing pad in exedb
+		# Enables cross-service data flow: ERP → raw → projection → crm/wiki/gateway
+		"after_insert": "erpnext.exe_bridge.events.on_after_insert",
+		"on_update": "erpnext.exe_bridge.events.on_update",
+		"on_submit": "erpnext.exe_bridge.events.on_submit",
+		"on_cancel": "erpnext.exe_bridge.events.on_cancel",
+		"on_trash": "erpnext.exe_bridge.events.on_trash",
 	},
 	tuple(period_closing_doctypes): {
 		"validate": "erpnext.accounts.doctype.accounting_period.accounting_period.validate_accounting_period_on_doc_save",
@@ -739,4 +746,18 @@ repost_allowed_doctypes = [
 # site_config.json requires:
 #   "gotrue_url": "http://gotrue:9999"
 #   "exe_admin_token": "your-secret-token"
+# ──────────────────────────────────────────────────────────────
+
+# ──────────────────────────────────────────────────────────────
+# Exe Monitor — Error forwarding to exe-monitor-hub
+# Forward unhandled request errors for centralized alerting.
+# Configure via env: MONITOR_ERROR_URL, MONITOR_API_KEY
+# ──────────────────────────────────────────────────────────────
+after_request_error = ["erpnext.exe_monitor.error_reporter.on_request_error"]
+
+# ──────────────────────────────────────────────────────────────
+# Exe Bridge — Additional API endpoints
+# Auto-exposed via @frappe.whitelist:
+#   GET /api/method/erpnext.exe_bridge.metrics.get_metrics (Prometheus)
+#   GET /api/method/erpnext.exe_monitor.health.check (enhanced health)
 # ──────────────────────────────────────────────────────────────
