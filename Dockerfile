@@ -130,8 +130,10 @@ RUN cd /opt/exe-erp-src && ~/frappe-bench/env/bin/python -c "import tomllib,subp
 
 # Install Node deps and build production assets.
 ENV XDG_CONFIG_HOME=/home/frappe/.config
-# Create apps.txt — esbuild reads /sites/apps.txt to discover which apps to build.
-# Also create sites dir with apps.txt in the bench directory.
+# FRAPPE_BENCH_ROOT tells esbuild where the bench directory is.
+# Without this, esbuild resolves __dirname/../.. which points to /
+# and looks for /sites/apps.txt instead of frappe-bench/sites/apps.txt.
+ENV FRAPPE_BENCH_ROOT=/home/frappe/frappe-bench
 RUN mkdir -p /home/frappe/.config && \
     mkdir -p sites && printf "frappe\nerpnext\n" > sites/apps.txt && \
     bench setup requirements --node && \
