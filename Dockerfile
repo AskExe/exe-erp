@@ -83,9 +83,23 @@ RUN pip install --no-cache-dir --user frappe-bench
 # Add local pip bin to PATH
 ENV PATH="/home/frappe/.local/bin:${PATH}"
 
-# Initialize bench with local Frappe source
+# Restructure source for bench's expected layout:
+#   bench expects: apps/frappe/frappe/__init__.py (nested)
+#   our fork has:  frappe/__init__.py (flat — frappe dir IS the package)
+# Fix: create wrapper directories with the standard bench layout.
+RUN mkdir -p /opt/frappe-app /opt/erpnext-app && \
+    ln -s /opt/exe-erp-src/frappe /opt/frappe-app/frappe && \
+    cp /opt/exe-erp-src/frappe/setup.py /opt/frappe-app/setup.py && \
+    cd /opt/frappe-app && git init && git add -A && \
+    git -c user.name=build -c user.email=build@exe commit -m "build" && \
+    ln -s /opt/exe-erp-src/apps/erpnext /opt/erpnext-app/erpnext && \
+    cp /opt/exe-erp-src/apps/erpnext/setup.py /opt/erpnext-app/setup.py && \
+    cd /opt/erpnext-app && git init && git add -A && \
+    git -c user.name=build -c user.email=build@exe commit -m "build"
+
+# Initialize bench with restructured Frappe source
 RUN bench init frappe-bench \
-    --frappe-path /opt/exe-erp-src/frappe \
+    --frappe-path /opt/frappe-app \
     --skip-redis-config-generation \
     --skip-assets \
     --python python3.14 \
@@ -93,8 +107,8 @@ RUN bench init frappe-bench \
 
 WORKDIR /home/frappe/frappe-bench
 
-# Install ERPNext from local source
-RUN bench get-app /opt/exe-erp-src/apps/erpnext
+# Install ERPNext from restructured source
+RUN bench get-app /opt/erpnext-app
 
 # Install Python deps for all apps
 RUN bench setup requirements --python
