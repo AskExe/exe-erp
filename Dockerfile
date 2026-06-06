@@ -116,23 +116,10 @@ WORKDIR /home/frappe/frappe-bench
 # Install ERPNext (skip assets — build separately after all deps)
 RUN bench get-app --skip-assets /opt/exe-erp-src/apps/erpnext
 
-# Install frappe Python deps.
-# The setup.py shim doesn't list deps — the real ones are in the root
-# pyproject.toml. We extract them and pip install directly since
-# .dockerignore excludes README.md which pyproject.toml references.
-RUN cd /opt/exe-erp-src && \
-    python3 -c "
-import tomllib, subprocess, sys
-with open('pyproject.toml', 'rb') as f:
-    deps = tomllib.load(f).get('project', {}).get('dependencies', [])
-# Filter out git+ deps (gunicorn fork) — install separately
-pip_deps = [d for d in deps if 'git+' not in d]
-git_deps = [d.split('@ ')[-1] for d in deps if 'git+' in d]
-if pip_deps:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', '--user'] + pip_deps)
-for gd in git_deps:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', '--user', gd])
-"
+# Install frappe Python deps from root pyproject.toml.
+# The setup.py shim doesn't list deps. We parse pyproject.toml with
+# tomllib and pip install each dependency directly.
+RUN cd /opt/exe-erp-src && python3 -c "import tomllib,subprocess,sys; deps=tomllib.load(open('pyproject.toml','rb')).get('project',{}).get('dependencies',[]); pip=[d for d in deps if 'git+' not in d]; git=[d.split('@ ')[-1] for d in deps if 'git+' in d]; pip and subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--user']+pip); [subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--user',g]) for g in git]"
 
 # Install Node deps and build production assets
 RUN bench setup requirements --node \
