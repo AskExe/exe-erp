@@ -99,6 +99,9 @@ ENV PATH="/home/frappe/.local/bin:${PATH}"
 RUN mkdir -p ~/frappe-app && \
     ln -s /opt/exe-erp-src/frappe ~/frappe-app/frappe && \
     cp /opt/exe-erp-src/frappe/setup.py ~/frappe-app/setup.py && \
+    cp /opt/exe-erp-src/package.json ~/frappe-app/package.json && \
+    test -f /opt/exe-erp-src/yarn.lock && cp /opt/exe-erp-src/yarn.lock ~/frappe-app/yarn.lock || true && \
+    ln -sf /opt/exe-erp-src/esbuild ~/frappe-app/esbuild && \
     printf '[project]\nname = "frappe"\nversion = "17.0.0"\n' > ~/frappe-app/pyproject.toml && \
     cd ~/frappe-app && git init && git add -A && \
     git -c user.name=build -c user.email=build@exe commit -m "build" && \
