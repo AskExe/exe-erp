@@ -100,7 +100,7 @@ RUN mkdir -p ~/frappe-app && \
     git -c user.name=build -c user.email=build@exe commit -m "build" && \
     cd /opt/exe-erp-src/apps/erpnext && \
     git init && git add -A && \
-    git -c user.name=build -c user.email=build@exe commit -m "build"
+    git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty
 
 # Initialize bench with restructured Frappe source
 RUN bench init frappe-bench \
