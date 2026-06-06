@@ -138,6 +138,7 @@ RUN mkdir -p /home/frappe/.config && \
     mkdir -p sites && printf "frappe\nerpnext\n" > sites/apps.txt && \
     bench setup requirements --node && \
     (cd /opt/exe-erp-src && yarn install) && \
+    (cd apps/frappe && yarn install 2>/dev/null || true) && \
     bench build --production
 
 # ── Stage 4: Final production image ─────────────────────────
