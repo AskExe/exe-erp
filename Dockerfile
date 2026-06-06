@@ -119,7 +119,9 @@ RUN bench get-app --skip-assets /opt/exe-erp-src/apps/erpnext
 # Install frappe Python deps from root pyproject.toml.
 # The setup.py shim doesn't list deps. We parse pyproject.toml with
 # tomllib and pip install each dependency directly.
-RUN cd /opt/exe-erp-src && python3 -c "import tomllib,subprocess,sys; deps=tomllib.load(open('pyproject.toml','rb')).get('project',{}).get('dependencies',[]); pip=[d for d in deps if 'git+' not in d]; git=[d.split('@ ')[-1] for d in deps if 'git+' in d]; pip and subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--user']+pip); [subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--user',g]) for g in git]"
+# Skip MySQL deps (mysqlclient, PyMySQL) — exe-erp is Postgres-only.
+# Skip git+ deps (gunicorn fork) — install separately.
+RUN cd /opt/exe-erp-src && python3 -c "import tomllib,subprocess,sys; deps=tomllib.load(open('pyproject.toml','rb')).get('project',{}).get('dependencies',[]); skip={'mysqlclient','PyMySQL'}; pip=[d for d in deps if 'git+' not in d and not any(d.startswith(s) for s in skip)]; git=[d.split('@ ')[-1] for d in deps if 'git+' in d]; pip and subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--user']+pip); [subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir','--user',g]) for g in git]"
 
 # Install Node deps and build production assets
 RUN bench setup requirements --node \
