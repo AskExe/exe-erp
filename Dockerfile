@@ -121,7 +121,9 @@ RUN bench get-app --skip-assets /opt/exe-erp-src/apps/erpnext
 # tomllib and pip install each dependency directly.
 # Install frappe deps into the bench virtualenv (not --user).
 # Skip MySQL deps — exe-erp is Postgres-only.
-RUN cd /opt/exe-erp-src && ~/frappe-bench/env/bin/python -c "import tomllib,subprocess,sys; deps=tomllib.load(open('pyproject.toml','rb')).get('project',{}).get('dependencies',[]); skip={'mysqlclient','PyMySQL'}; pip=[d for d in deps if 'git+' not in d and not any(d.startswith(s) for s in skip)]; git=[d.split('@ ')[-1] for d in deps if 'git+' in d]; pip and subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir']+pip); [subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir',g]) for g in git]"
+# Skip only mysqlclient (needs MySQL C libs). Keep PyMySQL (pure Python,
+# needed at import time for Frappe's database driver detection).
+RUN cd /opt/exe-erp-src && ~/frappe-bench/env/bin/python -c "import tomllib,subprocess,sys; deps=tomllib.load(open('pyproject.toml','rb')).get('project',{}).get('dependencies',[]); skip={'mysqlclient'}; pip=[d for d in deps if 'git+' not in d and not any(d.startswith(s) for s in skip)]; git=[d.split('@ ')[-1] for d in deps if 'git+' in d]; pip and subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir']+pip); [subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir',g]) for g in git]"
 
 # Install Node deps and build production assets
 RUN bench setup requirements --node \
