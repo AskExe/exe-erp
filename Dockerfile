@@ -76,15 +76,16 @@ COPY --chown=frappe:frappe ./pyproject.toml /opt/pyproject.toml
 USER frappe
 WORKDIR /home/frappe
 
-# Install bench
-RUN pip install --no-cache-dir --user frappe-bench
+# Install bench (pin to 5.x — 6.x breaks local path parsing)
+RUN pip install --no-cache-dir --user 'frappe-bench>=5.0,<6.0'
 
 # Add local pip bin to PATH
 ENV PATH="/home/frappe/.local/bin:${PATH}"
 
 # Initialize bench with local Frappe source
+# Use file:// prefix to avoid bench URL parser issues
 RUN bench init frappe-bench \
-    --frappe-path /opt/frappe \
+    --frappe-path file:///opt/frappe \
     --skip-redis-config-generation \
     --skip-assets \
     --python python3.14 \
@@ -93,7 +94,7 @@ RUN bench init frappe-bench \
 WORKDIR /home/frappe/frappe-bench
 
 # Install ERPNext from local source
-RUN bench get-app /opt/apps/erpnext
+RUN bench get-app file:///opt/apps/erpnext
 
 # Install Python deps for all apps
 RUN bench setup requirements --python
