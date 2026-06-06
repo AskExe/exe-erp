@@ -60,6 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblcms2-dev \
     libwebp-dev \
     pkg-config \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Stage 3: Builder (bench init + asset build) ──────────────
