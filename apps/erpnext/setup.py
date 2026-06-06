@@ -6,6 +6,6 @@ from setuptools import setup, find_packages
 
 setup(
     name="erpnext",
-    version="17.0.0.dev0",
+    version="17.0.0",
     packages=find_packages(),
 )
