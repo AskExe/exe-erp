@@ -96,6 +96,7 @@ ENV PATH="/home/frappe/.local/bin:${PATH}"
 RUN mkdir -p ~/frappe-app && \
     ln -s /opt/exe-erp-src/frappe ~/frappe-app/frappe && \
     cp /opt/exe-erp-src/frappe/setup.py ~/frappe-app/setup.py && \
+    printf '[project]\nname = "frappe"\nversion = "17.0.0.dev0"\n' > ~/frappe-app/pyproject.toml && \
     cd ~/frappe-app && git init && git add -A && \
     git -c user.name=build -c user.email=build@exe commit -m "build" && \
     cd /opt/exe-erp-src/apps/erpnext && \
