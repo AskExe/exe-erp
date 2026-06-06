@@ -59,6 +59,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6-dev \
     liblcms2-dev \
     libwebp-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Stage 3: Builder (bench init + asset build) ──────────────
