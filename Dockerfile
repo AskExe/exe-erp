@@ -64,28 +64,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Stage 3: Builder (bench init + asset build) ──────────────
 FROM build AS builder
 
-# Copy source into /opt
-COPY --chown=frappe:frappe ./frappe /opt/frappe
-COPY --chown=frappe:frappe ./apps/erpnext /opt/apps/erpnext
-COPY --chown=frappe:frappe ./package.json ./yarn.lock /opt/
-COPY --chown=frappe:frappe ./esbuild /opt/esbuild
-COPY --chown=frappe:frappe ./realtime /opt/realtime
-COPY --chown=frappe:frappe ./socketio.js /opt/socketio.js
-COPY --chown=frappe:frappe ./pyproject.toml /opt/pyproject.toml
+# Copy source into /opt (including .git — bench requires git repo)
+COPY --chown=frappe:frappe . /opt/exe-erp-src
+
+# Initialize git repos so bench recognizes them as valid apps.
+# Docker COPY strips .git if it's in .dockerignore or the build context
+# doesn't include it. We init fresh repos as a safety net.
+RUN cd /opt/exe-erp-src/frappe && \
+    (git rev-parse --git-dir 2>/dev/null || (git init && git add -A && git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty)) && \
+    cd /opt/exe-erp-src/apps/erpnext && \
+    (git rev-parse --git-dir 2>/dev/null || (git init && git add -A && git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty))
 
 USER frappe
 WORKDIR /home/frappe
 
-# Install bench (pin to 5.x — 6.x breaks local path parsing)
-RUN pip install --no-cache-dir --user 'frappe-bench>=5.0,<6.0'
+# Install bench
+RUN pip install --no-cache-dir --user frappe-bench
 
 # Add local pip bin to PATH
 ENV PATH="/home/frappe/.local/bin:${PATH}"
 
 # Initialize bench with local Frappe source
-# Use file:// prefix to avoid bench URL parser issues
 RUN bench init frappe-bench \
-    --frappe-path file:///opt/frappe \
+    --frappe-path /opt/exe-erp-src/frappe \
     --skip-redis-config-generation \
     --skip-assets \
     --python python3.14 \
@@ -94,7 +95,7 @@ RUN bench init frappe-bench \
 WORKDIR /home/frappe/frappe-bench
 
 # Install ERPNext from local source
-RUN bench get-app file:///opt/apps/erpnext
+RUN bench get-app /opt/exe-erp-src/apps/erpnext
 
 # Install Python deps for all apps
 RUN bench setup requirements --python
