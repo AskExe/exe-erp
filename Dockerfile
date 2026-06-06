@@ -125,9 +125,12 @@ RUN bench get-app --skip-assets /opt/exe-erp-src/apps/erpnext
 # needed at import time for Frappe's database driver detection).
 RUN cd /opt/exe-erp-src && ~/frappe-bench/env/bin/python -c "import tomllib,subprocess,sys; deps=tomllib.load(open('pyproject.toml','rb')).get('project',{}).get('dependencies',[]); skip={'mysqlclient'}; pip=[d for d in deps if 'git+' not in d and not any(d.startswith(s) for s in skip)]; git=[d.split('@ ')[-1] for d in deps if 'git+' in d]; pip and subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir']+pip); [subprocess.check_call([sys.executable,'-m','pip','install','--no-cache-dir',g]) for g in git]"
 
-# Install Node deps and build production assets
-RUN bench setup requirements --node \
-    && bench build --production
+# Install Node deps and build production assets.
+# XDG_CONFIG_HOME: uv/filelock tries to write to /config which root owns.
+ENV XDG_CONFIG_HOME=/home/frappe/.config
+RUN mkdir -p /home/frappe/.config && \
+    bench setup requirements --node && \
+    bench build --production
 
 # ── Stage 4: Final production image ─────────────────────────
 FROM base AS production
