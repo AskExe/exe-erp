@@ -113,14 +113,12 @@ RUN bench init frappe-bench \
 
 WORKDIR /home/frappe/frappe-bench
 
-# Install ERPNext (already has standard layout — use directly)
-RUN bench get-app /opt/exe-erp-src/apps/erpnext
+# Install ERPNext (skip assets — build separately after all deps)
+RUN bench get-app --skip-assets /opt/exe-erp-src/apps/erpnext
 
-# Install Python deps for all apps
-RUN bench setup requirements --python
-
-# Install Node deps and build production assets
-RUN bench setup requirements --node \
+# Install all dependencies then build assets
+RUN bench setup requirements --python \
+    && bench setup requirements --node \
     && bench build --production
 
 # ── Stage 4: Final production image ─────────────────────────
