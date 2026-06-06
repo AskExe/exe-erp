@@ -468,6 +468,10 @@ scheduler_events = {
 		],
 		# Daily but offset by 45 minutes
 		"45 0 * * *": [],
+		# Exe Bridge — Health telemetry every 5 minutes
+		"*/5 * * * *": [
+			"erpnext.exe_bridge.telemetry.emit_health_snapshot",
+		],
 	},
 	"hourly": [
 		"erpnext.projects.doctype.project.project.hourly_reminder",
@@ -482,7 +486,10 @@ scheduler_events = {
 		"erpnext.utilities.doctype.video.video.update_youtube_data",
 		"erpnext.accounts.doctype.bank_transaction_rule.bank_transaction_rule.scheduler_run_rule_evaluation",
 	],
-	"daily": [],
+	"daily": [
+		# Exe Bridge — Daily business summary telemetry
+		"erpnext.exe_bridge.telemetry.emit_daily_summary",
+	],
 	"daily_long": [],
 	"daily_maintenance": [
 		"erpnext.support.doctype.issue.issue.auto_close_tickets",
