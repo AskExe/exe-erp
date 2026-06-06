@@ -116,9 +116,14 @@ WORKDIR /home/frappe/frappe-bench
 # Install ERPNext (skip assets — build separately after all deps)
 RUN bench get-app --skip-assets /opt/exe-erp-src/apps/erpnext
 
-# Install all dependencies then build assets
-RUN bench setup requirements --python \
-    && bench setup requirements --node \
+# Install frappe Python deps from the real pyproject.toml.
+# The setup.py shim doesn't include install_requires — the actual
+# dependencies live in /opt/exe-erp-src/pyproject.toml.
+# pip can install directly from a directory with pyproject.toml.
+RUN pip install --no-cache-dir --user /opt/exe-erp-src/
+
+# Install Node deps and build production assets
+RUN bench setup requirements --node \
     && bench build --production
 
 # ── Stage 4: Final production image ─────────────────────────
