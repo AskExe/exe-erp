@@ -89,14 +89,17 @@ ENV PATH="/home/frappe/.local/bin:${PATH}"
 #   bench expects: apps/frappe/frappe/__init__.py (nested)
 #   our fork has:  frappe/__init__.py (flat — frappe dir IS the package)
 # Fix: create wrapper directories with the standard bench layout.
-RUN mkdir -p ~/frappe-app ~/erpnext-app && \
+# Frappe wrapper: frappe/ is flat (no nested frappe/frappe/), so we
+# create a standard layout: ~/frappe-app/setup.py + ~/frappe-app/frappe/
+# ERPNext already has standard layout (apps/erpnext/erpnext/__init__.py)
+# so it just needs a git init.
+RUN mkdir -p ~/frappe-app && \
     ln -s /opt/exe-erp-src/frappe ~/frappe-app/frappe && \
     cp /opt/exe-erp-src/frappe/setup.py ~/frappe-app/setup.py && \
     cd ~/frappe-app && git init && git add -A && \
     git -c user.name=build -c user.email=build@exe commit -m "build" && \
-    ln -s /opt/exe-erp-src/apps/erpnext ~/erpnext-app/erpnext && \
-    cp /opt/exe-erp-src/apps/erpnext/setup.py ~/erpnext-app/setup.py && \
-    cd ~/erpnext-app && git init && git add -A && \
+    cd /opt/exe-erp-src/apps/erpnext && \
+    git init && git add -A && \
     git -c user.name=build -c user.email=build@exe commit -m "build"
 
 # Initialize bench with restructured Frappe source
@@ -109,8 +112,8 @@ RUN bench init frappe-bench \
 
 WORKDIR /home/frappe/frappe-bench
 
-# Install ERPNext from restructured source
-RUN bench get-app ~/erpnext-app
+# Install ERPNext (already has standard layout — use directly)
+RUN bench get-app /opt/exe-erp-src/apps/erpnext
 
 # Install Python deps for all apps
 RUN bench setup requirements --python
