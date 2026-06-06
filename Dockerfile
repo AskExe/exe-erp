@@ -64,21 +64,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Stage 3: Builder (bench init + asset build) ──────────────
 FROM build AS builder
 
-# Copy source into /opt (including .git — bench requires git repo)
+# Copy source into /opt owned by frappe (bench runs as frappe user)
 COPY --chown=frappe:frappe . /opt/exe-erp-src
 
-# Initialize git repos so bench recognizes them as valid apps.
-# Docker COPY strips .git (excluded in .dockerignore). We init fresh
-# repos. safe.directory needed because COPY runs as root but we
-# switch to frappe user later.
-RUN git config --global --add safe.directory /opt/exe-erp-src/frappe && \
-    git config --global --add safe.directory /opt/exe-erp-src/apps/erpnext && \
-    cd /opt/exe-erp-src/frappe && \
+# Initialize git repos — .dockerignore excludes .git, but bench
+# requires source dirs to be valid git repos for clone/install.
+# Run as frappe since bench init runs as frappe.
+USER frappe
+RUN cd /opt/exe-erp-src/frappe && \
     git init && git add -A && git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty && \
     cd /opt/exe-erp-src/apps/erpnext && \
     git init && git add -A && git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty
-
-USER frappe
 WORKDIR /home/frappe
 
 # Install bench
