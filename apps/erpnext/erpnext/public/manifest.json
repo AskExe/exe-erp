@@ -1,0 +1,11 @@
+{
+  "name": "Exe ERP",
+  "short_name": "Exe ERP",
+  "start_url": "/desk",
+  "display": "standalone",
+  "background_color": "#0F0E1A",
+  "theme_color": "#F5D76E",
+  "icons": [
+    {"src": "/assets/erpnext/images/erpnext-logo.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}

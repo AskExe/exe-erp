@@ -106,6 +106,31 @@ main() {
     # Write currentsite.txt so Frappe knows the default site
     echo "${SITE_NAME}" > "${SITES_DIR}/currentsite.txt"
 
+    # ── Configure GoTrue SSO (if GOTRUE_URL is set) ─────────────
+    # Enables single sign-on across exe-crm, exe-wiki, and exe-erp.
+    # The exe_auth module reads these from site_config.json.
+    if [ -n "${GOTRUE_URL:-}" ]; then
+        echo "Configuring GoTrue SSO..."
+        local site_config="${SITE_DIR}/site_config.json"
+        if [ -f "${site_config}" ]; then
+            # Use Python to safely merge GoTrue config into site_config.json
+            python3 -c "
+import json, sys
+try:
+    with open('${site_config}') as f:
+        config = json.load(f)
+    config['gotrue_url'] = '${GOTRUE_URL}'
+    if '${EXE_ADMIN_TOKEN:-}':
+        config['exe_admin_token'] = '${EXE_ADMIN_TOKEN}'
+    with open('${site_config}', 'w') as f:
+        json.dump(config, f, indent=2)
+    print('GoTrue SSO configured in site_config.json')
+except Exception as e:
+    print(f'Warning: Could not configure GoTrue — {e}', file=sys.stderr)
+"
+        fi
+    fi
+
     # Hand off to the command (gunicorn, worker, scheduler, etc.)
     exec "$@"
 }
