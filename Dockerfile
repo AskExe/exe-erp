@@ -66,6 +66,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Stage 3: Builder (bench init + asset build) ──────────────
 FROM build AS builder
 
+# Create /config writable by frappe — uv/filelock writes lock files there
+RUN mkdir -p /config && chown frappe:frappe /config
+
 # Copy source into /opt owned by frappe (bench runs as frappe user)
 COPY --chown=frappe:frappe . /opt/exe-erp-src
 
