@@ -132,7 +132,7 @@ RUN cd /opt/exe-erp-src && ~/frappe-bench/env/bin/python -c "import tomllib,subp
 ENV XDG_CONFIG_HOME=/home/frappe/.config
 RUN mkdir -p /home/frappe/.config && \
     bench setup requirements --node && \
-    cd /opt/exe-erp-src && yarn install --frozen-lockfile 2>/dev/null || yarn install && \
+    (cd /opt/exe-erp-src && yarn install) && \
     bench build --production
 
 # ── Stage 4: Final production image ─────────────────────────
