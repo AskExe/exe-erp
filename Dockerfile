@@ -68,12 +68,15 @@ FROM build AS builder
 COPY --chown=frappe:frappe . /opt/exe-erp-src
 
 # Initialize git repos so bench recognizes them as valid apps.
-# Docker COPY strips .git if it's in .dockerignore or the build context
-# doesn't include it. We init fresh repos as a safety net.
-RUN cd /opt/exe-erp-src/frappe && \
-    (git rev-parse --git-dir 2>/dev/null || (git init && git add -A && git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty)) && \
+# Docker COPY strips .git (excluded in .dockerignore). We init fresh
+# repos. safe.directory needed because COPY runs as root but we
+# switch to frappe user later.
+RUN git config --global --add safe.directory /opt/exe-erp-src/frappe && \
+    git config --global --add safe.directory /opt/exe-erp-src/apps/erpnext && \
+    cd /opt/exe-erp-src/frappe && \
+    git init && git add -A && git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty && \
     cd /opt/exe-erp-src/apps/erpnext && \
-    (git rev-parse --git-dir 2>/dev/null || (git init && git add -A && git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty))
+    git init && git add -A && git -c user.name=build -c user.email=build@exe commit -m "build" --allow-empty
 
 USER frappe
 WORKDIR /home/frappe
