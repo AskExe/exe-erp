@@ -31,13 +31,16 @@ wait_for_db() {
 # ── Wait for Redis ───────────────────────────────────────────
 wait_for_redis() {
     local redis_url="${1}"
-    local host port
-    # Extract host:port from redis://host:port/db
-    host=$(echo "${redis_url}" | sed -E 's|redis://([^:]+):([0-9]+)/.*|\1|')
-    port=$(echo "${redis_url}" | sed -E 's|redis://([^:]+):([0-9]+)/.*|\2|')
+    local host port redis_pass
+    # Extract host:port from redis://[:password@]host:port/db
+    host=$(echo "${redis_url}" | sed -E 's|redis://([^@]+@)?([^:]+):([0-9]+)/.*|\2|')
+    port=$(echo "${redis_url}" | sed -E 's|redis://([^@]+@)?([^:]+):([0-9]+)/.*|\3|')
+    redis_pass=$(echo "${redis_url}" | sed -nE 's|redis://:([^@]+)@.*|\1|p')
     local retries=30
+    local auth_args=""
+    [ -n "${redis_pass}" ] && auth_args="-a ${redis_pass}"
     echo "Waiting for Redis at ${host}:${port}..."
-    while ! redis-cli -h "${host}" -p "${port}" ping >/dev/null 2>&1; do
+    while ! redis-cli -h "${host}" -p "${port}" ${auth_args} ping >/dev/null 2>&1; do
         retries=$((retries - 1))
         if [ "$retries" -le 0 ]; then
             echo "ERROR: Redis not reachable after 30 attempts"
