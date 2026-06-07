@@ -198,3 +198,9 @@ cypress/videos
 .helix/
 # Aider AI Chat
 .aider*
+
+# Employee task assignments (private)
+/exe/
+
+# Agent worktrees (exe-os)
+/.worktrees/
