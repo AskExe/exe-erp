@@ -142,6 +142,12 @@ except Exception as e:
     # Add bench virtualenv to PATH so gunicorn/bench/python resolve
     export PATH="/home/frappe/frappe-bench/env/bin:${PATH}"
 
+    # Ensure log directories exist for all sites
+    mkdir -p /home/frappe/logs
+    for site_dir in "${SITES_DIR}"/*/; do
+        [ -d "${site_dir}" ] && mkdir -p "${site_dir}/logs"
+    done
+
     # Hand off to the command (gunicorn, worker, scheduler, etc.)
     exec "$@"
 }
