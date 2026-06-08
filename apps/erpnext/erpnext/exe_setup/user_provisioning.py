@@ -78,6 +78,13 @@ def bulk_create_users(users: str | list | None = None) -> dict:
     if not isinstance(users, list):
         frappe.throw("'users' must be an array of user objects", frappe.ValidationError)
 
+    MAX_BATCH = 500
+    if len(users) > MAX_BATCH:
+        frappe.throw(
+            f"Maximum {MAX_BATCH} users per batch. Got {len(users)}.",
+            frappe.ValidationError,
+        )
+
     created = 0
     failed = 0
     errors: list[dict[str, str]] = []

@@ -483,7 +483,7 @@ SALES_INVOICE_HTML = (
                 <tr>
                     <td class="text-center exe-num">{{ loop.index }}</td>
                     <td>{{ item.item_name }}</td>
-                    <td style="font-size: 12px; color: var(--exe-gray-600);">{{ item.description or "" | truncate(80) }}</td>
+                    <td style="font-size: 12px; color: var(--exe-gray-600);">{{ (item.description or "") | truncate(80) | e }}</td>
                     <td class="text-center exe-num">{{ item.get_formatted("qty", 0) }} {{ item.uom or "" }}</td>
                     <td class="text-right exe-num">{{ item.get_formatted("rate", doc) }}</td>
                     <td class="text-right exe-num">{{ item.get_formatted("amount", doc) }}</td>
@@ -529,7 +529,7 @@ SALES_INVOICE_HTML = (
     {% if doc.terms %}
     <div class="exe-section">
         <h4>Terms & Conditions</h4>
-        <div>{{ doc.terms }}</div>
+        <div>{{ frappe.utils.sanitize_html(doc.terms) }}</div>
     </div>
     {% endif %}
 
@@ -617,7 +617,7 @@ PURCHASE_ORDER_HTML = (
                 <tr>
                     <td class="text-center exe-num">{{ loop.index }}</td>
                     <td>{{ item.item_name }}</td>
-                    <td style="font-size: 12px; color: var(--exe-gray-600);">{{ item.description or "" | truncate(80) }}</td>
+                    <td style="font-size: 12px; color: var(--exe-gray-600);">{{ (item.description or "") | truncate(80) | e }}</td>
                     <td class="text-center exe-num">{{ item.get_formatted("qty", 0) }} {{ item.uom or "" }}</td>
                     <td class="text-right exe-num">{{ item.get_formatted("rate", doc) }}</td>
                     <td class="text-right exe-num">{{ item.get_formatted("amount", doc) }}</td>
@@ -632,14 +632,14 @@ PURCHASE_ORDER_HTML = (
     {% if doc.terms %}
     <div class="exe-section">
         <h4>Terms & Conditions</h4>
-        <div>{{ doc.terms }}</div>
+        <div>{{ frappe.utils.sanitize_html(doc.terms) }}</div>
     </div>
     {% endif %}
 
     {% if doc.notes %}
     <div class="exe-section">
         <h4>Notes</h4>
-        <div>{{ doc.notes }}</div>
+        <div>{{ frappe.utils.sanitize_html(doc.notes) }}</div>
     </div>
     {% endif %}
 
@@ -724,7 +724,7 @@ QUOTATION_HTML = (
                 <tr>
                     <td class="text-center exe-num">{{ loop.index }}</td>
                     <td>{{ item.item_name }}</td>
-                    <td style="font-size: 12px; color: var(--exe-gray-600);">{{ item.description or "" | truncate(80) }}</td>
+                    <td style="font-size: 12px; color: var(--exe-gray-600);">{{ (item.description or "") | truncate(80) | e }}</td>
                     <td class="text-center exe-num">{{ item.get_formatted("qty", 0) }} {{ item.uom or "" }}</td>
                     <td class="text-right exe-num">{{ item.get_formatted("rate", doc) }}</td>
                     <td class="text-right exe-num">{{ item.get_formatted("amount", doc) }}</td>
@@ -746,7 +746,7 @@ QUOTATION_HTML = (
     {% if doc.terms %}
     <div class="exe-section">
         <h4>Terms & Conditions</h4>
-        <div>{{ doc.terms }}</div>
+        <div>{{ frappe.utils.sanitize_html(doc.terms) }}</div>
     </div>
     {% endif %}
 
@@ -865,7 +865,7 @@ DELIVERY_NOTE_HTML = (
     {% if doc.instructions %}
     <div class="exe-section">
         <h4>Delivery Instructions</h4>
-        <div>{{ doc.instructions }}</div>
+        <div>{{ frappe.utils.sanitize_html(doc.instructions) }}</div>
     </div>
     {% endif %}
 
@@ -971,7 +971,7 @@ SALES_ORDER_HTML = (
                 <tr>
                     <td class="text-center exe-num">{{ loop.index }}</td>
                     <td>{{ item.item_name }}</td>
-                    <td style="font-size: 12px; color: var(--exe-gray-600);">{{ item.description or "" | truncate(80) }}</td>
+                    <td style="font-size: 12px; color: var(--exe-gray-600);">{{ (item.description or "") | truncate(80) | e }}</td>
                     <td class="text-center exe-num">{{ item.get_formatted("qty", 0) }} {{ item.uom or "" }}</td>
                     <td class="text-right exe-num">{{ item.get_formatted("rate", doc) }}</td>
                     <td class="text-right exe-num">{{ item.get_formatted("amount", doc) }}</td>
@@ -986,7 +986,7 @@ SALES_ORDER_HTML = (
     {% if doc.terms %}
     <div class="exe-section">
         <h4>Terms & Conditions</h4>
-        <div>{{ doc.terms }}</div>
+        <div>{{ frappe.utils.sanitize_html(doc.terms) }}</div>
     </div>
     {% endif %}
 
