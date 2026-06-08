@@ -48,7 +48,10 @@ import frappe.boot
 import frappe.client
 import frappe.core.doctype.file.file
 import frappe.core.doctype.user.user
-import frappe.database.mariadb.mysqlclient  # Load database related utils
+try:
+	import frappe.database.mariadb.mysqlclient  # Load database related utils (MariaDB only)
+except ImportError:
+	pass  # Postgres-only deployment — MySQLdb not available
 import frappe.database.query
 import frappe.desk.desktop  # workspace
 import frappe.desk.form.save
