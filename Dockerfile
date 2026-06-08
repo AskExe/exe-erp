@@ -166,11 +166,19 @@ RUN rm -f /home/frappe/frappe-bench/apps/frappe/frappe \
 COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/frappe /home/frappe/frappe-bench/apps/frappe/frappe
 COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/esbuild /home/frappe/frappe-bench/apps/frappe/esbuild
 
-# Fix editable installs: bench uses `pip install -e` which creates finders
-# pointing to builder paths. Reinstall as non-editable from copied locations.
-RUN /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir --no-deps \
-    /home/frappe/frappe-bench/apps/frappe \
-    /home/frappe/frappe-bench/apps/erpnext
+# Fix editable installs: pip install from setup.py misses nested packages
+# (page_renderers, etc.) because frappe uses a flat layout without proper
+# find_packages. Instead: remove the broken editable finders and add .pth
+# files that point to the apps source directories (how bench works in dev).
+RUN rm -f /home/frappe/frappe-bench/env/lib/python*/site-packages/__editable__*frappe* \
+    && rm -rf /home/frappe/frappe-bench/env/lib/python*/site-packages/frappe \
+    && rm -rf /home/frappe/frappe-bench/env/lib/python*/site-packages/frappe-*.dist-info \
+    && rm -rf /home/frappe/frappe-bench/env/lib/python*/site-packages/erpnext \
+    && rm -rf /home/frappe/frappe-bench/env/lib/python*/site-packages/erpnext-*.dist-info \
+    && rm -f /home/frappe/frappe-bench/env/lib/python*/site-packages/__editable__*erpnext* \
+    && rm -f /home/frappe/frappe-bench/env/lib/python*/site-packages/erpnext.pth \
+    && echo "/home/frappe/frappe-bench/apps/frappe" > /home/frappe/frappe-bench/env/lib/python3.14/site-packages/frappe.pth \
+    && echo "/home/frappe/frappe-bench/apps/erpnext" > /home/frappe/frappe-bench/env/lib/python3.14/site-packages/erpnext.pth
 
 # Create sites directory with correct ownership
 RUN mkdir -p /home/frappe/frappe-bench/sites \
