@@ -5,7 +5,7 @@
 # ──────────────────────────────────────────────────────────────
 
 # ── Stage 1: Base runtime ────────────────────────────────────
-FROM python:3.14-slim-bookworm AS base
+FROM python:3.12-slim-bookworm AS base
 
 # System deps for runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -114,7 +114,7 @@ RUN bench init frappe-bench \
     --frappe-path ~/frappe-app \
     --skip-redis-config-generation \
     --skip-assets \
-    --python python3.14 \
+    --python python3.12 \
     --no-procfile
 
 WORKDIR /home/frappe/frappe-bench
@@ -170,15 +170,13 @@ COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/esbuild /home/frappe/
 # (page_renderers, etc.) because frappe uses a flat layout without proper
 # find_packages. Instead: remove the broken editable finders and add .pth
 # files that point to the apps source directories (how bench works in dev).
-RUN rm -f /home/frappe/frappe-bench/env/lib/python*/site-packages/__editable__*frappe* \
-    && rm -rf /home/frappe/frappe-bench/env/lib/python*/site-packages/frappe \
-    && rm -rf /home/frappe/frappe-bench/env/lib/python*/site-packages/frappe-*.dist-info \
-    && rm -rf /home/frappe/frappe-bench/env/lib/python*/site-packages/erpnext \
-    && rm -rf /home/frappe/frappe-bench/env/lib/python*/site-packages/erpnext-*.dist-info \
-    && rm -f /home/frappe/frappe-bench/env/lib/python*/site-packages/__editable__*erpnext* \
-    && rm -f /home/frappe/frappe-bench/env/lib/python*/site-packages/erpnext.pth \
-    && echo "/home/frappe/frappe-bench/apps/frappe" > /home/frappe/frappe-bench/env/lib/python3.14/site-packages/frappe.pth \
-    && echo "/home/frappe/frappe-bench/apps/erpnext" > /home/frappe/frappe-bench/env/lib/python3.14/site-packages/erpnext.pth
+RUN SITE_PKG=$(find /home/frappe/frappe-bench/env/lib -name site-packages -type d) \
+    && rm -f ${SITE_PKG}/__editable__*frappe* \
+    && rm -rf ${SITE_PKG}/frappe ${SITE_PKG}/frappe-*.dist-info \
+    && rm -rf ${SITE_PKG}/erpnext ${SITE_PKG}/erpnext-*.dist-info \
+    && rm -f ${SITE_PKG}/__editable__*erpnext* ${SITE_PKG}/erpnext.pth \
+    && echo "/home/frappe/frappe-bench/apps/frappe" > $(find /home/frappe/frappe-bench/env/lib -name site-packages -type d)/frappe.pth \
+    && echo "/home/frappe/frappe-bench/apps/erpnext" > $(find /home/frappe/frappe-bench/env/lib -name site-packages -type d)/erpnext.pth
 
 # Create sites directory with correct ownership
 RUN mkdir -p /home/frappe/frappe-bench/sites \
