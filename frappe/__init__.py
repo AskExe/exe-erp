@@ -1031,7 +1031,12 @@ def setup_module_map(include_all_apps: bool = True) -> None:
 		if include_all_apps:
 			apps = get_all_apps(with_internal_apps=True)
 		else:
-			apps = get_installed_apps(_ensure_on_bench=True)
+			try:
+				apps = get_installed_apps(_ensure_on_bench=True)
+			except Exception:
+				# During bench new-site, DB tables may not exist yet.
+				# Fall back to all apps from apps.txt so module mapping works.
+				apps = get_all_apps(with_internal_apps=True)
 
 		for app in apps:
 			app_modules.setdefault(app, [])

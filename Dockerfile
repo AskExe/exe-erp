@@ -5,7 +5,7 @@
 # ──────────────────────────────────────────────────────────────
 
 # ── Stage 1: Base runtime ────────────────────────────────────
-FROM python:3.12-slim-bookworm AS base
+FROM python:3.14-slim-bookworm AS base
 
 # System deps for runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -114,7 +114,7 @@ RUN bench init frappe-bench \
     --frappe-path ~/frappe-app \
     --skip-redis-config-generation \
     --skip-assets \
-    --python python3.12 \
+    --python python3.14 \
     --no-procfile
 
 WORKDIR /home/frappe/frappe-bench
