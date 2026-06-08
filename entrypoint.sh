@@ -139,6 +139,9 @@ except Exception as e:
         fi
     fi
 
+    # Add bench virtualenv to PATH so gunicorn/bench/python resolve
+    export PATH="/home/frappe/frappe-bench/env/bin:${PATH}"
+
     # Hand off to the command (gunicorn, worker, scheduler, etc.)
     exec "$@"
 }
