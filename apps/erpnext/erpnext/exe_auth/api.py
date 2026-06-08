@@ -15,6 +15,7 @@ Configuration (site_config.json):
   }
 """
 
+import hmac
 import frappe
 import requests
 
@@ -96,7 +97,7 @@ def admin_token(token=None):
 			frappe.ValidationError,
 		)
 
-	if token != expected_token:
+	if not hmac.compare_digest(token.encode(), expected_token.encode()):
 		frappe.throw("Invalid admin token", frappe.AuthenticationError)
 
 	# Login as Administrator
