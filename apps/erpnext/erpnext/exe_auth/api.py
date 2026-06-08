@@ -18,9 +18,11 @@ Configuration (site_config.json):
 import hmac
 import frappe
 import requests
+from frappe.rate_limiter import rate_limit
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(key="gotrue_login", limit=5, seconds=900)
 def gotrue_login(email=None, password=None, workspace_name=None):
 	"""Authenticate via GoTrue, auto-provision Frappe User on first login."""
 	if not email or not password:
@@ -85,6 +87,7 @@ def gotrue_login(email=None, password=None, workspace_name=None):
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(key="admin_token", limit=5, seconds=900)
 def admin_token(token=None):
 	"""Authenticate via shared admin token (for exe-os daemon/MCP access)."""
 	if not token:

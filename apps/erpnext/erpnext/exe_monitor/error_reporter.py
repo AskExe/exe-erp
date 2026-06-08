@@ -15,6 +15,7 @@ Usage:
 """
 
 import os
+import re
 import logging
 import traceback
 from datetime import datetime, timezone
@@ -75,11 +76,15 @@ def report_error(error, context=None, severity="error"):
 			tb = traceback.format_stack()
 			tb = "".join(tb) if isinstance(tb, list) else str(tb)
 
+		# Sanitize sensitive data before sending externally
+		tb = _sanitize_traceback(tb)
+		error_msg = _sanitize_traceback(error_msg)
+
 		payload = {
 			"service": "exe-erp",
 			"severity": severity,
 			"message": error_msg,
-			"traceback": tb[:4096],  # Cap traceback size
+			"traceback": tb,
 			"context": context or {},
 			"timestamp": datetime.now(timezone.utc).isoformat(),
 		}
@@ -118,6 +123,16 @@ def on_request_error(doc=None, method=None):
 		report_error(error, context, severity="error")
 	except Exception:
 		pass  # Never break the error handler
+
+
+def _sanitize_traceback(tb):
+	"""Remove sensitive data from tracebacks before sending externally."""
+	# Redact connection strings
+	tb = re.sub(r'postgresql?://[^\s"\']+', '[REDACTED_DSN]', tb)
+	# Redact tokens/keys/passwords
+	tb = re.sub(r'(password|token|secret|key)\s*[=:]\s*\S+', r'\1=[REDACTED]', tb, flags=re.IGNORECASE)
+	# Cap length
+	return tb[:2048]
 
 
 def report_queue_failure(job_name, error, queue="default"):

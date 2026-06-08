@@ -18,24 +18,6 @@ logger = logging.getLogger("exe_bridge")
 _local = threading.local()
 
 
-def _get_bridge_dsn():
-	"""Build DSN for the shared exedb instance.
-
-	Priority:
-	  1. EXE_BRIDGE_DATABASE_URL env var (full DSN)
-	  2. Construct from DB_HOST + defaults (same server, different database)
-	"""
-	dsn = os.environ.get("EXE_BRIDGE_DATABASE_URL")
-	if dsn:
-		return dsn
-
-	# Same PostgreSQL server as exe-erp, but different database
-	host = os.environ.get("DB_HOST", "exe-db")
-	port = os.environ.get("DB_PORT", "5432")
-	password = os.environ.get("DB_PASSWORD", "")
-	return f"postgresql://exe:{password}@{host}:{port}/exedb"
-
-
 def get_connection():
 	"""Get or create a psycopg2 connection to exedb.
 
@@ -61,8 +43,19 @@ def get_connection():
 	try:
 		import psycopg2
 
-		dsn = _get_bridge_dsn()
-		conn = psycopg2.connect(dsn, connect_timeout=5)
+		# Use keyword args instead of DSN to avoid password in a single string
+		dsn = os.environ.get("EXE_BRIDGE_DATABASE_URL")
+		if dsn:
+			conn = psycopg2.connect(dsn, connect_timeout=5)
+		else:
+			host = os.environ.get("DB_HOST", "exe-db")
+			port = os.environ.get("DB_PORT", "5432")
+			password = os.environ.get("DB_PASSWORD", "")
+			conn = psycopg2.connect(
+				host=host, port=port, dbname="exedb",
+				user="exe", password=password,
+				connect_timeout=5,
+			)
 		conn.autocommit = True  # Each event is an independent write
 		_local.bridge_conn = conn
 		logger.info("exe_bridge: Connected to exedb for event emission")

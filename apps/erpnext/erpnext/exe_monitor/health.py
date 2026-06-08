@@ -8,8 +8,11 @@ Endpoint: GET /api/method/erpnext.exe_monitor.health.check
 """
 
 import os
+import logging
 import frappe
 from datetime import datetime, timezone
+
+logger = logging.getLogger("exe_monitor")
 
 
 @frappe.whitelist(allow_guest=True)
@@ -35,7 +38,8 @@ def check():
 			"database": frappe.conf.get("db_name", "unknown"),
 		}
 	except Exception as e:
-		components["database"] = {"status": "unhealthy", "error": str(e)}
+		logger.error(f"Health check — database error: {e}")
+		components["database"] = {"status": "unhealthy", "error": "Database connectivity error"}
 		status = "unhealthy"
 
 	# ── Redis Cache ───────────────────────────────────────────
@@ -51,7 +55,8 @@ def check():
 			"used_memory_human": info.get("used_memory_human", "unknown"),
 		}
 	except Exception as e:
-		components["redis_cache"] = {"status": "unhealthy", "error": str(e)}
+		logger.error(f"Health check — redis cache error: {e}")
+		components["redis_cache"] = {"status": "unhealthy", "error": "Cache connectivity error"}
 		status = "degraded" if status == "healthy" else status
 
 	# ── Redis Queue ───────────────────────────────────────────
@@ -72,7 +77,8 @@ def check():
 			"queue_depths": queues,
 		}
 	except Exception as e:
-		components["redis_queue"] = {"status": "unhealthy", "error": str(e)}
+		logger.error(f"Health check — redis queue error: {e}")
+		components["redis_queue"] = {"status": "unhealthy", "error": "Queue connectivity error"}
 		status = "degraded" if status == "healthy" else status
 
 	# ── Scheduler ─────────────────────────────────────────────
@@ -86,7 +92,8 @@ def check():
 		if scheduler_disabled:
 			status = "degraded" if status == "healthy" else status
 	except Exception as e:
-		components["scheduler"] = {"status": "unknown", "error": str(e)}
+		logger.error(f"Health check — scheduler error: {e}")
+		components["scheduler"] = {"status": "unknown", "error": "Scheduler check failed"}
 
 	# ── Bridge (exedb connectivity) ───────────────────────────
 	try:
@@ -101,7 +108,8 @@ def check():
 		else:
 			components["bridge"] = {"status": "unavailable", "note": "exedb not reachable"}
 	except Exception as e:
-		components["bridge"] = {"status": "unhealthy", "error": str(e)}
+		logger.error(f"Health check — bridge error: {e}")
+		components["bridge"] = {"status": "unhealthy", "error": "Bridge connectivity error"}
 
 	# ── Site info ─────────────────────────────────────────────
 	site_name = frappe.local.site or "unknown"
