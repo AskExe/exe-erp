@@ -142,14 +142,22 @@ except Exception as e:
     # Add bench virtualenv to PATH so gunicorn/bench/python resolve
     export PATH="/home/frappe/frappe-bench/env/bin:${PATH}"
 
-    # Ensure log directories exist
+    # Frappe reads assets/assets.json from CWD, not SITES_PATH.
+    # Symlink bench/assets → bench/sites/assets so bundled_asset() works.
+    ln -sf "${SITES_DIR}/assets" "${FRAPPE_BENCH}/assets"
+
+    # Ensure log directories exist at ALL locations Frappe might look:
+    # 1. /home/frappe/logs (global fallback)
+    # 2. sites/<site>/logs (SITES_PATH-based)
+    # 3. <bench>/<site>/logs (CWD-based — Frappe logging uses this)
     mkdir -p /home/frappe/logs
     for site_dir in "${SITES_DIR}"/*/; do
         [ -d "${site_dir}" ] && mkdir -p "${site_dir}/logs"
     done
+    # Frappe's logging resolves log path relative to CWD, not SITES_PATH
+    [ -d "${SITES_DIR}/${SITE_NAME}" ] && mkdir -p "${FRAPPE_BENCH}/${SITE_NAME}/logs"
 
     # Set SITES_PATH so Frappe finds sites at the absolute path.
-    # Frappe uses this for site resolution, log paths, and asset serving.
     export SITES_PATH="${SITES_DIR}"
 
     # Hand off to the command (gunicorn, worker, scheduler, etc.)

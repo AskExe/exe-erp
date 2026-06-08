@@ -119,9 +119,8 @@ RUN bench init frappe-bench \
 
 WORKDIR /home/frappe/frappe-bench
 
-# Install ERPNext + HRMS (skip assets — build separately after all deps)
+# Install ERPNext (skip assets — build separately after all deps)
 RUN bench get-app --skip-assets /opt/exe-erp-src/apps/erpnext
-RUN bench get-app --skip-assets /opt/exe-erp-src/apps/hrms
 
 # Install frappe Python deps from root pyproject.toml.
 # The setup.py shim doesn't list deps. We parse pyproject.toml with
@@ -139,7 +138,7 @@ ENV XDG_CONFIG_HOME=/home/frappe/.config
 # and looks for /sites/apps.txt instead of frappe-bench/sites/apps.txt.
 ENV FRAPPE_BENCH_ROOT=/home/frappe/frappe-bench
 RUN mkdir -p /home/frappe/.config && \
-    mkdir -p sites && printf "frappe\nerpnext\nhrms\n" > sites/apps.txt && \
+    mkdir -p sites && printf "frappe\nerpnext\n" > sites/apps.txt && \
     bench setup requirements --node && \
     (cd /opt/exe-erp-src && yarn install) && \
     (cd apps/frappe && yarn install 2>/dev/null || true) && \
@@ -156,8 +155,9 @@ COPY --from=builder --chown=frappe:frappe /home/frappe/.local /home/frappe/.loca
 COPY --chown=frappe:frappe ./entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Add local pip bin to PATH
-ENV PATH="/home/frappe/.local/bin:${PATH}"
+# Add local pip bin to PATH + set SITES_PATH for Frappe site/log resolution
+ENV PATH="/home/frappe/.local/bin:${PATH}" \
+    SITES_PATH="/home/frappe/frappe-bench/sites"
 
 # Fix broken symlinks: builder stage creates symlinks pointing to
 # /opt/exe-erp-src/ which doesn't exist in production. Remove the dead
@@ -186,6 +186,10 @@ RUN mkdir -p /home/frappe/frappe-bench/sites \
 # Nginx config for static files
 RUN rm -f /etc/nginx/sites-enabled/default
 COPY --from=builder /home/frappe/frappe-bench/sites/assets /home/frappe/frappe-bench/sites/assets
+
+# Fix broken asset symlinks (same issue as app symlinks — builder paths)
+RUN rm -f /home/frappe/frappe-bench/sites/assets/frappe \
+    && ln -s /home/frappe/frappe-bench/apps/frappe/frappe/public /home/frappe/frappe-bench/sites/assets/frappe
 
 # Copy WSGI wrapper (TracingMiddleware)
 COPY --chown=frappe:frappe ./wsgi.py /home/frappe/frappe-bench/wsgi.py

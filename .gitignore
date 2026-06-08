@@ -204,3 +204,4 @@ cypress/videos
 
 # Agent worktrees (exe-os)
 /.worktrees/
+apps/hrms
