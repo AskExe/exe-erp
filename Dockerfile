@@ -119,8 +119,9 @@ RUN bench init frappe-bench \
 
 WORKDIR /home/frappe/frappe-bench
 
-# Install ERPNext (skip assets — build separately after all deps)
+# Install ERPNext + HRMS (skip assets — build separately after all deps)
 RUN bench get-app --skip-assets /opt/exe-erp-src/apps/erpnext
+RUN bench get-app --skip-assets /opt/exe-erp-src/apps/hrms
 
 # Install frappe Python deps from root pyproject.toml.
 # The setup.py shim doesn't list deps. We parse pyproject.toml with
@@ -138,7 +139,7 @@ ENV XDG_CONFIG_HOME=/home/frappe/.config
 # and looks for /sites/apps.txt instead of frappe-bench/sites/apps.txt.
 ENV FRAPPE_BENCH_ROOT=/home/frappe/frappe-bench
 RUN mkdir -p /home/frappe/.config && \
-    mkdir -p sites && printf "frappe\nerpnext\n" > sites/apps.txt && \
+    mkdir -p sites && printf "frappe\nerpnext\nhrms\n" > sites/apps.txt && \
     bench setup requirements --node && \
     (cd /opt/exe-erp-src && yarn install) && \
     (cd apps/frappe && yarn install 2>/dev/null || true) && \
