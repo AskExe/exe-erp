@@ -26,7 +26,12 @@ from frappe.utils.caching import redis_cache
 from frappe.utils.data import get_url
 from frappe.utils.jinja_globals import bundled_asset, is_rtl
 
-cssutils.log.setLog(frappe.logger("cssutils"))
+try:
+	cssutils.log.setLog(frappe.logger("cssutils"))
+except Exception:
+	# frappe.logger() may fail during early import (before frappe.init)
+	import logging
+	cssutils.log.setLevel(logging.CRITICAL)
 
 PDF_CONTENT_ERRORS = [
 	"ContentNotFoundError",
