@@ -158,6 +158,13 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Add local pip bin to PATH
 ENV PATH="/home/frappe/.local/bin:${PATH}"
 
+# Fix editable installs: bench uses `pip install -e` which creates finders
+# pointing to builder paths (/opt/exe-erp-src). In production those paths
+# don't exist. Reinstall apps as non-editable from their copied locations.
+RUN /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir --no-deps \
+    /home/frappe/frappe-bench/apps/frappe \
+    /home/frappe/frappe-bench/apps/erpnext
+
 # Create sites directory with correct ownership
 RUN mkdir -p /home/frappe/frappe-bench/sites \
     && chown -R frappe:frappe /home/frappe/frappe-bench/sites
@@ -165,6 +172,9 @@ RUN mkdir -p /home/frappe/frappe-bench/sites \
 # Nginx config for static files
 RUN rm -f /etc/nginx/sites-enabled/default
 COPY --from=builder /home/frappe/frappe-bench/sites/assets /home/frappe/frappe-bench/sites/assets
+
+# Copy WSGI wrapper (TracingMiddleware)
+COPY --chown=frappe:frappe ./wsgi.py /home/frappe/frappe-bench/wsgi.py
 
 WORKDIR /home/frappe/frappe-bench
 
@@ -181,4 +191,4 @@ CMD ["gunicorn", \
      "--timeout", "120", \
      "--graceful-timeout", "30", \
      "--worker-tmp-dir", "/dev/shm", \
-     "frappe.app:application"]
+     "wsgi:application"]

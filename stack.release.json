@@ -1,12 +1,12 @@
 {
   "service": "exe-erp",
   "packageName": "@askexenow/exe-erp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "components": {
-    "erp": "ghcr.io/askexe/exe-erp:v0.1.1",
-    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.1.1",
-    "erp-queue": "ghcr.io/askexe/exe-erp:v0.1.1",
-    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.1.1"
+    "erp": "ghcr.io/askexe/exe-erp:v0.1.2",
+    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.1.2",
+    "erp-queue": "ghcr.io/askexe/exe-erp:v0.1.2",
+    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.1.2"
   },
   "stackParticipation": {
     "required": false,
