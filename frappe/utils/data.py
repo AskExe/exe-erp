@@ -2504,7 +2504,7 @@ def to_markdown(html: str) -> str:
 		pass
 
 
-def md_to_html(markdown_text: str) -> "UnicodeWithAttrs" | None:
+def md_to_html(markdown_text: str) -> "UnicodeWithAttrs | None":
 	"""Convert the given markdown text to HTML and returns it."""
 	from markdown2 import MarkdownError
 	from markdown2 import markdown as _markdown
@@ -2524,7 +2524,7 @@ def md_to_html(markdown_text: str) -> "UnicodeWithAttrs" | None:
 		pass
 
 
-def markdown(markdown_text: str) -> "UnicodeWithAttrs" | None:
+def markdown(markdown_text: str) -> "UnicodeWithAttrs | None":
 	"""Convert the given markdown text to HTML and returns it."""
 	return md_to_html(markdown_text)
 
