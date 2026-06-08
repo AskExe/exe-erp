@@ -70,11 +70,16 @@ EOF
 # ── First boot: create site ──────────────────────────────────
 create_site() {
     echo "First boot — creating site: ${SITE_NAME}"
+    # Use the same DB user (exe) that owns the exe_erp database.
+    # --db-root-username tells bench to use this user for DDL operations
+    # instead of creating a new per-site user.
     bench new-site "${SITE_NAME}" \
         --db-type postgres \
         --db-host "${DB_HOST}" \
         --db-port "${DB_PORT:-5432}" \
         --db-name "${DB_NAME:-exe_erp}" \
+        --db-root-username "${POSTGRES_USER:-exe}" \
+        --db-root-password "${DB_PASSWORD}" \
         --db-password "${DB_PASSWORD}" \
         --admin-password "${ADMIN_PASSWORD:-admin}" \
         --no-mariadb-socket
