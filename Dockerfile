@@ -158,9 +158,16 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Add local pip bin to PATH
 ENV PATH="/home/frappe/.local/bin:${PATH}"
 
+# Fix broken symlinks: builder stage creates symlinks pointing to
+# /opt/exe-erp-src/ which doesn't exist in production. Remove the dead
+# symlinks, then copy actual source from builder into the correct locations.
+RUN rm -f /home/frappe/frappe-bench/apps/frappe/frappe \
+    && rm -f /home/frappe/frappe-bench/apps/frappe/esbuild
+COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/frappe /home/frappe/frappe-bench/apps/frappe/frappe
+COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/esbuild /home/frappe/frappe-bench/apps/frappe/esbuild
+
 # Fix editable installs: bench uses `pip install -e` which creates finders
-# pointing to builder paths (/opt/exe-erp-src). In production those paths
-# don't exist. Reinstall apps as non-editable from their copied locations.
+# pointing to builder paths. Reinstall as non-editable from copied locations.
 RUN /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir --no-deps \
     /home/frappe/frappe-bench/apps/frappe \
     /home/frappe/frappe-bench/apps/erpnext
