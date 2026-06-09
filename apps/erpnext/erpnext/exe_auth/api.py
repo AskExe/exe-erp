@@ -16,6 +16,7 @@ Configuration (site_config.json):
 """
 
 import hmac
+import os
 import frappe
 import requests
 from frappe.rate_limiter import rate_limit
@@ -44,16 +45,28 @@ def gotrue_login(email=None, password=None, workspace_name=None):
 			timeout=10,
 		)
 	except requests.RequestException as e:
-		frappe.throw(f"GoTrue service unavailable: {e}", frappe.AuthenticationError)
+		frappe.log_error(
+			title="GoTrue Auth Error",
+			message=f"GoTrue service unavailable: {e}",
+		)
+		frappe.throw("Authentication service temporarily unavailable", frappe.AuthenticationError)
 
 	if resp.status_code != 200:
-		error_msg = "Invalid credentials"
+		# Log full error server-side for debugging, never expose to client
 		try:
 			error_data = resp.json()
-			error_msg = error_data.get("error_description") or error_data.get("msg") or error_msg
+			# Redact sensitive fields before logging
+			safe_data = {k: v for k, v in error_data.items() if k not in ("access_token", "refresh_token", "password")}
+			frappe.log_error(
+				title="GoTrue Auth Failure",
+				message=f"Status {resp.status_code}: {safe_data}",
+			)
 		except Exception:
-			pass
-		frappe.throw(error_msg, frappe.AuthenticationError)
+			frappe.log_error(
+				title="GoTrue Auth Failure",
+				message=f"Status {resp.status_code}: {resp.text[:500]}",
+			)
+		frappe.throw("Invalid email or password", frappe.AuthenticationError)
 
 	# GoTrue accepted — find or create Frappe User
 	if not frappe.db.exists("User", email):
@@ -71,10 +84,23 @@ def gotrue_login(email=None, password=None, workspace_name=None):
 		user_doc.flags.no_welcome_mail = True
 		user_doc.insert()
 
-		# First user gets System Manager role (admin)
+		# First user gets System Manager role ONLY in bootstrap mode.
+		# In production (default), first user gets a standard role.
+		bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
 		user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
-		if user_count <= 1:
+		if user_count <= 1 and bootstrap_mode:
+			frappe.logger().warning(
+				"BOOTSTRAP MODE ACTIVE: Auto-promoting first user %s to System Manager. "
+				"Disable ERP_BOOTSTRAP_MODE after initial setup.",
+				email,
+			)
 			user_doc.add_roles("System Manager")
+		elif user_count <= 1:
+			frappe.logger().info(
+				"First user %s created with standard role. "
+				"Set ERP_BOOTSTRAP_MODE=true to auto-promote to System Manager.",
+				email,
+			)
 
 	# Login the user
 	frappe.local.login_manager.login_as(email)

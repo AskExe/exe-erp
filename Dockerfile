@@ -32,10 +32,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
 
-# Install Node.js 24 via NodeSource
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+# Install Node.js 24 via NodeSource (pinned version for reproducibility)
+# Pin: NodeSource setup_24.x as of 2026-06 — review and update periodically
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x -o /tmp/nodesource_setup.sh \
+    && bash /tmp/nodesource_setup.sh \
     && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g yarn \
+    && rm -f /tmp/nodesource_setup.sh \
+    && npm install -g yarn@1.22.22 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create frappe user
