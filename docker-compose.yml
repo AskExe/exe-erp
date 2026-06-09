@@ -16,7 +16,7 @@ services:
       DB_TYPE: postgres
       DB_NAME: exe_erp
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      ADMIN_PASSWORD: ${ERP_ADMIN_PASSWORD:-admin}
+      ADMIN_PASSWORD: ${ERP_ADMIN_PASSWORD:?ERP_ADMIN_PASSWORD is required — set a strong password (12+ chars, mixed case, numbers, special chars)}
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
@@ -51,7 +51,7 @@ services:
       REDIS_SOCKETIO: redis://redis:6379/5
       SITE_NAME: erp.askexe.com
     ports:
-      - "8069:8000"
+      - "127.0.0.1:8069:8000"
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:
@@ -77,7 +77,7 @@ services:
       REDIS_SOCKETIO: redis://redis:6379/5
       SITE_NAME: erp.askexe.com
     ports:
-      - "9069:9000"
+      - "127.0.0.1:9069:9000"
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:

@@ -13,6 +13,34 @@ SITE_DIR="${SITES_DIR}/${SITE_NAME}"
 
 cd "${FRAPPE_BENCH}"
 
+# ── Validate admin password ─────────────────────────────────
+validate_admin_password() {
+    local pw="${ADMIN_PASSWORD:-}"
+    if [ -z "${pw}" ]; then
+        echo "ERROR: ADMIN_PASSWORD (ERP_ADMIN_PASSWORD) is required but not set."
+        echo "Set ERP_ADMIN_PASSWORD in your .env or docker-compose override."
+        exit 1
+    fi
+    local len=${#pw}
+    if [ "${len}" -lt 12 ]; then
+        echo "ERROR: ADMIN_PASSWORD must be at least 12 characters (got ${len})."
+        exit 1
+    fi
+    # Check against common weak defaults
+    local weak
+    for weak in admin password changeme admin123 password123 administrator; do
+        if [ "${pw}" = "${weak}" ]; then
+            echo "ERROR: ADMIN_PASSWORD cannot be a common default ('${weak}')."
+            exit 1
+        fi
+    done
+    # Require at least one special character
+    if ! echo "${pw}" | grep -qP '[^a-zA-Z0-9]'; then
+        echo "ERROR: ADMIN_PASSWORD must contain at least one special character."
+        exit 1
+    fi
+}
+
 # ── Wait for Postgres ────────────────────────────────────────
 wait_for_db() {
     local retries=30
@@ -81,7 +109,7 @@ create_site() {
         --db-root-username "${POSTGRES_USER:-exe}" \
         --db-root-password "${DB_PASSWORD}" \
         --db-password "${DB_PASSWORD}" \
-        --admin-password "${ADMIN_PASSWORD:-admin}" \
+        --admin-password "${ADMIN_PASSWORD}" \
         --no-mariadb-socket
 
     bench --site "${SITE_NAME}" install-app erpnext
@@ -97,6 +125,7 @@ run_migrations() {
 
 # ── Main ─────────────────────────────────────────────────────
 main() {
+    validate_admin_password
     wait_for_db
 
     if [ -n "${REDIS_CACHE}" ]; then
