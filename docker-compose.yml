@@ -7,7 +7,7 @@ services:
   # ── First-boot configurator (runs once, creates site) ──────
   exe-erp-configurator:
     build: .
-    image: ghcr.io/askexe/exe-erp:v0.1.0
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final3
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
     command: ["echo", "Site configured successfully"]
     environment:
@@ -30,7 +30,7 @@ services:
   # ── Gunicorn backend ───────────────────────────────────────
   exe-erp:
     build: .
-    image: ghcr.io/askexe/exe-erp:v0.1.0
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final3
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
     command:
       - gunicorn
@@ -70,7 +70,7 @@ services:
   # ── Socket.io for realtime events ──────────────────────────
   exe-erp-websocket:
     build: .
-    image: ghcr.io/askexe/exe-erp:v0.1.0
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final3
     entrypoint: []
     command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
     environment:
@@ -90,7 +90,7 @@ services:
   # ── RQ worker for background jobs ──────────────────────────
   exe-erp-queue:
     build: .
-    image: ghcr.io/askexe/exe-erp:v0.1.0
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final3
     entrypoint: []
     command:
       - bench
@@ -118,7 +118,7 @@ services:
   # ── Frappe scheduler (cron-like background tasks) ──────────
   exe-erp-scheduler:
     build: .
-    image: ghcr.io/askexe/exe-erp:v0.1.0
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final3
     entrypoint: []
     command:
       - bench
