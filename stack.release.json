@@ -1,4 +1,7 @@
 {
+  "$schema": "https://updates.askexe.com/schemas/stack.release.schema.json",
+  "schemaVersion": 1,
+  "repo": "AskExe/exe-erp",
   "service": "exe-erp",
   "packageName": "@askexenow/exe-erp",
   "version": "0.2.0-final3",
