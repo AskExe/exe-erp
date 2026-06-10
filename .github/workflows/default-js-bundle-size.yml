@@ -14,7 +14,7 @@ permissions:
 jobs:
   checkrun:
     name: Plan Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     outputs:
       build: ${{ steps.check-build.outputs.build }}
 
@@ -34,7 +34,7 @@ jobs:
 
   compare:
     name: Compare
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: needs.checkrun.outputs.build == 'strawberry'
     needs: checkrun
     env:

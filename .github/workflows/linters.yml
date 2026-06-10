@@ -15,7 +15,7 @@ concurrency:
 jobs:
   commit-lint:
     name: 'Semantic Commits'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: github.event_name == 'pull_request'
 
     steps:
@@ -34,7 +34,7 @@ jobs:
 
   docs-required:
     name: 'Documentation Required'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: github.event_name == 'pull_request'
 
     steps:
@@ -53,7 +53,7 @@ jobs:
 
   linter:
     name: 'Semgrep Rules'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: github.event_name == 'pull_request'
 
     steps:
@@ -73,7 +73,7 @@ jobs:
 
   deps-vulnerable-check:
     name: 'Vulnerable Dependency Check'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
 
     steps:
       - uses: actions/setup-python@v6
@@ -99,7 +99,7 @@ jobs:
 
   precommit:
     name: 'Pre-Commit'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: github.event_name == 'pull_request'
 
     steps:

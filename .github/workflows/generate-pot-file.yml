@@ -8,7 +8,7 @@ on:
 jobs:
   regenerate-pot-file:
     name: Regenerate POT file
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     strategy:
       fail-fast: false
       matrix:

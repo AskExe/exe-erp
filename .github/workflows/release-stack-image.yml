@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   release-image:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     env:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
     steps:

@@ -18,7 +18,7 @@ permissions:
 jobs:
   checkrun:
     name: Plan Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     outputs:
       build: ${{ steps.check-build.outputs.build }}
       run_postgres: ${{ steps.check-build.outputs.run_postgres }}
@@ -39,7 +39,7 @@ jobs:
     name: Integration
     needs: checkrun
     if: ${{ needs.checkrun.outputs.build == 'strawberry' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 30
     env:
       NODE_ENV: "production"
@@ -125,7 +125,7 @@ jobs:
     name: Migration
     needs: checkrun
     if: ${{ needs.checkrun.outputs.build == 'strawberry' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 60
     env:
       PYTHONWARNINGS: "ignore"
@@ -229,7 +229,7 @@ jobs:
     name: Coverage Wrap Up
     needs: [test, checkrun]
     if: ${{ needs.checkrun.outputs.build == 'strawberry' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - name: Clone
         uses: actions/checkout@v6
@@ -249,7 +249,7 @@ jobs:
     name: Success
     needs: [test, migrate]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - name: Tests '${{ needs.test.result }}' / Migration '${{ needs.migrate.result }}'
         shell: python

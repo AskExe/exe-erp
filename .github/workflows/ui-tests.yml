@@ -18,7 +18,7 @@ permissions:
 jobs:
   checkrun:
     name: Plan Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     outputs:
       build: ${{ steps.check-build.outputs.build }}
     steps:
@@ -38,7 +38,7 @@ jobs:
     name: Integration
     needs: checkrun
     if: ${{ needs.checkrun.outputs.build == 'strawberry' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 30
     env:
       NODE_ENV: "production"
@@ -145,7 +145,7 @@ jobs:
     name: Success
     needs: [test]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - name: UI Test '${{ needs.test.result }}'
         shell: python
