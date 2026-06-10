@@ -21,6 +21,9 @@ services:
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
       SITE_NAME: erp.askexe.com
+      EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
+      EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
+      GOTRUE_URL: ${GOTRUE_URL:-}
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:
@@ -50,6 +53,9 @@ services:
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
       SITE_NAME: erp.askexe.com
+      EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
+      EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
+      GOTRUE_URL: ${GOTRUE_URL:-}
     ports:
       - "127.0.0.1:8069:8000"
     volumes:
