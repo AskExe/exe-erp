@@ -169,6 +169,9 @@ RUN rm -f /home/frappe/frappe-bench/apps/frappe/frappe \
     && rm -f /home/frappe/frappe-bench/apps/frappe/esbuild
 COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/frappe /home/frappe/frappe-bench/apps/frappe/frappe
 COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/esbuild /home/frappe/frappe-bench/apps/frappe/esbuild
+COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/socketio.js /home/frappe/frappe-bench/apps/frappe/socketio.js
+COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/node_utils.js /home/frappe/frappe-bench/apps/frappe/node_utils.js
+COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/realtime /home/frappe/frappe-bench/apps/frappe/realtime
 
 # Fix editable installs: pip install from setup.py misses nested packages
 # (page_renderers, etc.) because frappe uses a flat layout without proper
