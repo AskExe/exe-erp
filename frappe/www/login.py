@@ -45,6 +45,7 @@ def get_context(context):
 	context["disable_signup"] = cint(frappe.get_website_settings("disable_signup"))
 	context["show_footer_on_login"] = cint(frappe.get_website_settings("show_footer_on_login"))
 	context["disable_user_pass_login"] = cint(frappe.get_system_settings("disable_user_pass_login"))
+	context["gotrue_login_enabled"] = bool(frappe.conf.get("gotrue_url"))
 	context["logo"] = get_app_logo()
 	context["app_name"] = (
 		frappe.get_website_settings("app_name") or frappe.get_system_settings("app_name") or _("Exe ERP")

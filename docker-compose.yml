@@ -24,6 +24,7 @@ services:
       EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
+      GOTRUE_ADMIN_TOKEN: ${GOTRUE_ADMIN_TOKEN:-}
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:
@@ -56,6 +57,7 @@ services:
       EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
+      GOTRUE_ADMIN_TOKEN: ${GOTRUE_ADMIN_TOKEN:-}
     ports:
       - "127.0.0.1:8069:8000"
     volumes:

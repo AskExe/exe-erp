@@ -9,7 +9,7 @@
  "label": "ERPNext",
  "link": "/app/home",
  "link_type": "External",
- "logo_url": "/assets/erpnext/images/erpnext-logo.svg",
+ "logo_url": "/assets/frappe/images/exe-erp-logo.svg",
  "modified": "2025-11-17 16:33:37.520201",
  "modified_by": "Administrator",
  "name": "ERPNext",

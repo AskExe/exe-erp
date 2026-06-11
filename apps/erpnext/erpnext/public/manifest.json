@@ -6,6 +6,6 @@
   "background_color": "#0F0E1A",
   "theme_color": "#F5D76E",
   "icons": [
-    {"src": "/assets/erpnext/images/erpnext-logo.svg", "sizes": "any", "type": "image/svg+xml"}
+    {"src": "/assets/frappe/images/exe-erp-logo.svg", "sizes": "any", "type": "image/svg+xml"}
   ]
 }

@@ -3,6 +3,7 @@
 
 window.disable_signup = {{ disable_signup and "true" or "false" }};
 window.show_footer_on_login = {{ show_footer_on_login and "true" or "false" }};
+window.gotrue_login_enabled = {{ gotrue_login_enabled and "true" or "false" }};
 
 window.login = {};
 
@@ -23,7 +24,18 @@ login.bind_events = function () {
 			frappe.msgprint("{{ _('Both login and password required') | striptags | e }}");
 			return false;
 		}
-		login.call(args, null, "/api/method/login");
+		if (window.gotrue_login_enabled) {
+			login.call(
+				{
+					email: args.usr,
+					password: args.pwd,
+				},
+				null,
+				"/api/auth/gotrue-login"
+			);
+		} else {
+			login.call(args, null, "/api/method/login");
+		}
 		return false;
 	});
 
@@ -222,6 +234,12 @@ login.login_handlers = (function () {
 
 	var login_handlers = {
 		200: function (data) {
+			var gotrue_response = data.message && typeof data.message === "object" ? data.message : data;
+			if (gotrue_response && gotrue_response.success) {
+				data.message = "Logged In";
+				data.home_page = gotrue_response.home_page || data.home_page || "/desk";
+			}
+
 			if (data.message == 'Logged In') {
 				login.set_status({{ _("Success") | tojson }}, 'green');
 				document.body.innerHTML = `{% include "templates/includes/splash_screen.html" %}`;

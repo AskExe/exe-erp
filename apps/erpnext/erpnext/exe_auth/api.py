@@ -11,7 +11,8 @@ Two endpoints:
 Configuration (site_config.json):
   {
     "gotrue_url": "http://gotrue:9999",
-    "exe_admin_token": "your-secret-token"
+    "exe_admin_token": "your-secret-token",
+    "gotrue_admin_token": "your-service-role-key"
   }
 """
 
@@ -19,6 +20,7 @@ import hmac
 import os
 import frappe
 import requests
+from frappe.website.utils import get_home_page
 from frappe.rate_limiter import rate_limit
 
 
@@ -77,7 +79,7 @@ def gotrue_login(email=None, password=None, workspace_name=None):
 				"email": email,
 				"first_name": first_name,
 				"enabled": 1,
-				"user_type": "Website User",
+				"user_type": "System User",
 			}
 		)
 		user_doc.flags.ignore_permissions = True
@@ -107,8 +109,10 @@ def gotrue_login(email=None, password=None, workspace_name=None):
 
 	return {
 		"success": True,
+		"message": "Logged In",
 		"user": email,
 		"sid": frappe.session.sid,
+		"home_page": get_home_page() or "/desk",
 	}
 
 
@@ -134,7 +138,9 @@ def admin_token(token=None):
 
 	return {
 		"success": True,
+		"message": "Logged In",
 		"user": "Administrator",
 		"sid": frappe.session.sid,
+		"home_page": get_home_page() or "/desk",
 		"isAdminToken": True,
 	}

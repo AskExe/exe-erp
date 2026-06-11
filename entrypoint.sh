@@ -160,6 +160,9 @@ try:
     _admin_token = '${EXE_ERP_ADMIN_TOKEN:-}' or '${EXE_ADMIN_TOKEN:-}'
     if _admin_token:
         config['exe_admin_token'] = _admin_token
+    _gotrue_admin_token = '${GOTRUE_ADMIN_TOKEN:-}'
+    if _gotrue_admin_token:
+        config['gotrue_admin_token'] = _gotrue_admin_token
     with open('${site_config}', 'w') as f:
         json.dump(config, f, indent=2)
     print('GoTrue SSO configured in site_config.json')

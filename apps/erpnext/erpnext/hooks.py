@@ -7,13 +7,13 @@ app_color = "#F5D76E"  # Exe Foundry Bold gold
 app_email = "support@askexe.com"
 app_license = "GNU General Public License (v3)"
 source_link = "https://github.com/AskExe/exe-erp"
-app_logo_url = "/assets/erpnext/images/erpnext-logo.svg"  # TODO: replace with Exe logo
+app_logo_url = "/assets/frappe/images/exe-erp-logo.svg"
 app_home = "/desk"
 
 add_to_apps_screen = [
 	{
 		"name": app_name,
-		"logo": "/assets/erpnext/images/erpnext-logo.svg",
+		"logo": "/assets/frappe/images/exe-erp-logo.svg",
 		"title": app_title,
 		"route": app_home,
 		"has_permission": "erpnext.check_app_permission",
@@ -115,8 +115,8 @@ calendars = ["Task", "Work Order", "Sales Order", "Holiday List", "ToDo"]
 website_generators = ["BOM", "Sales Partner"]
 
 website_context = {
-	"favicon": "/assets/erpnext/images/erpnext-favicon.svg",
-	"splash_image": "/assets/erpnext/images/erpnext-logo.svg",
+	"favicon": "/assets/frappe/images/exe-erp-favicon.svg",
+	"splash_image": "/assets/frappe/images/exe-erp-splash.svg",
 }
 
 # Exe ERP — GoTrue SSO endpoints
@@ -534,7 +534,7 @@ scheduler_events = {
 	],
 }
 
-email_brand_image = "assets/erpnext/images/erpnext-logo.jpg"
+email_brand_image = "assets/frappe/images/exe-erp-logo.svg"
 
 default_mail_footer = """
 	<span>
