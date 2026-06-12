@@ -26,7 +26,11 @@ from frappe.rate_limiter import rate_limit
 
 @frappe.whitelist(allow_guest=True)
 @rate_limit(key="gotrue_login", limit=5, seconds=900)
-def gotrue_login(email=None, password=None, workspace_name=None):
+def gotrue_login(
+	email: str | None = None,
+	password: str | None = None,
+	workspace_name: str | None = None,
+):
 	"""Authenticate via GoTrue, auto-provision Frappe User on first login."""
 	if not email or not password:
 		frappe.throw("Email and password are required", frappe.AuthenticationError)
@@ -118,7 +122,7 @@ def gotrue_login(email=None, password=None, workspace_name=None):
 
 @frappe.whitelist(allow_guest=True)
 @rate_limit(key="admin_token", limit=5, seconds=900)
-def admin_token(token=None):
+def admin_token(token: str | None = None):
 	"""Authenticate via shared admin token (for exe-os daemon/MCP access)."""
 	if not token:
 		frappe.throw("Token is required", frappe.AuthenticationError)
