@@ -31,7 +31,7 @@ login.bind_events = function () {
 					password: args.pwd,
 				},
 				null,
-				"/api/auth/gotrue-login"
+				"/api/method/erpnext.exe_auth.api.gotrue_login"
 			);
 		} else {
 			login.call(args, null, "/api/method/login");
