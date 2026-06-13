@@ -8,18 +8,21 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empt
 import ErrorBanner from "@/components/ui/error-banner"
 import { FileDropzone } from "@/components/ui/file-dropzone"
 import { Label } from "@/components/ui/label"
+import { TableLoader } from "@/components/ui/loaders"
+import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { H3, Paragraph } from "@/components/ui/typography"
+import { useMultiFileUploadProgress } from "@/hooks/useMultiFileUploadProgress"
 import { useCurrentCompany } from "@/hooks/useCurrentCompany"
 import { formatDate } from "@/lib/date"
 import { flt, formatCurrency } from "@/lib/numbers"
 import _ from "@/lib/translate"
 import { cn } from "@/lib/utils"
 import { BankStatementImportLog } from "@/types/Accounts/BankStatementImportLog"
-import { useFrappeCreateDoc, useFrappeFileUpload, useFrappeGetDocList } from "frappe-react-sdk"
+import { FrappeConfig, FrappeContext, useFrappeCreateDoc, useFrappeGetDocList } from "frappe-react-sdk"
 import { useAtom, useAtomValue } from "jotai"
 import { ListIcon, Loader2Icon } from "lucide-react"
-import { useState } from "react"
+import { useContext, useState } from "react"
 import { useNavigate } from "react-router"
 
 
@@ -31,24 +34,33 @@ const BankStatementImporter = () => {
 
     const [files, setFiles] = useState<File[]>([])
 
-    const { upload, error, loading } = useFrappeFileUpload()
+    const { file: frappeFile } = useContext(FrappeContext) as FrappeConfig
+    const { uploadProgress, startTracking, updateFileProgress, resetProgress } = useMultiFileUploadProgress()
+    const [isUploading, setIsUploading] = useState(false)
+    const [uploadError, setUploadError] = useState<Error | null>(null)
 
     const navigate = useNavigate()
     const { createDoc, loading: createLoading, error: createError } = useFrappeCreateDoc<BankStatementImportLog>()
 
     const onUpload = () => {
 
-        if (!selectedBankAccount) {
+        if (!selectedBankAccount || files.length === 0) {
             return
         }
 
         const id = `new-bank-statement-import-log-${Date.now()}`
 
-        upload(files[0], {
+        setIsUploading(true)
+        setUploadError(null)
+        startTracking(1)
+
+        frappeFile.uploadFile(files[0], {
             isPrivate: true,
             doctype: "Bank Statement Import Log",
             docname: id,
             fieldname: 'file'
+        }, (_bytesUploaded, _totalBytes, progress) => {
+            updateFileProgress(0, progress?.progress ?? 0)
         }).then((file) => {
             return createDoc("Bank Statement Import Log",
                 // @ts-expect-error - not filling everything else
@@ -58,14 +70,23 @@ const BankStatementImporter = () => {
                     bank_account: selectedBankAccount.name
                 })
         }).then((doc) => {
+            resetProgress()
+            setIsUploading(false)
             navigate(`/statement-importer/${doc.name}`)
+        }).catch((err) => {
+            resetProgress()
+            setIsUploading(false)
+            setUploadError(err instanceof Error ? err : new Error(String(err)))
         })
     }
+
+    const isLoading = isUploading || createLoading
+    const uploadPct = Math.round(uploadProgress * 100)
 
     return (
         <div className="flex px-4">
             <div className="w-[52%]">
-                {error && <ErrorBanner error={error} />}
+                {uploadError && <ErrorBanner error={uploadError} />}
                 {createError && <ErrorBanner error={createError} />}
                 <div className="py-2 flex flex-col gap-6">
                     <div className="flex flex-col gap-2">
@@ -110,13 +131,23 @@ const BankStatementImporter = () => {
                             multiple={false}
                         />
                     </div>}
+                    {isUploading && (
+                        <div className="px-4">
+                            <Progress
+                                value={uploadPct}
+                                size="lg"
+                                label={_("Uploading...")}
+                                hint
+                            />
+                        </div>
+                    )}
                     <div className="flex justify-end px-4">
                         <Button
                             onClick={onUpload}
                             size='md'
-                            disabled={files.length === 0 || loading || createLoading || !selectedBankAccount || !selectedCompany}>
-                            {loading || createLoading ? <Loader2Icon className="size-4 animate-spin" /> : null}
-                            {loading || createLoading ? _("Uploading...") : _("Upload")}
+                            disabled={files.length === 0 || isLoading || !selectedBankAccount || !selectedCompany}>
+                            {isLoading ? <Loader2Icon className="size-4 animate-spin" /> : null}
+                            {isLoading ? _("Uploading...") : _("Upload")}
                         </Button>
                     </div>
                 </div>
@@ -189,7 +220,7 @@ const StatementImportLog = () => {
 
     const bankAccount = useAtomValue(selectedBankAccountAtom)
 
-    const { data, error } = useFrappeGetDocList<BankStatementImportLog>("Bank Statement Import Log", {
+    const { data, isLoading, error } = useFrappeGetDocList<BankStatementImportLog>("Bank Statement Import Log", {
         fields: ["name", "file", "status", "number_of_transactions", "start_date", "end_date", "closing_balance", "creation"],
         filters: [["bank_account", "=", bankAccount?.name ?? ""]],
         orderBy: {
@@ -213,7 +244,9 @@ const StatementImportLog = () => {
 
             {error && <ErrorBanner error={error} />}
 
-            {data && data.length > 0 ? (
+            {isLoading ? (
+                <TableLoader rows={4} columns={6} />
+            ) : data && data.length > 0 ? (
 
                 <Table>
                     <TableHeader>
