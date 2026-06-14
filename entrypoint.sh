@@ -125,7 +125,6 @@ run_migrations() {
 
 # ── Main ─────────────────────────────────────────────────────
 main() {
-    validate_admin_password
     wait_for_db
 
     if [ -n "${REDIS_CACHE}" ]; then
@@ -135,6 +134,8 @@ main() {
     configure_site_config
 
     if [ ! -d "${SITE_DIR}" ]; then
+        # Only validate admin password on first boot (site creation)
+        validate_admin_password
         create_site
     else
         run_migrations
@@ -150,20 +151,21 @@ main() {
         echo "Configuring GoTrue SSO..."
         local site_config="${SITE_DIR}/site_config.json"
         if [ -f "${site_config}" ]; then
-            # Use Python to safely merge GoTrue config into site_config.json
-            python3 -c "
-import json, sys
+            # Use Python with os.environ to avoid shell injection via variable values
+            SITE_CONFIG_PATH="${site_config}" python3 -c "
+import json, sys, os
 try:
-    with open('${site_config}') as f:
+    config_path = os.environ['SITE_CONFIG_PATH']
+    with open(config_path) as f:
         config = json.load(f)
-    config['gotrue_url'] = '${GOTRUE_URL}'
-    _admin_token = '${EXE_ERP_ADMIN_TOKEN:-}' or '${EXE_ADMIN_TOKEN:-}'
+    config['gotrue_url'] = os.environ.get('GOTRUE_URL', '')
+    _admin_token = os.environ.get('EXE_ERP_ADMIN_TOKEN', '') or os.environ.get('EXE_ADMIN_TOKEN', '')
     if _admin_token:
         config['exe_admin_token'] = _admin_token
-    _gotrue_admin_token = '${GOTRUE_ADMIN_TOKEN:-}'
+    _gotrue_admin_token = os.environ.get('GOTRUE_ADMIN_TOKEN', '')
     if _gotrue_admin_token:
         config['gotrue_admin_token'] = _gotrue_admin_token
-    with open('${site_config}', 'w') as f:
+    with open(config_path, 'w') as f:
         json.dump(config, f, indent=2)
     print('GoTrue SSO configured in site_config.json')
 except Exception as e:

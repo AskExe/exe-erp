@@ -539,8 +539,8 @@ email_brand_image = "assets/frappe/images/exe-erp-logo.svg"
 default_mail_footer = """
 	<span>
 		Sent via
-		<a class="text-muted" href="https://frappe.io/erpnext?source=via_email_footer" target="_blank">
-			ERPNext
+		<a class="text-muted" href="https://askexe.com?source=via_email_footer" target="_blank">
+			Exe ERP
 		</a>
 	</span>
 """

@@ -4,12 +4,12 @@
   "repo": "AskExe/exe-erp",
   "service": "exe-erp",
   "packageName": "@askexenow/exe-erp",
-  "version": "0.2.0-final3",
+  "version": "0.2.0-final7",
   "components": {
-    "erp": "ghcr.io/askexe/exe-erp:v0.2.0-final3",
-    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.2.0-final3",
-    "erp-queue": "ghcr.io/askexe/exe-erp:v0.2.0-final3",
-    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.2.0-final3"
+    "erp": "ghcr.io/askexe/exe-erp:v0.2.0-final7",
+    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.2.0-final7",
+    "erp-queue": "ghcr.io/askexe/exe-erp:v0.2.0-final7",
+    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.2.0-final7"
   },
   "stackParticipation": {
     "required": false,
@@ -41,6 +41,9 @@
       "ERP_ADMIN_PASSWORD"
     ],
     "optional": [
+      "EXE_ERP_ADMIN_TOKEN",
+      "GOTRUE_ADMIN_TOKEN",
+      "GOTRUE_URL",
       "FRAPPE_SENTRY_DSN",
       "ENABLE_SENTRY_DB_MONITORING",
       "SENTRY_TRACING_SAMPLE_RATE",

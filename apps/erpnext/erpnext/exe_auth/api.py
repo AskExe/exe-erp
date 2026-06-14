@@ -77,13 +77,22 @@ def gotrue_login(
 	# GoTrue accepted — find or create Frappe User
 	if not frappe.db.exists("User", email):
 		first_name = email.split("@")[0]
+		# Default to System User for internal domains, Website User for external
+		allowed_domains = frappe.conf.get("allowed_email_domains", [])
+		email_domain = email.split("@")[1] if "@" in email else ""
+		if allowed_domains and email_domain not in allowed_domains:
+			frappe.throw(
+				f"Email domain '{email_domain}' is not allowed. Contact your administrator.",
+				frappe.AuthenticationError,
+			)
+		default_user_type = frappe.conf.get("default_gotrue_user_type", "System User")
 		user_doc = frappe.get_doc(
 			{
 				"doctype": "User",
 				"email": email,
 				"first_name": first_name,
 				"enabled": 1,
-				"user_type": "System User",
+				"user_type": default_user_type,
 			}
 		)
 		user_doc.flags.ignore_permissions = True
