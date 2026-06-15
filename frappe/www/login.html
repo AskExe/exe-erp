@@ -35,7 +35,7 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 .exe-btn-signin,.exe-login-section .btn-primary{width:100%!important;background:#F5D76E!important;color:#0F0E1A!important;border:none!important;border-radius:8px!important;padding:14px 24px!important;font-family:'Epilogue',sans-serif!important;font-size:.95rem!important;font-weight:700!important;letter-spacing:.1em!important;text-transform:uppercase!important;cursor:pointer;transition:background-color .15s;margin-top:.5rem;outline:none;box-shadow:none!important;min-height:auto!important}
 .exe-btn-signin:hover,.exe-login-section .btn-primary:hover{background:#e6c85e!important}
 .exe-btn-signin:active,.exe-login-section .btn-primary:active{background:#d4b84e!important}
-.exe-btn-signin:disabled,.exe-login-section .btn-primary:disabled{opacity:.6;cursor:not-allowed}
+.exe-btn-signin:disabled,.exe-login-section .btn-primary:disabled{opacity:.5;cursor:not-allowed}
 .exe-login-card.invalid-login,.login-content.page-card.invalid-login{animation:wiggle .5s linear}
 @keyframes wiggle{8%,41%{transform:translateX(-10px)}25%,58%{transform:translateX(10px)}75%{transform:translateX(-5px)}92%{transform:translateX(5px)}0%,100%{transform:translateX(0)}}
 .exe-login-section .page-card-body.invalid .exe-input{border-color:#EF4444!important;box-shadow:0 0 0 3px rgba(239,68,68,.15)!important}
@@ -94,7 +94,7 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 					<div class="page-card-body">
 						<div class="exe-field-group">
 							<label class="exe-label" for="login_email">Email</label>
-							<input type="text" id="login_email" class="exe-input"
+							<input type="email" id="login_email" class="exe-input"
 								placeholder="you@company.com"
 								required autofocus autocomplete="username">
 						</div>
@@ -105,7 +105,7 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 								autocomplete="current-password" required>
 						</div>
 					</div>
-					<button class="exe-btn-signin btn-primary btn-login" type="submit">SIGN IN</button>
+					<button class="exe-btn-signin btn-primary btn-login" type="submit" disabled>SIGN IN</button>
 				</form>
 			</div>
 
@@ -114,13 +114,14 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 				<form class="form-signin form-token" role="form">
 					<div class="page-card-body">
 						<div class="exe-field-group">
-							<label class="exe-label" for="login_token_input">Token</label>
+							<label class="exe-label" for="login_token_input">Admin Token</label>
 							<input type="password" id="login_token_input" class="exe-input"
-								placeholder="Enter admin token"
+								placeholder="Paste your admin token"
 								autocomplete="off" required>
+							<p class="exe-helper-text" style="color:#8a8a9a;font-size:12px;font-style:italic;margin-top:6px;">Found in your server's .env file</p>
 						</div>
 					</div>
-					<button class="exe-btn-signin btn-primary btn-token-login" type="submit">SIGN IN</button>
+					<button class="exe-btn-signin btn-primary btn-token-login" type="submit" disabled>SIGN IN</button>
 				</form>
 			</div>
 		</div>
@@ -186,6 +187,23 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 			}
 		});
 	});
+
+	// ── Button disabled state: grey until fields are filled (matches CRM) ──
+	var loginBtn = document.querySelector('.btn-login');
+	var tokenBtn = document.querySelector('.btn-token-login');
+	var emailInput = document.getElementById('login_email');
+	var passInput = document.getElementById('login_password');
+	var tokenInput = document.getElementById('login_token_input');
+
+	function updateLoginBtn() {
+		if (loginBtn) loginBtn.disabled = !(emailInput.value.trim() && passInput.value.trim());
+	}
+	function updateTokenBtn() {
+		if (tokenBtn) tokenBtn.disabled = !tokenInput.value.trim();
+	}
+	if (emailInput) emailInput.addEventListener('input', updateLoginBtn);
+	if (passInput) passInput.addEventListener('input', updateLoginBtn);
+	if (tokenInput) tokenInput.addEventListener('input', updateTokenBtn);
 
 	// Token form submit
 	document.querySelector('.form-token').addEventListener('submit', function(e) {
