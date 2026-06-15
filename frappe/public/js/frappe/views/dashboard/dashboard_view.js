@@ -128,6 +128,10 @@ frappe.views.DashboardView = class DashboardView extends frappe.views.ListView {
 				chart.chart_settings = this.dashboard_chart_settings[chart.chart_name] || {};
 			});
 			this.render_dashboard_charts();
+		}).catch((err) => {
+			console.error("Failed to load dashboard settings:", err);
+			// Still render charts without custom settings
+			this.render_dashboard_charts();
 		});
 		this.render_number_cards();
 
@@ -144,6 +148,10 @@ frappe.views.DashboardView = class DashboardView extends frappe.views.ListView {
 			})
 			.then((items) => {
 				this[obj_name] = items;
+			})
+			.catch((err) => {
+				console.error(`Failed to fetch ${obj_name}:`, err);
+				this[obj_name] = [];
 			});
 	}
 

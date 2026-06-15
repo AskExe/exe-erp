@@ -61,9 +61,20 @@ export default class ChartWidget extends Widget {
 		this.empty.hide().appendTo(this.body);
 
 		this.error_state = $(
-			`<div class="chart-loading-state text-danger" style="height: ${this.height}px;"></div>`
+			`<div class="chart-loading-state chart-error-state text-danger" style="height: ${this.height}px;">
+				<div class="text-center">
+					<div class="chart-error-message mb-2"></div>
+					<button class="btn btn-xs btn-default btn-section-retry">
+						${__("Retry")}
+					</button>
+				</div>
+			</div>`
 		);
 		this.error_state.hide().appendTo(this.body);
+		this.error_state.find(".btn-section-retry").on("click", () => {
+			delete this.dashboard_chart;
+			this.make_chart();
+		});
 
 		this.chart_wrapper = $(`<div></div>`);
 		this.chart_wrapper.appendTo(this.body);
@@ -560,12 +571,17 @@ export default class ChartWidget extends Widget {
 		return frappe.xcall(method, args, undefined, {
 			silent: true,
 			error: (err) => {
-				const message = JSON.parse(JSON.parse(err._server_messages)[0])?.message;
+				let message;
+				try {
+					message = JSON.parse(JSON.parse(err._server_messages)[0])?.message;
+				} catch (_e) {
+					message = __("Failed to load chart data");
+				}
 				this.chart_wrapper.hide();
 				this.loading.hide();
 				this.$summary && this.$summary.hide();
 				this.empty.hide();
-				this.error_state.text(message);
+				this.error_state.find(".chart-error-message").text(message);
 				this.error_state.show();
 			},
 		});

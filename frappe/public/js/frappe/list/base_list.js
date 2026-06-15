@@ -290,6 +290,7 @@ frappe.views.BaseList = class BaseList {
 				this.setup_result_area,
 				this.setup_no_result_area,
 				this.setup_freeze_area,
+				this.setup_error_area,
 				this.setup_paging_area,
 			].map((fn) => fn.bind(this))
 		);
@@ -358,6 +359,49 @@ frappe.views.BaseList = class BaseList {
 	setup_freeze_area() {
 		this.$freeze = $('<div class="freeze"></div>').hide();
 		this.$frappe_list.append(this.$freeze);
+	}
+
+	setup_error_area() {
+		this.$error_state = $(`
+			<div class="section-error-state flex justify-center align-center" style="display: none;">
+				<div class="text-center">
+					<div class="mb-3">
+						<svg class="icon icon-xl" style="stroke: var(--red-500);">
+							<use href="#icon-alert-circle"></use>
+						</svg>
+					</div>
+					<p class="section-error-message text-muted">
+						${__("Failed to load data")}
+					</p>
+					<button class="btn btn-default btn-sm btn-section-retry mt-2">
+						${__("Retry")}
+					</button>
+				</div>
+			</div>
+		`).hide();
+		this.$frappe_list.append(this.$error_state);
+
+		this.$error_state.on("click", ".btn-section-retry", () => {
+			this.last_args = null;
+			this.show_error_state(false);
+			this.refresh();
+		});
+	}
+
+	show_error_state(show, message) {
+		if (!this.$error_state) return;
+		if (show) {
+			this.$result && this.$result.parent(".result-container").hide();
+			this.$result && this.$result.hide();
+			this.$paging_area && this.$paging_area.hide();
+			this.$no_result && this.$no_result.hide();
+			if (message) {
+				this.$error_state.find(".section-error-message").text(message);
+			}
+			this.$error_state.show();
+		} else {
+			this.$error_state.hide();
+		}
 	}
 
 	get_no_result_message() {
@@ -522,6 +566,7 @@ frappe.views.BaseList = class BaseList {
 			return Promise.resolve();
 		}
 		this.freeze(true);
+		this.show_error_state(false);
 		// fetch data from server
 		return frappe.call(args).then((r) => {
 			// render
@@ -536,6 +581,13 @@ frappe.views.BaseList = class BaseList {
 			if (this.settings.refresh) {
 				this.settings.refresh(this);
 			}
+		}).catch((err) => {
+			this.freeze(false);
+			console.error("List refresh failed:", err);
+			const message = err?.message || err?._server_messages
+				? __("Connection error — data may be stale")
+				: __("Failed to load data");
+			this.show_error_state(true, message);
 		});
 	}
 
@@ -592,6 +644,7 @@ frappe.views.BaseList = class BaseList {
 	}
 
 	toggle_result_area() {
+		this.$error_state && this.$error_state.hide();
 		this.$result.parent(".result-container").toggle(this.data.length > 0);
 		this.$result.toggle(this.data.length > 0);
 		this.$paging_area.toggle(this.data.length > 0);

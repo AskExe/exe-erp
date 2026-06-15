@@ -95,7 +95,8 @@ export default class ShortcutWidget extends Widget {
 				.count(this.link_to, {
 					filters: filters || [],
 				})
-				.then((count) => this.set_count(count));
+				.then((count) => this.set_count(count))
+				.catch(() => this.set_count_error());
 		}
 	}
 
@@ -112,6 +113,18 @@ export default class ShortcutWidget extends Widget {
 		let color = this.color && count ? this.color.toLowerCase() : "gray";
 		$(
 			`<div class="indicator-pill no-indicator-dot ellipsis ${color}">${__(label)}</div>`
+		).appendTo(this.action_area);
+
+		$(frappe.utils.icon("es-line-arrow-up-right", "xs", "", "", "ml-2")).appendTo(
+			this.action_area
+		);
+	}
+
+	set_count_error() {
+		this.action_area.empty();
+		$(
+			`<div class="indicator-pill no-indicator-dot ellipsis orange"
+				title="${__("Could not load count")}">--</div>`
 		).appendTo(this.action_area);
 
 		$(frappe.utils.icon("es-line-arrow-up-right", "xs", "", "", "ml-2")).appendTo(

@@ -730,11 +730,13 @@ body {
 
 	&.quick-list-widget-box {
 		.list-loading-state,
-		.list-no-data-state {
+		.list-no-data-state,
+		.list-error-state {
 			display: flex;
 			justify-content: center;
 			align-items: center;
 			height: 202px;
+			flex-direction: column;
 		}
 
 		.refresh-list,
@@ -1400,4 +1402,42 @@ body {
 	.dropdown-item-icon {
 		margin-right: 5px;
 	}
+}
+
+/* Section-level state indicators (loading, error, degraded) */
+.section-error-state {
+	min-height: 200px;
+	padding: var(--padding-xl);
+	text-align: center;
+
+	.section-error-message {
+		font-size: var(--text-sm);
+		max-width: 300px;
+		margin: 0 auto;
+	}
+}
+
+.section-degraded-state {
+	border-left: 3px solid var(--orange-500);
+
+	.widget-body .section-degraded {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 50px;
+	}
+}
+
+.chart-error-state {
+	flex-direction: column;
+
+	.chart-error-message {
+		font-size: var(--text-sm);
+	}
+}
+
+.btn-section-retry {
+	font-size: var(--text-xs);
+	padding: var(--padding-xs) var(--padding-sm);
 }
