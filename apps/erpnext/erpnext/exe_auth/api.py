@@ -85,7 +85,7 @@ def gotrue_login(
 				f"Email domain '{email_domain}' is not allowed. Contact your administrator.",
 				frappe.AuthenticationError,
 			)
-		default_user_type = frappe.conf.get("default_gotrue_user_type", "System User")
+		default_user_type = frappe.conf.get("default_gotrue_user_type", "Website User")
 		user_doc = frappe.get_doc(
 			{
 				"doctype": "User",
@@ -187,7 +187,7 @@ def gotrue_login_callback():
 				f"Email domain '{email_domain}' is not allowed. Contact your administrator.",
 				frappe.AuthenticationError,
 			)
-		default_user_type = frappe.conf.get("default_gotrue_user_type", "System User")
+		default_user_type = frappe.conf.get("default_gotrue_user_type", "Website User")
 		user_doc = frappe.get_doc(
 			{
 				"doctype": "User",
