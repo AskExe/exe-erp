@@ -125,6 +125,18 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 					<button class="exe-btn-signin btn-primary btn-token-login" type="submit" disabled>SIGN IN</button>
 				</form>
 			</div>
+
+			<!-- Exe SSO divider + link -->
+			<div style="display:flex;align-items:center;gap:12px;margin-top:1.5rem;max-width:340px">
+				<div style="flex:1;height:1px;background:rgba(240,237,232,0.1)"></div>
+				<span style="color:#A09CAF;font-size:12px;font-family:'Manrope',sans-serif">or</span>
+				<div style="flex:1;height:1px;background:rgba(240,237,232,0.1)"></div>
+			</div>
+			<a id="exe-sso-link"
+				style="display:flex;align-items:center;justify-content:center;width:100%;max-width:340px;height:42px;margin-top:1rem;border:1px solid rgba(240,237,232,0.1);border-radius:8px;color:#F0EDE8;font-family:'Manrope',sans-serif;font-size:13px;font-weight:500;text-decoration:none;transition:background-color 0.15s,border-color 0.15s;cursor:pointer"
+				onmouseover="this.style.backgroundColor='rgba(37,35,64,0.6)';this.style.borderColor='rgba(245,215,110,0.3)'"
+				onmouseout="this.style.backgroundColor='transparent';this.style.borderColor='rgba(240,237,232,0.1)'"
+			>Sign in via Exe SSO</a>
 		</div>
 	</section>
 
@@ -213,6 +225,13 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 		updateLoginBtn(); updateTokenBtn();
 		if (++_pollCount > 100) clearInterval(_pollTimer);
 	}, 200);
+
+	// Exe SSO link — redirect to auth.askexe.com with callback to our GoTrue endpoint
+	var ssoLink = document.getElementById('exe-sso-link');
+	if (ssoLink) {
+		var callbackUrl = window.location.origin + '/api/method/erpnext.exe_auth.api.gotrue_login_callback';
+		ssoLink.href = 'https://auth.askexe.com/login?product=ERP&redirect=' + encodeURIComponent(callbackUrl);
+	}
 
 	// Token form submit
 	document.querySelector('.form-token').addEventListener('submit', function(e) {

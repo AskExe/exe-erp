@@ -1,0 +1,45 @@
+{
+  "colors": {
+    "bgPrimary": "#0F0E1A",
+    "bgSecondary": "#191823",
+    "bgTertiary": "#201f2a",
+    "accent": "#F5D76E",
+    "accentHover": "#e6c85e",
+    "accentActive": "#d4b84e",
+    "text": "#F0EDE8",
+    "textMuted": "#A09CAF",
+    "textInverted": "#0F0E1A",
+    "border": "rgba(240, 237, 232, 0.1)",
+    "error": "#EF4444",
+    "success": "#22C55E",
+    "inputBg": "rgba(255, 255, 255, 0.05)",
+    "inputBgFocus": "rgba(255, 255, 255, 0.07)",
+    "tabActiveBg": "rgb(37, 35, 64)",
+    "tabBg": "rgba(255, 255, 255, 0.05)"
+  },
+  "fonts": {
+    "heading": "Epilogue, sans-serif",
+    "body": "Manrope, system-ui, -apple-system, sans-serif",
+    "mono": "Space Grotesk, ui-monospace, monospace"
+  },
+  "spacing": {
+    "radius": "8px",
+    "radiusSm": "6px",
+    "radiusLg": "12px",
+    "inputHeight": "42px",
+    "btnHeight": "42px",
+    "cardMaxWidth": "480px",
+    "loginCardMaxWidth": "340px"
+  },
+  "typography": {
+    "h1": "30px",
+    "h2": "24px",
+    "h3": "20px",
+    "body": "16px",
+    "small": "14px",
+    "caption": "12px",
+    "headingWeight": 700,
+    "headingLetterSpacing": "-0.02em",
+    "headingTransform": "uppercase"
+  }
+}

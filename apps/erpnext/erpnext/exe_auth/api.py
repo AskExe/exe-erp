@@ -129,6 +129,89 @@ def gotrue_login(
 	}
 
 
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+@rate_limit(key="gotrue_callback", limit=10, seconds=900)
+def gotrue_login_callback():
+	"""Handle redirect from auth.askexe.com with JWT token.
+
+	auth.askexe.com redirects to:
+	  /api/method/erpnext.exe_auth.api.gotrue_login_callback?access_token=JWT&refresh_token=REFRESH
+
+	We validate the JWT against GoTrue's /user endpoint, auto-provision
+	a Frappe User if needed, log them in, and redirect to /desk.
+	"""
+	access_token = frappe.form_dict.get("access_token")
+	if not access_token:
+		frappe.throw("No access token provided", frappe.AuthenticationError)
+
+	gotrue_url = frappe.conf.get("gotrue_url")
+	if not gotrue_url:
+		frappe.throw(
+			"GoTrue URL not configured. Set gotrue_url in site_config.json",
+			frappe.ValidationError,
+		)
+
+	# Validate the JWT against GoTrue
+	try:
+		resp = requests.get(
+			f"{gotrue_url.rstrip('/')}/user",
+			headers={"Authorization": f"Bearer {access_token}"},
+			timeout=10,
+		)
+	except requests.RequestException as e:
+		frappe.log_error(
+			title="GoTrue SSO Callback Error",
+			message=f"GoTrue service unavailable: {e}",
+		)
+		frappe.throw("Authentication service temporarily unavailable", frappe.AuthenticationError)
+
+	if resp.status_code != 200:
+		frappe.log_error(
+			title="GoTrue SSO Callback Failure",
+			message=f"Status {resp.status_code}: {resp.text[:500]}",
+		)
+		frappe.throw("Invalid or expired SSO token", frappe.AuthenticationError)
+
+	user_data = resp.json()
+	email = user_data.get("email")
+	if not email:
+		frappe.throw("No email in SSO token", frappe.AuthenticationError)
+
+	# Auto-provision Frappe User if needed (same logic as gotrue_login)
+	if not frappe.db.exists("User", email):
+		first_name = email.split("@")[0]
+		allowed_domains = frappe.conf.get("allowed_email_domains", [])
+		email_domain = email.split("@")[1] if "@" in email else ""
+		if allowed_domains and email_domain not in allowed_domains:
+			frappe.throw(
+				f"Email domain '{email_domain}' is not allowed. Contact your administrator.",
+				frappe.AuthenticationError,
+			)
+		default_user_type = frappe.conf.get("default_gotrue_user_type", "System User")
+		user_doc = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": first_name,
+				"enabled": 1,
+				"user_type": default_user_type,
+			}
+		)
+		user_doc.flags.ignore_permissions = True
+		user_doc.flags.no_welcome_mail = True
+		user_doc.insert()
+
+		bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
+		user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
+		if user_count <= 1 and bootstrap_mode:
+			user_doc.add_roles("System Manager")
+
+	# Login and redirect to desk
+	frappe.local.login_manager.login_as(email)
+	frappe.local.response["type"] = "redirect"
+	frappe.local.response["location"] = get_home_page() or "/desk"
+
+
 @frappe.whitelist(allow_guest=True)
 @rate_limit(key="admin_token", limit=5, seconds=900)
 def admin_token(token: str | None = None):
