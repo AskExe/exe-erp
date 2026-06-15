@@ -201,9 +201,17 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 	function updateTokenBtn() {
 		if (tokenBtn) tokenBtn.disabled = !tokenInput.value.trim();
 	}
-	if (emailInput) emailInput.addEventListener('input', updateLoginBtn);
-	if (passInput) passInput.addEventListener('input', updateLoginBtn);
-	if (tokenInput) tokenInput.addEventListener('input', updateTokenBtn);
+	['input', 'change', 'keyup', 'paste'].forEach(function(evt) {
+		if (emailInput) emailInput.addEventListener(evt, updateLoginBtn);
+		if (passInput) passInput.addEventListener(evt, updateLoginBtn);
+		if (tokenInput) tokenInput.addEventListener(evt, updateTokenBtn);
+	});
+	// Also poll briefly in case programmatic fill doesn't fire events
+	var _pollCount = 0;
+	var _pollTimer = setInterval(function() {
+		updateLoginBtn(); updateTokenBtn();
+		if (++_pollCount > 100) clearInterval(_pollTimer);
+	}, 200);
 
 	// Token form submit
 	document.querySelector('.form-token').addEventListener('submit', function(e) {
