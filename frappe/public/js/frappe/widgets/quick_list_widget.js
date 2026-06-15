@@ -135,6 +135,21 @@ export default class QuickListWidget extends Widget {
 		this.loading.appendTo(this.body);
 	}
 
+	render_error_state() {
+		this.body.empty();
+		const $error = $(`<div class="list-error-state text-muted">
+			<div>${__("Failed to load")}</div>
+			<button class="btn btn-xs btn-default mt-2 btn-section-retry">
+				${__("Retry")}
+			</button>
+		</div>`);
+		$error.find(".btn-section-retry").on("click", () => {
+			this.body.empty();
+			this.set_body();
+		});
+		$error.appendTo(this.body);
+	}
+
 	setup_quick_list_item(doc) {
 		const indicator = frappe.get_indicator(doc, this.document_type);
 
@@ -246,6 +261,9 @@ export default class QuickListWidget extends Widget {
 				this.quick_list.forEach(($quick_list_item) =>
 					$quick_list_item.appendTo(this.body)
 				);
+			}).catch((err) => {
+				console.error("Quick list failed to load:", this.document_type, err);
+				this.render_error_state();
 			});
 		});
 	}

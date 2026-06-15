@@ -769,3 +769,16 @@ input.list-header-checkbox {
 		text-overflow: ellipsis;
 	}
 }
+
+/* Section error state for list views */
+.frappe-list {
+	.section-error-state {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		min-height: 300px;
+		background-color: var(--subtle-fg);
+		border-radius: var(--border-radius);
+		margin: var(--margin-sm) 0;
+	}
+}

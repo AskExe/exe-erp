@@ -46,6 +46,9 @@ export default class NumberCardWidget extends Widget {
 			}
 
 			this.set_events();
+		}).catch((err) => {
+			console.error("Number card doc fetch failed:", this.name, err);
+			this.render_error_state();
 		});
 	}
 
@@ -178,16 +181,37 @@ export default class NumberCardWidget extends Widget {
 		}
 
 		this.settings = this.get_settings(this.card_doc.type);
-		await this.get_data();
 
-		this.render_number();
-		this.render_stats();
+		try {
+			await this.get_data();
+			this.render_number();
+			this.render_stats();
+		} catch (err) {
+			console.error("Number card failed to load:", this.name, err);
+			this.render_error_state();
+		}
 	}
 
 	set_loading_state() {
 		$(this.body).html(`<div class="number-card-loading text-muted">
 			${__("Loading...")}
 		</div>`);
+	}
+
+	render_error_state() {
+		$(this.body).html(`<div class="widget-content section-degraded">
+			<div class="number text-muted" style="font-size: var(--text-lg);">
+				${__("Unavailable")}
+			</div>
+			<button class="btn btn-xs btn-default mt-2 btn-section-retry">
+				${__("Retry")}
+			</button>
+		</div>`);
+		this.widget.addClass("section-degraded-state");
+		$(this.body).find(".btn-section-retry").on("click", () => {
+			this.widget.removeClass("section-degraded-state");
+			this.render_card();
+		});
 	}
 
 	async get_data() {

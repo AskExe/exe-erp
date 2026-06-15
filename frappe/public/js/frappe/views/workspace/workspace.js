@@ -131,6 +131,12 @@ frappe.views.Workspace = class Workspace {
 						this.pages[page.name] = this.page_data;
 					}
 				});
+			})
+			.catch((err) => {
+				console.error("Workspace data load failed:", page.name, err);
+				// Provide empty page_data so the workspace still renders
+				this.page_data = { charts: { items: [] }, shortcuts: { items: [] } };
+				this.pages[page.name] = this.page_data;
 			});
 	}
 

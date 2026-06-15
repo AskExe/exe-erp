@@ -384,6 +384,9 @@ frappe.views.ListView = class ListView extends frappe.views.BaseList {
 			this.update_url_with_filters();
 			this.setup_realtime_updates();
 			this.apply_styles_basedon_dropdown();
+		}).catch((err) => {
+			// error already handled by BaseList.refresh — just log
+			console.warn("ListView refresh degraded:", err);
 		});
 	}
 
@@ -1346,6 +1349,10 @@ frappe.views.ListView = class ListView extends frappe.views.BaseList {
 				},
 				Boolean(this.count_upper_bound)
 			)
+			.catch(() => {
+				// count failed — show degraded indicator
+				return null;
+			})
 			.then((total_count) => {
 				this.total_count = total_count;
 				this.count_without_children =
