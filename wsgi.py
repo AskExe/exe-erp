@@ -9,7 +9,11 @@ Usage in docker-compose.yml:
   gunicorn --bind=0.0.0.0:8000 wsgi:application
 """
 
-from frappe.app import application as _frappe_app
+from frappe.app import application as _frappe_app, application_with_statics
+
+# Ensure static file serving middleware is applied (SharedDataMiddleware for /assets)
+# Without this, /assets/* returns 404 and the frontend has no CSS/JS/images.
+_frappe_app = application_with_statics()
 
 try:
     from erpnext.exe_bridge.middleware import TracingMiddleware
