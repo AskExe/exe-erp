@@ -4,70 +4,10 @@
     {{ super() }}
 {% endif %}
 {% endblock %}
-{% macro email_login_body() -%}
-{% if not disable_user_pass_login or (ldap_settings and ldap_settings.enabled) %}
-<div class="page-card-body">
-	<div class="form-group">
-		<label class="form-label sr-only" for="login_email">{{ login_label or _("Email")}}</label>
-		<div class="email-field">
-			<input type="text" id="login_email" class="form-control"
-				placeholder="{% if login_name_placeholder %}{{ login_name_placeholder  }}{% else %}{{ _('jane@example.com') }}{% endif %}"
-				required autofocus autocomplete="username">
-
-			<svg class="field-icon email-icon" width="16" height="16" viewBox="0 0 16 16" fill="none"
-				xmlns="http://www.w3.org/2000/svg">
-				<use class="es-lock" href="#es-line-email"></use>
-			</svg>
-		</div>
-	</div>
-
-	<div class="form-group">
-		<label class="form-label sr-only" for="login_password">{{ _("Password") }}</label>
-		<div class="password-field">
-			<input type="password" id="login_password" class="form-control" placeholder="•••••"
-				autocomplete="current-password" required>
-
-			<svg class="field-icon password-icon" width="16" height="16" viewBox="0 0 16 16" fill="none"
-				xmlns="http://www.w3.org/2000/svg">
-					<use class="es-lock" href="#es-line-lock"></use>
-			</svg>
-			<span toggle="#login_password" class="toggle-password text-muted">{{ _('Show') }}</span>
-		</div>
-	</div>
-
-	{% if not disable_user_pass_login %}
-	<p class="forgot-password-message">
-		<a href="#forgot">{{ _("Forgot Password?") }}</a>
-	</p>
-	{% endif %}
-</div>
-{% endif %}
-<div class="page-card-actions">
-	{% if not disable_user_pass_login %}
-	<button class="btn btn-sm btn-primary btn-block btn-login" type="submit">
-		{{ _("Login") }}</button>
-	{% endif %}
-	{% if ldap_settings and ldap_settings.enabled %}
-	<button class="btn btn-sm {{ "btn-primary" if disable_user_pass_login else "btn-default" }} btn-block btn-login btn-ldap-login">
-		{{ _("Login with LDAP") }}</button>
-	{% endif %}
-</div>
-{% endmacro %}
 
 {% block head_include %}
 {{ include_style('login.bundle.css') }}
 {% endblock %}
-
-{% macro logo_section(title=null) %}
-<div class="page-card-head">
-	<img class="app-logo" src="{{ logo }}">
-	{% if title %}
-	<h4>{{ _(title)}}</h4>
-	{% else %}
-	<h4>{{ _('Login to {0}').format(app_name or _("Exe ERP")) }}</h4>
-	{% endif %}
-</div>
-{% endmacro %}
 
 {% block page_content %}
 
@@ -80,137 +20,93 @@
 				{{ _("You need to enable JavaScript for your app to work.") }}<br>{{ _("To enable it follow the instructions in the following link: {0}").format("<a href='https://enable-javascript.com/'>enable-javascript.com</a></p>") }}
 		</div>
 	</noscript>
-	<section class='for-login'>
-		{{ logo_section() }}
-		<div class="login-content page-card">
-			<form class="form-signin form-login" role="form">
-				{%- if social_login or login_with_email_link -%}
-				<div class="page-card-body">
-					<form class="form-signin form-login" role="form">
-						{{ email_login_body() }}
-					</form>
-					<div class="social-logins text-center">
-						{% if not disable_user_pass_login or (ldap_settings and ldap_settings.enabled) %}
-						<p class="text-muted login-divider">{{ _("or") }}</p>
-						{% endif %}
-						<div class="social-login-buttons">
-							{% for provider in provider_logins %}
-							<div class="login-button-wrapper">
-								<a href="{{ provider.auth_url }}"
-									class="btn btn-block btn-default btn-sm btn-login-option btn-{{ provider.name }}">
-									{% if provider.icon %}
-										{{ provider.icon }}
-									{% endif %}
-									{{ _("Login with {0}").format(provider.provider_name) }}</a>
-							</div>
-							{% endfor %}
-						</div>
 
-						{# Frappe Cloud login removed — Exe ERP fork #}
-
-						{% if login_with_email_link %}
-						<div class="login-with-email-link social-login-buttons">
-							<div class="login-button-wrapper">
-								<a href="#login-with-email-link"
-									class="btn btn-block btn-default btn-sm btn-login-option btn-login-with-email-link">
-									{{ _("Login with Email Link") }}</a>
-							</div>
-						</div>
-						{% endif %}
-					</div>
-				</div>
-				{% else %}
-					{{ email_login_body() }}
-				{%- endif -%}
-			</form>
-		</div>
-		{%- if not disable_signup and not disable_user_pass_login -%}
-		<div class="text-center sign-up-message">
-			{{ _("Don't have an account?") }}
-			<a href="#signup">{{ _("Sign up") }}</a>
-		</div>
-		{%- endif -%}
-	</section>
-
-	{%- if social_login -%}
-	<section class='for-email-login'>
-		{{ logo_section() }}
-		<div class="login-content page-card">
-			<form class="form-signin form-login" role="form">
-			{{ email_login_body() }}
-			</form>
-		</div>
-		{%- if not disable_signup and not disable_user_pass_login -%}
-		<div class="text-center sign-up-message">
-			{{ _("Don't have an account?") }}
-			<a href="#signup">{{ _("Sign up") }}</a>
-		</div>
-		{%- endif -%}
-	</section>
-	{%- endif -%}
-	<section class='for-signup {{ "signup-disabled" if disable_signup else "" }}'>
-		{{ logo_section(_('Create a {0} Account').format(app_name or _("Exe ERP"))) }}
-		<div class="login-content page-card">
-			{%- if not disable_signup -%}
-			{{ signup_form_template }}
-			{%- else -%}
-			<div class='page-card-head mb-2'>
-				<span class='indicator gray'>{{_("Signup Disabled")}}</span>
-				<p class="text-muted text-normal sign-up-message mt-1 mb-8">{{_("Signups have been disabled for this website.")}}</p>
-				<div><a href='/' class='btn btn-primary btn-md'>{{ _("Home") }}</a></div>
+	<section class="for-login exe-login-section">
+		<div class="exe-login-card login-content page-card">
+			<!-- Logo: EXE in gold italic + ERP in white bold -->
+			<div class="exe-logo">
+				<span class="exe-logo-exe">EXE</span>
+				<span class="exe-logo-product">ERP</span>
 			</div>
-			{%- endif -%}
-		</div>
+			<p class="exe-subtitle">Sign in to your workspace</p>
 
+			<!-- Tab switcher -->
+			<div class="exe-tab-switcher">
+				<div class="exe-tab active" data-tab="login">Login</div>
+				<div class="exe-tab" data-tab="token">Token</div>
+			</div>
+
+			<!-- Login tab content -->
+			<div class="exe-tab-content" id="exe-tab-login">
+				<form class="form-signin form-login" role="form">
+					<div class="page-card-body">
+						<div class="exe-field-group">
+							<label class="exe-label" for="login_email">Email</label>
+							<input type="text" id="login_email" class="exe-input"
+								placeholder="you@company.com"
+								required autofocus autocomplete="username">
+						</div>
+						<div class="exe-field-group">
+							<label class="exe-label" for="login_password">Password</label>
+							<input type="password" id="login_password" class="exe-input"
+								placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;"
+								autocomplete="current-password" required>
+						</div>
+					</div>
+					<button class="exe-btn-signin btn-primary btn-login" type="submit">SIGN IN</button>
+				</form>
+			</div>
+
+			<!-- Token tab content -->
+			<div class="exe-tab-content" id="exe-tab-token" style="display: none;">
+				<form class="form-signin form-token" role="form">
+					<div class="page-card-body">
+						<div class="exe-field-group">
+							<label class="exe-label" for="login_token_input">Token</label>
+							<input type="password" id="login_token_input" class="exe-input"
+								placeholder="Enter admin token"
+								autocomplete="off" required>
+						</div>
+					</div>
+					<button class="exe-btn-signin btn-primary btn-token-login" type="submit">SIGN IN</button>
+				</form>
+			</div>
+		</div>
 	</section>
 
-	<section class='for-forgot'>
-		{{ logo_section('Forgot Password') }}
+	<!-- Hidden sections kept for Frappe JS routing compatibility -->
+	<section class="for-email-login" style="display:none;">
+		<div class="login-content page-card">
+			<form class="form-signin form-login" role="form"></form>
+		</div>
+	</section>
+	<section class="for-signup signup-disabled" style="display:none;">
+		<div class="login-content page-card"></div>
+	</section>
+	<section class="for-forgot" style="display:none;">
 		<div class="login-content page-card">
 			<form class="form-signin form-forgot hide" role="form">
 				<div class="page-card-body">
-					<div class="email-field">
-						<input type="email" id="forgot_email" class="form-control"
-							placeholder="{{ _('Email Address') }}" required autofocus autocomplete="username">
-						<svg class="field-icon email-icon" width="16" height="16" viewBox="0 0 16 16" fill="none"
-							xmlns="http://www.w3.org/2000/svg">
-							<use class="es-lock" href="#es-line-email"></use>
-						</svg>
-
-					</div>
+					<input type="email" id="forgot_email" class="form-control"
+						placeholder="{{ _('Email Address') }}" required autofocus autocomplete="username">
 				</div>
 				<div class="page-card-actions">
 					<button class="btn btn-sm btn-primary btn-block btn-forgot"
 						type="submit">{{ _("Reset Password") }}</button>
-					<p class="text-center sign-up-message">
-						<a href="#login">{{ _("Back to Login") }}</a>
-					</p>
 				</div>
-
 			</form>
 		</div>
 	</section>
-
-	<section class='for-login-with-email-link'>
-			{{ logo_section(_('Login with Email Link')) }}
+	<section class="for-login-with-email-link" style="display:none;">
 		<div class="login-content page-card">
 			<form class="form-signin form-login-with-email-link hide" role="form">
 				<div class="page-card-body">
-					<div class="email-field">
-						<input type="email" id="login_with_email_link_email" class="form-control"
-							placeholder="{{ _('Email Address') }}" required autofocus autocomplete="username">
-						<svg class="field-icon email-icon" width="16" height="16" viewBox="0 0 16 16" fill="none"
-							xmlns="http://www.w3.org/2000/svg">
-							<use class="es-lock" href="#es-line-email"></use>
-						</svg>
-					</div>
+					<input type="email" id="login_with_email_link_email" class="form-control"
+						placeholder="{{ _('Email Address') }}" required autofocus autocomplete="username">
 				</div>
 				<div class="page-card-actions">
 					<button class="btn btn-sm btn-primary btn-block btn-login-with-email-link"
 						type="submit">{{ _("Send login link") }}</button>
-					<p class="text-center sign-up-message">
-						<a href="#login">{{ _("Back to Login") }}</a>
-					</p>
 				</div>
 			</form>
 		</div>
@@ -220,6 +116,70 @@
 
 {% block script %}
 <script>{% include "templates/includes/login/login.js" %}</script>
+<script>
+// ── Exe ERP: Tab switcher + Token login ──
+(function() {
+	// Tab switching
+	document.querySelectorAll('.exe-tab').forEach(function(tab) {
+		tab.addEventListener('click', function() {
+			document.querySelectorAll('.exe-tab').forEach(function(t) { t.classList.remove('active'); });
+			document.querySelectorAll('.exe-tab-content').forEach(function(c) { c.style.display = 'none'; });
+			tab.classList.add('active');
+			var target = tab.getAttribute('data-tab');
+			document.getElementById('exe-tab-' + target).style.display = 'block';
+			if (target === 'login') {
+				document.getElementById('login_email').focus();
+			} else {
+				document.getElementById('login_token_input').focus();
+			}
+		});
+	});
+
+	// Token form submit
+	document.querySelector('.form-token').addEventListener('submit', function(e) {
+		e.preventDefault();
+		var token = document.getElementById('login_token_input').value.trim();
+		if (!token) {
+			frappe.msgprint('Token is required');
+			return;
+		}
+		var btn = document.querySelector('.btn-token-login');
+		var origText = btn.textContent;
+		btn.textContent = 'Verifying...';
+		btn.disabled = true;
+
+		frappe.call({
+			type: 'POST',
+			url: '/api/method/erpnext.exe_auth.api.admin_token',
+			args: { token: token },
+			callback: function(r) {
+				if (r && r.message && r.message.success) {
+					btn.textContent = 'Success';
+					document.body.innerHTML = '{% include "templates/includes/splash_screen.html" %}';
+					window.location.href = r.message.home_page || '/desk';
+				}
+			},
+			statusCode: {
+				401: function() {
+					btn.textContent = origText;
+					btn.disabled = false;
+					frappe.msgprint('Invalid token');
+				},
+				403: function() {
+					btn.textContent = origText;
+					btn.disabled = false;
+					frappe.msgprint('Invalid token');
+				},
+				500: function() {
+					btn.textContent = origText;
+					btn.disabled = false;
+					frappe.msgprint('Something went wrong');
+				}
+			}
+		});
+	});
+})();
+</script>
 {% endblock %}
 
 {% block sidebar %}{% endblock %}

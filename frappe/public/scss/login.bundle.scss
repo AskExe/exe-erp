@@ -1,295 +1,374 @@
-@import "./desk/variables";
-
 /* =====================================================
-   Exe Foundry Bold — Login Page Design System Override
-   Matches CRM (crm.askexe.com/welcome) and Wiki login.
-   Colors: #0F0E1A bg, #1A1832 card, #252340 input,
-           #F5D76E gold CTA, #F0EDE8 text, #A09CAF secondary
-   Typography: Epilogue (headlines), Manrope (body)
+   Exe Foundry Bold — Login Page
+   Pixel-perfect match: crm.askexe.com + wiki.askexe.com
+   Colors: #0F0E1A bg, #F5D76E gold, #F0EDE8 text
+   Typography: Epilogue (display), Manrope (body)
    ===================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@700;900&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,700;0,900;1,700;1,900&family=Manrope:wght@400;500;600;700&display=swap');
 
+/* ── Reset: kill all Frappe chrome ── */
 body {
 	background-color: #0F0E1A !important;
-	font-family: 'Manrope', system-ui, sans-serif;
-
-	@include media-breakpoint-up(sm) {
-		background-color: #0F0E1A !important;
-	}
-	.page-content-wrapper {
-		min-height: calc(100vh - 220px);
-	}
-	.web-footer {
-		display: none;
-	}
+	font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+	margin: 0;
+	padding: 0;
 }
 
-.for-forgot,
-.for-login-with-email-link,
+/* Hide Frappe navbar, footer, breadcrumbs, page wrappers */
+.navbar,
+.web-footer,
+.page-breadcrumbs,
+.page-header-wrapper,
+.page-header {
+	display: none !important;
+}
+
+/* Remove Frappe container constraints */
+.page-content-wrapper {
+	min-height: 100vh;
+	padding: 0 !important;
+	margin: 0 !important;
+}
+
+.page_content {
+	padding: 0 !important;
+	margin: 0 !important;
+}
+
+main.container {
+	max-width: 100% !important;
+	padding: 0 !important;
+}
+
+/* Hide all legacy Frappe sections */
+.for-email-login,
 .for-signup,
-.for-email-login {
-	display: none;
-}
-
-.for-login,
 .for-forgot,
-.for-login-with-email-link,
-.for-signup,
-.for-email-login {
-	.page-card {
-		padding: 45px 10px;
-		background-color: #1A1832;
-		max-width: 400px;
-		margin: 0 auto;
-		border-radius: 12px;
-		border: 1px solid #2E2C47;
-
-		form {
-			max-width: 320px;
-			margin: 0 auto;
-
-			.form-group {
-				margin-bottom: var(--margin-sm);
-			}
-		}
-
-		.page-card-actions {
-			margin-top: var(--margin-lg);
-		}
-
-		.page-card-body {
-			::placeholder,
-			::-ms-input-placeholder {
-				color: #A09CAF;
-				opacity: 0.5;
-			}
-
-			input[type="text"],
-			input[type="email"],
-			input[type="password"] {
-				border: 1px solid #2E2C47;
-				color: #F0EDE8;
-				font-family: 'Manrope', system-ui, sans-serif;
-				font-size: 14px;
-				font-weight: 400;
-				background-color: #252340;
-				margin-bottom: 1rem;
-				border-radius: 8px;
-				padding: 10px 12px 10px 35px;
-				transition: border-color 0.15s, box-shadow 0.15s;
-
-				&:focus {
-					border-color: #F5D76E;
-					box-shadow: 0 0 0 3px rgba(245, 215, 110, 0.15);
-					outline: none;
-					background-color: #252340;
-					color: #F0EDE8;
-				}
-			}
-
-			&.invalid {
-				input[type="text"],
-				input[type="email"],
-				input[type="password"] {
-					border: 1px solid #EF4444;
-				}
-			}
-
-			.form-label {
-				color: #A09CAF;
-				font-family: 'Manrope', system-ui, sans-serif;
-				font-size: 13px;
-			}
-
-			.forgot-password-message {
-				text-align: right;
-				line-height: 1;
-
-				> * {
-					color: #A09CAF;
-					font-size: 12px;
-
-					&:hover {
-						color: #F5D76E;
-					}
-				}
-			}
-
-			.field-icon {
-				left: 9px;
-				top: 50%;
-				transform: translateY(-50%);
-				position: absolute;
-				z-index: 2;
-				fill: #A09CAF;
-			}
-
-			.email-field,
-			.password-field {
-				position: relative;
-
-				input {
-					padding-left: 35px;
-				}
-
-				.toggle-password {
-					right: 9px;
-					top: 5px;
-					position: absolute;
-					z-index: 2;
-					cursor: pointer;
-					font-size: 12px;
-					color: #A09CAF;
-				}
-			}
-
-			.btn-login-option {
-				font-family: 'Manrope', system-ui, sans-serif;
-				font-size: 14px;
-				font-weight: 500;
-				color: #F0EDE8;
-				background: #252340;
-				box-shadow: none;
-				border: 1px solid #2E2C47;
-				display: flex;
-				place-content: center;
-				border-radius: 8px;
-
-				img {
-					margin-right: var(--padding-xs);
-				}
-
-				&:hover {
-					border-color: #F5D76E;
-					background: #252340;
-					color: #F5D76E;
-				}
-			}
-
-			.social-logins {
-				margin-top: var(--margin-md);
-				color: #A09CAF;
-
-				.social-login-buttons {
-					margin-top: var(--margin-md);
-
-					.login-button-wrapper {
-						@include media-breakpoint-up(md) {
-							min-width: 33.33%;
-						}
-						min-width: 50%;
-						padding: 0 4px;
-						margin-bottom: var(--margin-md);
-
-						&:last-child {
-							margin-bottom: 0;
-						}
-					}
-				}
-			}
-
-			.login-divider {
-				margin: var(--margin-md) 0;
-				color: #A09CAF;
-			}
-		}
-	}
-
-	/* Gold CTA button — Exe Foundry Bold */
-	.btn-primary,
-	.btn-login {
-		background-color: #F5D76E !important;
-		color: #0F0E1A !important;
-		border: none !important;
-		font-family: 'Epilogue', system-ui, sans-serif;
-		font-weight: 700;
-		font-size: 14px;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		border-radius: 8px;
-		min-height: 42px;
-		transition: background-color 0.15s;
-
-		&:hover {
-			background-color: #E5C75E !important;
-			color: #0F0E1A !important;
-		}
-
-		&:disabled {
-			opacity: 0.5;
-			cursor: not-allowed;
-		}
-	}
-
-	.sign-up-message {
-		margin-top: 1rem;
-		margin-bottom: 0;
-		color: #A09CAF;
-		font-family: 'Manrope', system-ui, sans-serif;
-		font-size: 14px;
-
-		a {
-			color: #F5D76E;
-
-			&:hover {
-				color: #E5C75E;
-			}
-		}
-	}
-
-	.invalid-login {
-		-webkit-animation: wiggle 0.5s linear;
-	}
-
-	@-webkit-keyframes wiggle {
-		8%,
-		41% {
-			-webkit-transform: translateX(-10px);
-		}
-		25%,
-		58% {
-			-webkit-transform: translateX(10px);
-		}
-		75% {
-			-webkit-transform: translateX(-5px);
-		}
-		92% {
-			-webkit-transform: translateX(5px);
-		}
-		0%,
-		100% {
-			-webkit-transform: translateX(0);
-		}
-	}
+.for-login-with-email-link {
+	display: none !important;
 }
 
-.page-card-head {
-	padding: max(5vh, 30px) 0 14px 0px;
-	margin: 0 auto;
-	text-align: center;
-	font-size: 20px;
-	font-weight: 600;
-
-	img {
-		max-height: 42px;
-	}
-
-	h4 {
-		margin-top: 1rem;
-		font-family: 'Manrope', system-ui, sans-serif;
-		font-size: 20px;
-		font-weight: 600;
-		letter-spacing: 0.01em;
-		color: #F0EDE8;
-	}
-}
-
-/* Noscript message for dark theme */
+/* ── Noscript ── */
 noscript {
 	color: #F0EDE8;
-
 	.text-muted {
 		color: #A09CAF !important;
+	}
+}
+
+/* ── Login Section ── */
+.exe-login-section {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+	padding: 20px;
+	box-sizing: border-box;
+}
+
+/* ── Login Card ── */
+.exe-login-card {
+	width: 100%;
+	max-width: 420px;
+	margin: 0 auto;
+	text-align: center;
+
+	/* Reset Frappe .page-card / .login-content defaults */
+	&.page-card,
+	&.login-content {
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		padding: 0 !important;
+	}
+}
+
+/* ── Logo ── */
+.exe-logo {
+	margin-bottom: 12px;
+	user-select: none;
+}
+
+.exe-logo-exe {
+	font-family: 'Epilogue', sans-serif;
+	font-weight: 800;
+	font-style: italic;
+	font-size: 2.6rem;
+	letter-spacing: 0.15em;
+	color: #F5D76E;
+}
+
+.exe-logo-product {
+	font-family: 'Epilogue', sans-serif;
+	font-weight: 800;
+	font-size: 2.6rem;
+	letter-spacing: 0.15em;
+	color: #FFFFFF;
+	margin-left: 0.15em;
+}
+
+/* ── Subtitle ── */
+.exe-subtitle {
+	color: #8a8a9a;
+	font-family: 'Manrope', system-ui, sans-serif;
+	font-size: 0.95rem;
+	font-weight: 400;
+	margin: 0 0 2rem 0;
+	letter-spacing: 0.01em;
+}
+
+/* ── Tab Switcher ── */
+.exe-tab-switcher {
+	display: flex;
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 8px;
+	padding: 4px;
+	margin-bottom: 2rem;
+}
+
+.exe-tab {
+	flex: 1;
+	text-align: center;
+	padding: 10px 16px;
+	border-radius: 6px;
+	color: #8a8a9a;
+	font-family: 'Manrope', system-ui, sans-serif;
+	font-size: 0.9rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background-color 0.15s, color 0.15s;
+	user-select: none;
+	border: none;
+	outline: none;
+
+	&:hover {
+		color: #bbb;
+	}
+
+	&.active {
+		background: rgba(255, 255, 255, 0.1);
+		color: #FFFFFF;
+	}
+}
+
+/* ── Form Fields ── */
+.exe-field-group {
+	margin-bottom: 1.25rem;
+	text-align: left;
+}
+
+.exe-label {
+	display: block;
+	color: #8a8a9a;
+	font-family: 'Manrope', system-ui, sans-serif;
+	font-size: 0.85rem;
+	font-weight: 500;
+	margin-bottom: 6px;
+	letter-spacing: 0.01em;
+}
+
+.exe-input {
+	width: 100%;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 8px;
+	padding: 12px 16px;
+	color: #FFFFFF;
+	font-family: 'Manrope', system-ui, sans-serif;
+	font-size: 0.95rem;
+	font-weight: 400;
+	box-sizing: border-box;
+	transition: border-color 0.15s, box-shadow 0.15s;
+	outline: none;
+
+	&::placeholder {
+		color: rgba(255, 255, 255, 0.3);
+	}
+
+	&:focus {
+		border-color: #F5D76E;
+		box-shadow: 0 0 0 3px rgba(245, 215, 110, 0.15);
+		background: rgba(255, 255, 255, 0.07);
+	}
+}
+
+/* ── Sign In Button ── */
+.exe-btn-signin,
+.exe-login-section .btn-primary {
+	width: 100% !important;
+	background: #F5D76E !important;
+	color: #0F0E1A !important;
+	border: none !important;
+	border-radius: 8px !important;
+	padding: 14px 24px !important;
+	font-family: 'Epilogue', sans-serif !important;
+	font-size: 0.95rem !important;
+	font-weight: 700 !important;
+	letter-spacing: 0.1em !important;
+	text-transform: uppercase !important;
+	cursor: pointer;
+	transition: background-color 0.15s;
+	margin-top: 0.5rem;
+	outline: none;
+	box-shadow: none !important;
+	min-height: auto !important;
+
+	&:hover {
+		background: #e6c85e !important;
+	}
+
+	&:active {
+		background: #d4b84e !important;
+	}
+
+	&:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+}
+
+/* ── Invalid state animation ── */
+.exe-login-card.invalid-login,
+.login-content.page-card.invalid-login {
+	animation: wiggle 0.5s linear;
+}
+
+@keyframes wiggle {
+	8%, 41% { transform: translateX(-10px); }
+	25%, 58% { transform: translateX(10px); }
+	75% { transform: translateX(-5px); }
+	92% { transform: translateX(5px); }
+	0%, 100% { transform: translateX(0); }
+}
+
+/* ── Frappe compat: page-card-body (invisible wrapper for login.js invalid state) ── */
+.exe-login-section .page-card-body {
+	/* No visual styling — purely a compat wrapper */
+	&.invalid {
+		.exe-input {
+			border-color: #EF4444 !important;
+			box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+		}
+	}
+}
+
+/* ── OTP / 2FA verification (injected by login.js) ── */
+.login-content {
+	max-width: 420px;
+	margin: 0 auto;
+	padding: 2rem 1.5rem;
+
+	#twofactor_div {
+		text-align: center;
+
+		.page-card-head {
+			margin-bottom: 1rem;
+
+			.indicator {
+				color: #F0EDE8;
+				font-family: 'Manrope', system-ui, sans-serif;
+			}
+		}
+
+		#login_token {
+			width: 100%;
+			background: rgba(255, 255, 255, 0.05);
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			border-radius: 8px;
+			padding: 12px 16px;
+			color: #FFFFFF;
+			font-family: 'Manrope', system-ui, sans-serif;
+			font-size: 0.95rem;
+			box-sizing: border-box;
+			margin-bottom: 0.5rem;
+
+			&::placeholder {
+				color: rgba(255, 255, 255, 0.3);
+			}
+
+			&:focus {
+				border-color: #F5D76E;
+				box-shadow: 0 0 0 3px rgba(245, 215, 110, 0.15);
+				outline: none;
+			}
+		}
+
+		.btn-primary,
+		#verify_token {
+			width: 100%;
+			background: #F5D76E !important;
+			color: #0F0E1A !important;
+			border: none !important;
+			border-radius: 8px;
+			padding: 14px 24px;
+			font-family: 'Epilogue', sans-serif;
+			font-size: 0.95rem;
+			font-weight: 700;
+			letter-spacing: 0.1em;
+			text-transform: uppercase;
+			cursor: pointer;
+
+			&:hover {
+				background: #e6c85e !important;
+			}
+		}
+
+		.text-muted {
+			color: #8a8a9a !important;
+			font-family: 'Manrope', system-ui, sans-serif;
+		}
+	}
+}
+
+/* ── Frappe msgprint dialog dark theme ── */
+.modal-content {
+	background: #1A1832 !important;
+	border: 1px solid rgba(255, 255, 255, 0.1) !important;
+	border-radius: 12px;
+
+	.modal-header {
+		border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+
+		.modal-title {
+			color: #F0EDE8 !important;
+		}
+
+		.btn-close,
+		.close {
+			color: #8a8a9a !important;
+			filter: invert(1);
+		}
+	}
+
+	.modal-body {
+		color: #F0EDE8 !important;
+	}
+
+	.modal-footer {
+		border-top-color: rgba(255, 255, 255, 0.1) !important;
+
+		.btn-primary {
+			background: #F5D76E !important;
+			color: #0F0E1A !important;
+			border: none !important;
+		}
+	}
+}
+
+/* ── Splash screen (shown after successful login) ── */
+.splash {
+	background-color: #0F0E1A !important;
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 480px) {
+	.exe-login-card {
+		padding: 0 16px;
+	}
+
+	.exe-logo-exe,
+	.exe-logo-product {
+		font-size: 2rem;
 	}
 }
