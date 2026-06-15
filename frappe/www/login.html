@@ -9,8 +9,9 @@
 {# Inline CSS — avoids dependency on bench build for login page styling.
    Compiled from frappe/public/scss/login.bundle.scss via: npx sass login.bundle.scss #}
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,700;0,900;1,700;1,900&family=Manrope:wght@400;500;600;700&display=swap');
-body{background-color:#0F0E1A!important;font-family:'Manrope',system-ui,-apple-system,sans-serif;margin:0;padding:0}
+@import url('https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,700;0,900;1,700;1,900&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+body{background-color:#0F0E1A!important;color:#F0EDE8;font-family:'Manrope',system-ui,-apple-system,sans-serif;margin:0;padding:0}
+h1,h2{text-transform:uppercase;letter-spacing:-0.02em}
 .navbar,.web-footer,.page-breadcrumbs,.page-header-wrapper,.page-header{display:none!important}
 .page-content-wrapper{min-height:100vh;padding:0!important;margin:0!important}
 .page_content{padding:0!important;margin:0!important}
@@ -18,46 +19,46 @@ main.container{max-width:100%!important;padding:0!important}
 .for-email-login,.for-signup,.for-forgot,.for-login-with-email-link{display:none!important}
 noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 .exe-login-section{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;box-sizing:border-box}
-.exe-login-card{width:100%;max-width:420px;margin:0 auto;text-align:center}
+.exe-login-card{width:100%;max-width:340px;margin:0 auto;text-align:center}
 .exe-login-card.page-card,.exe-login-card.login-content{background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important}
 .exe-logo{margin-bottom:12px;user-select:none}
-.exe-logo-exe{font-family:'Epilogue',sans-serif;font-weight:800;font-style:italic;font-size:2.6rem;letter-spacing:.15em;color:#F5D76E}
-.exe-logo-product{font-family:'Epilogue',sans-serif;font-weight:800;font-size:2.6rem;letter-spacing:.15em;color:#fff;margin-left:.15em}
-.exe-subtitle{color:#8a8a9a;font-family:'Manrope',system-ui,sans-serif;font-size:.95rem;font-weight:400;margin:0 0 2rem;letter-spacing:.01em}
-.exe-tab-switcher{display:flex;background:rgba(255,255,255,.05);border-radius:8px;padding:4px;margin-bottom:2rem}
-.exe-tab{flex:1;text-align:center;padding:10px 16px;border-radius:6px;color:#8a8a9a;font-family:'Manrope',system-ui,sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;transition:background-color .15s,color .15s;user-select:none;border:none;outline:none}
-.exe-tab:hover{color:#bbb}.exe-tab.active{background:rgba(255,255,255,.1);color:#fff}
+.exe-logo-exe{font-family:'Epilogue',sans-serif;font-weight:700;font-style:italic;font-size:30px;letter-spacing:4.5px;color:#F5D76E}
+.exe-logo-product{font-family:'Epilogue',sans-serif;font-weight:700;font-size:30px;letter-spacing:4.5px;color:#fff;margin-left:.15em}
+.exe-subtitle{color:#A09CAF;font-family:'Manrope',system-ui,sans-serif;font-size:14px;font-weight:400;margin:0 0 2rem;letter-spacing:.01em}
+.exe-tab-switcher{display:flex;background:rgba(255,255,255,.05);border-radius:8px;padding:4px;margin-bottom:2rem;max-width:340px}
+.exe-tab{flex:1;text-align:center;padding:10px 0px;border-radius:6px;color:#A09CAF;font-family:'Manrope',system-ui,sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background-color .15s,color .15s;user-select:none;border:none;outline:none}
+.exe-tab:hover{color:#bbb}.exe-tab.active{background:rgb(37,35,64);color:#fff}
 .exe-field-group{margin-bottom:1.25rem;text-align:left}
-.exe-label{display:block;color:#8a8a9a;font-family:'Manrope',system-ui,sans-serif;font-size:.85rem;font-weight:500;margin-bottom:6px;letter-spacing:.01em}
-.exe-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px 16px;color:#fff;font-family:'Manrope',system-ui,sans-serif;font-size:.95rem;font-weight:400;box-sizing:border-box;transition:border-color .15s,box-shadow .15s;outline:none}
+.exe-label{display:block;color:#A09CAF;font-family:'Manrope',system-ui,sans-serif;font-size:12px;font-weight:500;margin-bottom:6px;letter-spacing:.01em}
+.exe-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(240,237,232,.1);border-radius:8px;height:42px;padding:0px 14px;color:#fff;font-family:'Space Grotesk',monospace;font-size:16px;font-weight:400;box-sizing:border-box;transition:border-color .15s,box-shadow .15s;outline:none}
 .exe-input::placeholder{color:rgba(255,255,255,.3)}
 .exe-input:focus{border-color:#F5D76E;box-shadow:0 0 0 3px rgba(245,215,110,.15);background:rgba(255,255,255,.07)}
-.exe-btn-signin,.exe-login-section .btn-primary{width:100%!important;background:#F5D76E!important;color:#0F0E1A!important;border:none!important;border-radius:8px!important;padding:14px 24px!important;font-family:'Epilogue',sans-serif!important;font-size:.95rem!important;font-weight:700!important;letter-spacing:.1em!important;text-transform:uppercase!important;cursor:pointer;transition:background-color .15s;margin-top:.5rem;outline:none;box-shadow:none!important;min-height:auto!important}
+.exe-btn-signin,.exe-login-section .btn-primary{width:100%!important;background:#F5D76E!important;color:#0F0E1A!important;border:none!important;border-radius:8px!important;height:42px;padding:1px 6px!important;font-family:'Epilogue',sans-serif!important;font-size:16px!important;font-weight:700!important;letter-spacing:1.28px!important;text-transform:uppercase!important;cursor:pointer;transition:background-color .15s;margin-top:.5rem;outline:none;box-shadow:none!important;min-height:auto!important}
 .exe-btn-signin:hover,.exe-login-section .btn-primary:hover{background:#e6c85e!important}
 .exe-btn-signin:active,.exe-login-section .btn-primary:active{background:#d4b84e!important}
 .exe-btn-signin:disabled,.exe-login-section .btn-primary:disabled{opacity:.5;cursor:not-allowed}
 .exe-login-card.invalid-login,.login-content.page-card.invalid-login{animation:wiggle .5s linear}
 @keyframes wiggle{8%,41%{transform:translateX(-10px)}25%,58%{transform:translateX(10px)}75%{transform:translateX(-5px)}92%{transform:translateX(5px)}0%,100%{transform:translateX(0)}}
 .exe-login-section .page-card-body.invalid .exe-input{border-color:#EF4444!important;box-shadow:0 0 0 3px rgba(239,68,68,.15)!important}
-.login-content{max-width:420px;margin:0 auto;padding:2rem 1.5rem}
+.login-content{max-width:340px;margin:0 auto;padding:2rem 1.5rem}
 .login-content #twofactor_div{text-align:center}
 .login-content #twofactor_div .page-card-head{margin-bottom:1rem}
 .login-content #twofactor_div .page-card-head .indicator{color:#F0EDE8;font-family:'Manrope',system-ui,sans-serif}
-.login-content #twofactor_div #login_token{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px 16px;color:#fff;font-family:'Manrope',system-ui,sans-serif;font-size:.95rem;box-sizing:border-box;margin-bottom:.5rem}
+.login-content #twofactor_div #login_token{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(240,237,232,.1);border-radius:8px;height:42px;padding:0px 14px;color:#fff;font-family:'Space Grotesk',monospace;font-size:16px;box-sizing:border-box;margin-bottom:.5rem}
 .login-content #twofactor_div #login_token::placeholder{color:rgba(255,255,255,.3)}
 .login-content #twofactor_div #login_token:focus{border-color:#F5D76E;box-shadow:0 0 0 3px rgba(245,215,110,.15);outline:none}
-.login-content #twofactor_div .btn-primary,.login-content #twofactor_div #verify_token{width:100%;background:#F5D76E!important;color:#0F0E1A!important;border:none!important;border-radius:8px;padding:14px 24px;font-family:'Epilogue',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.login-content #twofactor_div .btn-primary,.login-content #twofactor_div #verify_token{width:100%;background:#F5D76E!important;color:#0F0E1A!important;border:none!important;border-radius:8px;height:42px;padding:1px 6px;font-family:'Epilogue',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.28px;text-transform:uppercase;cursor:pointer}
 .login-content #twofactor_div .btn-primary:hover,.login-content #twofactor_div #verify_token:hover{background:#e6c85e!important}
-.login-content #twofactor_div .text-muted{color:#8a8a9a!important;font-family:'Manrope',system-ui,sans-serif}
+.login-content #twofactor_div .text-muted{color:#A09CAF!important;font-family:'Manrope',system-ui,sans-serif}
 .modal-content{background:#1A1832!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:12px}
 .modal-content .modal-header{border-bottom-color:rgba(255,255,255,.1)!important}
 .modal-content .modal-header .modal-title{color:#F0EDE8!important}
-.modal-content .modal-header .btn-close,.modal-content .modal-header .close{color:#8a8a9a!important;filter:invert(1)}
+.modal-content .modal-header .btn-close,.modal-content .modal-header .close{color:#A09CAF!important;filter:invert(1)}
 .modal-content .modal-body{color:#F0EDE8!important}
 .modal-content .modal-footer{border-top-color:rgba(255,255,255,.1)!important}
 .modal-content .modal-footer .btn-primary{background:#F5D76E!important;color:#0F0E1A!important;border:none!important}
 .splash{background-color:#0F0E1A!important}
-@media(max-width:480px){.exe-login-card{padding:0 16px}.exe-logo-exe,.exe-logo-product{font-size:2rem}}
+@media(max-width:480px){.exe-login-card{padding:0 16px}.exe-logo-exe,.exe-logo-product{font-size:24px}}
 </style>
 {% endblock %}
 
@@ -118,7 +119,7 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 							<input type="password" id="login_token_input" class="exe-input"
 								placeholder="Paste your admin token"
 								autocomplete="off" required>
-							<p class="exe-helper-text" style="color:#8a8a9a;font-size:12px;font-style:italic;margin-top:6px;">Found in your server's .env file</p>
+							<p class="exe-helper-text" style="color:#A09CAF;font-size:12px;font-style:italic;margin-top:6px;">Found in your server's .env file</p>
 						</div>
 					</div>
 					<button class="exe-btn-signin btn-primary btn-token-login" type="submit" disabled>SIGN IN</button>
