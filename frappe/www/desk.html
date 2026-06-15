@@ -35,6 +35,8 @@
 	</head>
 	<body>
 		{% include "templates/includes/splash_screen.html" %}
+		<script src="/assets/frappe/js/exe-service-switcher.js"></script>
+		<exe-service-switcher current="ERP" user="{{ frappe.session.user }}"></exe-service-switcher>
 		<div class="main-section">
 			<header></header>
 			<div id="body"></div>
