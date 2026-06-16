@@ -15,7 +15,7 @@ services:
       DB_PORT: "5432"
       DB_TYPE: postgres
       DB_NAME: exe_erp
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set a strong password (12+ chars, mixed case, numbers, special chars)}
       ADMIN_PASSWORD: ${ERP_ADMIN_PASSWORD:?ERP_ADMIN_PASSWORD is required — set a strong password (12+ chars, mixed case, numbers, special chars)}
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
@@ -49,7 +49,7 @@ services:
       DB_PORT: "5432"
       DB_TYPE: postgres
       DB_NAME: exe_erp
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set a strong password (12+ chars, mixed case, numbers, special chars)}
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
@@ -109,7 +109,7 @@ services:
       DB_PORT: "5432"
       DB_TYPE: postgres
       DB_NAME: exe_erp
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set a strong password (12+ chars, mixed case, numbers, special chars)}
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
@@ -136,7 +136,7 @@ services:
       DB_PORT: "5432"
       DB_TYPE: postgres
       DB_NAME: exe_erp
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — set a strong password (12+ chars, mixed case, numbers, special chars)}
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5

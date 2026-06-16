@@ -94,6 +94,7 @@
     "utf-8-validate": "^6.0.3"
   },
   "resolutions": {
-    "esbuild-plugin-vue3/esbuild": "^0.28.0"
+    "esbuild-plugin-vue3/esbuild": "^0.28.0",
+    "ws": "^8.17.1"
   }
 }

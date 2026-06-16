@@ -205,3 +205,7 @@ cypress/videos
 # Agent worktrees (exe-os)
 /.worktrees/
 apps/hrms
+
+# CI fixtures — contain placeholder credentials; never commit to public repo
+apps/erpnext/.github/helper/site_config_postgres.json
+apps/erpnext/.github/helper/site_config_mariadb.json

@@ -35,7 +35,8 @@ def check():
 		components["database"] = {
 			"status": "healthy",
 			"type": "postgres",
-			"database": frappe.conf.get("db_name", "unknown"),
+			# db_name is omitted from the unauthenticated response to avoid
+			# leaking internal database names to unauthenticated callers.
 		}
 	except Exception as e:
 		logger.error(f"Health check — database error: {e}")
