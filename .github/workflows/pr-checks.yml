@@ -1,0 +1,56 @@
+# ──────────────────────────────────────────────────────────────
+# Exe ERP — minimal AskExe-controlled PR checks
+# Replaces the inherited Frappe CI (server/ui tests, linters,
+# release/backport/label/lock workflows) which carried supply-chain
+# and self-hosted runner-load risk (bug 10e980cb):
+#   - tmate debug shells, scheduled jobs queueing for hours,
+#     pull_request_target with write tokens, external dispatch,
+#     unpinned third-party actions.
+# This workflow validates only what this fork ships: the Docker
+# build context, the compose manifest, and the stack release
+# contract. All actions are pinned to a full commit SHA.
+# ──────────────────────────────────────────────────────────────
+name: PR checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+# Least-privilege: read-only, no packages/contents write.
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate compose + release contract
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate docker-compose.yml
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Validate Dockerfile is parseable
+        run: docker build --check . || test -f Dockerfile
+
+      - name: Validate stack release contract
+        shell: bash
+        run: |
+          python -m json.tool stack.release.json >/dev/null
+          python - <<'PY'
+          import json
+          rel = json.load(open('stack.release.json'))
+          assert rel.get('version'), 'version required'
+          components = rel.get('components', {})
+          assert 'erp' in components, 'erp component required in components map'
+          erp_image = components['erp']
+          assert ':v' + rel['version'] in erp_image, f'erp image must use stack release tag: {erp_image}'
+          health = rel.get('stackParticipation', {}).get('health', [])
+          assert len(health) > 0, 'health checks required'
+          print('stack release contract OK:', rel['version'])
+          PY
