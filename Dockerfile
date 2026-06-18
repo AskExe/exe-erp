@@ -147,6 +147,18 @@ RUN mkdir -p /home/frappe/.config && \
     (cd apps/frappe && yarn install 2>/dev/null || true) && \
     bench build --production
 
+# Verify the realtime/websocket runtime deps were actually installed into the
+# frappe app's node_modules. The websocket service runs `node apps/frappe/socketio.js`,
+# which require()s socket.io, @redis/client and cookie — these MUST be present in
+# /opt/exe-erp-src/node_modules so they can be copied into the production image.
+# Fail the build loudly here rather than crash-loop the websocket container at runtime
+# (regression guard for bug 790794e8 / 35576eed).
+RUN cd /opt/exe-erp-src && \
+    for m in socket.io @redis/client cookie; do \
+        test -d "node_modules/$m" || { echo "FATAL: realtime dep '$m' missing from /opt/exe-erp-src/node_modules — websocket would crash-loop"; exit 1; }; \
+    done && \
+    echo "OK: realtime runtime deps present (socket.io, @redis/client, cookie)"
+
 # ── Stage 4: Final production image ─────────────────────────
 FROM base AS production
 
@@ -172,6 +184,27 @@ COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/esbuild /home/frappe/
 COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/socketio.js /home/frappe/frappe-bench/apps/frappe/socketio.js
 COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/node_utils.js /home/frappe/frappe-bench/apps/frappe/node_utils.js
 COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/realtime /home/frappe/frappe-bench/apps/frappe/realtime
+COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/package.json /home/frappe/frappe-bench/apps/frappe/package.json
+
+# The websocket service runs `node apps/frappe/socketio.js`, which require()s
+# socket.io / @redis/client / cookie. Node resolves these by walking up from
+# apps/frappe/, so the realtime node_modules MUST sit at apps/frappe/node_modules.
+# The bulk frappe-bench COPY above does NOT include them (apps/frappe yarn install
+# is best-effort and writes to a different tree), so copy the verified node_modules
+# from the source install explicitly. Without this the websocket container
+# crash-loops on MODULE_NOT_FOUND (bug 790794e8 / 35576eed).
+COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/node_modules /home/frappe/frappe-bench/apps/frappe/node_modules
+
+# Final regression guard: the realtime entrypoint + its runtime deps must be
+# present and resolvable in the production image, or the websocket service is
+# undeployable. Fail the build instead of shipping a broken image (bug 790794e8).
+RUN test -f /home/frappe/frappe-bench/apps/frappe/socketio.js \
+    && test -f /home/frappe/frappe-bench/apps/frappe/node_utils.js \
+    && test -f /home/frappe/frappe-bench/apps/frappe/realtime/index.js \
+    && test -d /home/frappe/frappe-bench/apps/frappe/node_modules/socket.io \
+    && test -d /home/frappe/frappe-bench/apps/frappe/node_modules/@redis/client \
+    && test -d /home/frappe/frappe-bench/apps/frappe/node_modules/cookie \
+    && echo "OK: websocket entrypoint + realtime deps shipped to production image"
 
 # Fix editable installs: pip install from setup.py misses nested packages
 # (page_renderers, etc.) because frappe uses a flat layout without proper

@@ -96,13 +96,15 @@ def get_root_connection():
 				or getpass("Postgres super user password: ")
 			)
 
+		# Bug 02960685: use "postgres" maintenance DB for the root connection,
+		# not a DB named after the login role (which may not exist).
 		frappe.local.flags.root_connection = frappe.database.get_db(
 			socket=frappe.conf.db_socket,
 			host=frappe.conf.db_host,
 			port=frappe.conf.db_port,
 			user=frappe.flags.root_login,
 			password=frappe.flags.root_password,
-			cur_db_name=frappe.flags.root_login,
+			cur_db_name=os.environ.get("POSTGRES_MAINTENANCE_DB", "postgres"),
 		)
 
 	return frappe.local.flags.root_connection
