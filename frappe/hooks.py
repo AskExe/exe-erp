@@ -69,6 +69,11 @@ website_redirects = [
 	{"source": r"/app/(.*)", "target": r"/desk/\1", "forward_query_parameters": True},
 	{"source": "/apps", "target": "/desk"},
 	{"source": "/app", "target": "/desk"},
+	# Legacy login path: the login page moved from /web/login to /login.
+	# Redirect the old path (and any sub-path) so bookmarks, monitoring probes,
+	# integrations, and SSO/GoTrue redirect targets referencing /web/login keep
+	# working. forward_query_parameters preserves ?redirect-to=... for SSO flows.
+	{"source": r"/web/login(.*)", "target": r"/login\1", "forward_query_parameters": True},
 ]
 
 base_template = "templates/base.html"
