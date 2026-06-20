@@ -226,11 +226,13 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 		if (++_pollCount > 100) clearInterval(_pollTimer);
 	}, 200);
 
-	// Exe SSO link — redirect to auth.askexe.com with callback to our GoTrue endpoint
+	// Exe SSO link — redirect to THIS customer's auth domain (derived server-side
+	// in login.py:get_exe_auth_url, never hardcoded) with callback to our GoTrue endpoint.
 	var ssoLink = document.getElementById('exe-sso-link');
 	if (ssoLink) {
+		var exeAuthUrl = {{ (exe_auth_url or "https://auth.askexe.com") | tojson }};
 		var callbackUrl = window.location.origin + '/api/method/erpnext.exe_auth.api.gotrue_login_callback';
-		ssoLink.href = 'https://auth.askexe.com/login?product=ERP&redirect=' + encodeURIComponent(callbackUrl);
+		ssoLink.href = exeAuthUrl.replace(/\/+$/, '') + '/login?product=ERP&redirect=' + encodeURIComponent(callbackUrl);
 	}
 
 	// Token form submit

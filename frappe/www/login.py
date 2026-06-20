@@ -2,6 +2,7 @@
 # License: MIT. See LICENSE
 
 
+import os
 from urllib.parse import urljoin, urlparse
 
 import frappe
@@ -46,6 +47,7 @@ def get_context(context):
 	context["show_footer_on_login"] = cint(frappe.get_website_settings("show_footer_on_login"))
 	context["disable_user_pass_login"] = cint(frappe.get_system_settings("disable_user_pass_login"))
 	context["gotrue_login_enabled"] = bool(frappe.conf.get("gotrue_url"))
+	context["exe_auth_url"] = get_exe_auth_url()
 	context["logo"] = get_app_logo()
 	context["app_name"] = (
 		frappe.get_website_settings("app_name") or frappe.get_system_settings("app_name") or _("Exe ERP")
@@ -113,6 +115,59 @@ def get_context(context):
 	context["login_with_frappe_cloud_url"] = None  # Frappe Cloud removed — Exe ERP fork
 
 	return context
+
+
+def get_exe_auth_url() -> str:
+	"""Resolve the Exe SSO base URL for THIS customer's deployment.
+
+	Never hardcode auth.askexe.com — a customer ERP at erp.acme.com must send
+	users to acme.com's own auth tenant, or SSO tokens fail validation against
+	the customer's GoTrue.
+
+	Resolution order (first match wins):
+	  1. Explicit override — site_config "exe_auth_url" or env EXE_AUTH_URL
+	     (full URL, e.g. https://auth.acme.com). Lets operators point anywhere.
+	  2. Explicit auth domain — site_config "auth_domain" or env AUTH_DOMAIN
+	     (bare host, e.g. auth.acme.com → https://auth.acme.com).
+	  3. Derived from the request host — replace the leading label with "auth"
+	     (erp.acme.com → auth.acme.com), preserving scheme. Single-label hosts
+	     (e.g. "localhost") are prefixed (auth.localhost).
+	  4. Last resort — https://auth.askexe.com (AskExe's own tenant). Only hit
+	     when nothing else is configured/derivable; preserves legacy behavior.
+	"""
+	# 1. Full URL override
+	explicit = frappe.conf.get("exe_auth_url") or os.environ.get("EXE_AUTH_URL")
+	if explicit:
+		return explicit.rstrip("/")
+
+	# 2. Auth domain (bare host) → https scheme
+	auth_domain = frappe.conf.get("auth_domain") or os.environ.get("AUTH_DOMAIN")
+	if auth_domain:
+		auth_domain = auth_domain.strip()
+		if "://" in auth_domain:
+			return auth_domain.rstrip("/")
+		return f"https://{auth_domain.rstrip('/')}"
+
+	# 3. Derive from the request host (erp.acme.com → auth.acme.com)
+	try:
+		parsed = urlparse(frappe.local.request.url)
+		host = parsed.hostname
+		scheme = parsed.scheme or "https"
+		if host:
+			labels = host.split(".")
+			if len(labels) >= 2:
+				auth_host = ".".join(["auth"] + labels[1:])
+			else:
+				auth_host = f"auth.{host}"
+			# Preserve a non-default port if present (e.g. dev on :8080)
+			port = f":{parsed.port}" if parsed.port else ""
+			return f"{scheme}://{auth_host}{port}"
+	except Exception:
+		# Request context may be unavailable in some render paths; fall through.
+		pass
+
+	# 4. Last-resort default (AskExe's own deployment)
+	return "https://auth.askexe.com"
 
 
 @frappe.whitelist(allow_guest=True)
