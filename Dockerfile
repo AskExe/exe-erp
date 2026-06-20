@@ -230,6 +230,18 @@ COPY --from=builder /home/frappe/frappe-bench/sites/assets /home/frappe/frappe-b
 RUN rm -f /home/frappe/frappe-bench/sites/assets/frappe \
     && ln -s /home/frappe/frappe-bench/apps/frappe/frappe/public /home/frappe/frappe-bench/sites/assets/frappe
 
+# Back up prebuilt assets OUTSIDE the sites/ tree (bug 29a22993).
+# At runtime, docker-compose mounts the erp-sites named volume over
+# /home/frappe/frappe-bench/sites, which SHADOWS the baked-in sites/assets on a
+# fresh volume — assets vanish and the desk UI 404s on CSS/JS. /opt is never a
+# volume mount, so this copy survives; the entrypoint restores it into the
+# volume on boot when sites/assets is missing or empty.
+RUN mkdir -p /opt/exe-erp-assets \
+    && cp -a /home/frappe/frappe-bench/sites/assets/. /opt/exe-erp-assets/ \
+    && chown -R frappe:frappe /opt/exe-erp-assets \
+    && test -f /opt/exe-erp-assets/assets.json \
+    && echo "OK: prebuilt assets backed up to /opt/exe-erp-assets (volume-shadow safe)"
+
 # Copy WSGI wrapper (TracingMiddleware)
 COPY --chown=frappe:frappe ./wsgi.py /home/frappe/frappe-bench/wsgi.py
 

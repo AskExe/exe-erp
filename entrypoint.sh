@@ -79,6 +79,33 @@ wait_for_redis() {
     echo "Redis at ${host}:${port} is ready."
 }
 
+# ── Restore prebuilt assets shadowed by the sites volume ─────
+# The image bakes assets to sites/assets, but the erp-sites volume mounts over
+# sites/ and SHADOWS them on a fresh volume — the desk UI then 404s on CSS/JS
+# (bug 29a22993). The Dockerfile keeps a volume-safe backup at
+# /opt/exe-erp-assets; restore it into the volume when sites/assets is missing
+# or empty. Idempotent: a no-op once assets are present.
+ASSETS_BACKUP="/opt/exe-erp-assets"
+restore_prebuilt_assets() {
+    local assets_dir="${SITES_DIR}/assets"
+    # Already populated (manifest present) → nothing to do.
+    if [ -f "${assets_dir}/assets.json" ]; then
+        return 0
+    fi
+    if [ ! -d "${ASSETS_BACKUP}" ] || [ ! -f "${ASSETS_BACKUP}/assets.json" ]; then
+        echo "WARNING: no prebuilt asset backup at ${ASSETS_BACKUP}; skipping asset restore."
+        return 0
+    fi
+    echo "Prebuilt assets missing under volume — restoring from ${ASSETS_BACKUP}..."
+    mkdir -p "${assets_dir}"
+    cp -a "${ASSETS_BACKUP}/." "${assets_dir}/"
+    # Re-establish the frappe asset symlink → live app public dir (the baked
+    # symlink target is outside the volume and resolves at runtime).
+    rm -f "${assets_dir}/frappe"
+    ln -sf "${FRAPPE_BENCH}/apps/frappe/frappe/public" "${assets_dir}/frappe"
+    echo "Prebuilt assets restored into ${assets_dir}."
+}
+
 # ── Configure common_site_config.json ────────────────────────
 configure_site_config() {
     echo "Writing common_site_config.json..."
@@ -177,6 +204,9 @@ main() {
     fi
 
     configure_site_config
+
+    # Restore prebuilt assets if the sites volume shadowed them (bug 29a22993).
+    restore_prebuilt_assets
 
     # Decide create/repair vs migrate based on ACTUAL install state, not just
     # directory existence. A dir can exist from a `bench new-site` that ran but
