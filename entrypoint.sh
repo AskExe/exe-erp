@@ -95,24 +95,69 @@ configure_site_config() {
 EOF
 }
 
-# ── First boot: create site ──────────────────────────────────
+# Marker written only after a fully successful create + install-app erpnext.
+# Used as a fast-path so we don't hit the DB on every boot; the authoritative
+# check is is_erpnext_installed() (queries the site DB).
+INSTALL_MARKER="${SITE_DIR}/.exe_install_complete"
+
+# ── Is erpnext actually installed in the site DB? ────────────
+# Directory existence is NOT proof of a working site: `bench new-site` may have
+# created the dir, then `install-app erpnext` failed — leaving a half-installed
+# site that pings but has no desk/data. Ask the DB, which is the source of truth.
+is_erpnext_installed() {
+    # Fast path: completion marker from a prior successful boot.
+    if [ -f "${INSTALL_MARKER}" ]; then
+        return 0
+    fi
+    # Authoritative: query installed apps from the site DB.
+    # `bench list-apps` connects to the site DB and lists installed apps.
+    if bench --site "${SITE_NAME}" list-apps 2>/dev/null | grep -qiw "erpnext"; then
+        # Backfill the marker so future boots take the fast path.
+        touch "${INSTALL_MARKER}" 2>/dev/null || true
+        return 0
+    fi
+    return 1
+}
+
+# ── Does the Frappe framework site itself exist (DB created)? ─
+# `bench new-site` writes site_config.json with the db_name once the framework
+# is bootstrapped. Used to decide whether new-site must run.
+is_site_db_initialized() {
+    [ -f "${SITE_DIR}/site_config.json" ] && grep -q '"db_name"' "${SITE_DIR}/site_config.json" 2>/dev/null
+}
+
+# ── First boot / repair: create site + install erpnext ───────
+# Idempotent: safe to re-run after a partially failed previous boot.
+#   - If the framework site DB isn't initialized yet, run `bench new-site`.
+#   - If new-site already ran but erpnext install failed, skip new-site and
+#     (re-)run install-app erpnext to repair the half-installed site.
 create_site() {
-    echo "First boot — creating site: ${SITE_NAME}"
-    # Use the same DB user (exe) that owns the exe_erp database.
-    # --db-root-username tells bench to use this user for DDL operations
-    # instead of creating a new per-site user.
-    bench new-site "${SITE_NAME}" \
-        --db-type postgres \
-        --db-host "${DB_HOST}" \
-        --db-port "${DB_PORT:-5432}" \
-        --db-name "${DB_NAME:-exe_erp}" \
-        --db-root-username "${POSTGRES_USER:-exe}" \
-        --db-root-password "${DB_PASSWORD}" \
-        --db-password "${DB_PASSWORD}" \
-        --admin-password "${ADMIN_PASSWORD}" \
-        --no-mariadb-socket
+    if is_site_db_initialized; then
+        echo "Site framework already initialized but erpnext not installed — repairing install..."
+    else
+        echo "First boot — creating site: ${SITE_NAME}"
+        # Use the same DB user (exe) that owns the exe_erp database.
+        # --db-root-username tells bench to use this user for DDL operations
+        # instead of creating a new per-site user.
+        # --force lets us re-run new-site if a prior attempt left a stale dir
+        # without an initialized DB (e.g. crash mid-bootstrap).
+        bench new-site "${SITE_NAME}" \
+            --db-type postgres \
+            --db-host "${DB_HOST}" \
+            --db-port "${DB_PORT:-5432}" \
+            --db-name "${DB_NAME:-exe_erp}" \
+            --db-root-username "${POSTGRES_USER:-exe}" \
+            --db-root-password "${DB_PASSWORD}" \
+            --db-password "${DB_PASSWORD}" \
+            --admin-password "${ADMIN_PASSWORD}" \
+            --no-mariadb-socket \
+            --force
+    fi
 
     bench --site "${SITE_NAME}" install-app erpnext
+    # Only mark complete once install-app actually succeeded (set -e aborts above
+    # on failure, so reaching here means the install returned 0).
+    touch "${INSTALL_MARKER}"
     echo "Site created and erpnext installed."
 }
 
@@ -133,8 +178,16 @@ main() {
 
     configure_site_config
 
-    if [ ! -d "${SITE_DIR}" ]; then
-        # Only validate admin password on first boot (site creation)
+    # Decide create/repair vs migrate based on ACTUAL install state, not just
+    # directory existence. A dir can exist from a `bench new-site` that ran but
+    # whose `install-app erpnext` then failed — that site must be repaired, not
+    # migrated (migrating a half-installed site leaves desk/data broken while
+    # ping still passes).
+    if ! is_erpnext_installed; then
+        if [ -d "${SITE_DIR}" ]; then
+            echo "Site dir exists but erpnext is NOT installed — running create/repair."
+        fi
+        # Validate admin password on the create/repair path (site bootstrap).
         validate_admin_password
         create_site
     else
