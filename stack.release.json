@@ -27,7 +27,7 @@
       }
     ],
     "migrations": {
-      "command": "docker compose -f /opt/exe-erp/docker-compose.yml exec -T exe-erp bench --site erp.askexe.com migrate",
+      "command": "docker compose -f /opt/exe-erp/docker-compose.yml exec -T exe-erp bench --site ${SITE_NAME:-erp.localhost} migrate",
       "description": "Run Frappe bench migrations"
     }
   },

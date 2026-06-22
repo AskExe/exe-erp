@@ -132,9 +132,9 @@ def gotrue_login(
 @frappe.whitelist(allow_guest=True, methods=["GET"])
 @rate_limit(key="gotrue_callback", limit=10, seconds=900)
 def gotrue_login_callback():
-	"""Handle redirect from auth.askexe.com with JWT token.
+	"""Handle redirect from the Exe SSO auth domain with JWT token.
 
-	auth.askexe.com redirects to:
+	The auth domain (e.g. auth.acme.com) redirects to:
 	  /api/method/erpnext.exe_auth.api.gotrue_login_callback?access_token=JWT&refresh_token=REFRESH
 
 	We validate the JWT against GoTrue's /user endpoint, auto-provision

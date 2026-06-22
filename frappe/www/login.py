@@ -132,8 +132,8 @@ def get_exe_auth_url() -> str:
 	  3. Derived from the request host — replace the leading label with "auth"
 	     (erp.acme.com → auth.acme.com), preserving scheme. Single-label hosts
 	     (e.g. "localhost") are prefixed (auth.localhost).
-	  4. Last resort — https://auth.askexe.com (AskExe's own tenant). Only hit
-	     when nothing else is configured/derivable; preserves legacy behavior.
+	  4. Last resort — derive from SITE_NAME env (erp.acme.com → auth.acme.com).
+	     Falls back to https://auth.localhost when nothing is configured.
 	"""
 	# 1. Full URL override
 	explicit = frappe.conf.get("exe_auth_url") or os.environ.get("EXE_AUTH_URL")
@@ -166,8 +166,14 @@ def get_exe_auth_url() -> str:
 		# Request context may be unavailable in some render paths; fall through.
 		pass
 
-	# 4. Last-resort default (AskExe's own deployment)
-	return "https://auth.askexe.com"
+	# 4. Last-resort default — derive from SITE_NAME env (customer domains)
+	site_name = os.environ.get("SITE_NAME", "")
+	if site_name:
+		labels = site_name.split(".")
+		if len(labels) >= 2:
+			return f"https://auth.{'.'.join(labels[1:])}"
+		return f"https://auth.{site_name}"
+	return "https://auth.localhost"
 
 
 @frappe.whitelist(allow_guest=True)

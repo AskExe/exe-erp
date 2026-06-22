@@ -15,7 +15,7 @@
  * Attributes:
  *   current  — "CRM" | "Wiki" | "ERP" (highlights the active service)
  *   user     — optional email to display on the right side
- *   base-url — override base domain (default: askexe.com)
+ *   base-url — override base domain (default: derived from window.location)
  *
  * Design: Exe Foundry Bold — #0F0E1A bg, #F5D76E gold, Manrope 600
  * Ships as a self-contained Web Component with Shadow DOM encapsulation.
@@ -79,7 +79,13 @@ class ExeServiceSwitcher extends HTMLElement {
   }
 
   get _baseDomain() {
-    return this.getAttribute("base-url") || "askexe.com";
+    if (this.getAttribute("base-url")) return this.getAttribute("base-url");
+    // Derive from current hostname: erp.acme.com → acme.com, wiki.acme.com → acme.com
+    try {
+      const labels = window.location.hostname.split(".");
+      if (labels.length >= 2) return labels.slice(1).join(".");
+    } catch (_) { /* SSR / no window */ }
+    return "localhost";
   }
 
   _serviceUrl(path) {

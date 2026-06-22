@@ -20,7 +20,7 @@ services:
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
-      SITE_NAME: erp.askexe.com
+      SITE_NAME: ${SITE_NAME:-erp.localhost}
       EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
@@ -53,7 +53,7 @@ services:
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
-      SITE_NAME: erp.askexe.com
+      SITE_NAME: ${SITE_NAME:-erp.localhost}
       EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
@@ -83,7 +83,7 @@ services:
     command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
     environment:
       REDIS_SOCKETIO: redis://redis:6379/5
-      SITE_NAME: erp.askexe.com
+      SITE_NAME: ${SITE_NAME:-erp.localhost}
     ports:
       - "127.0.0.1:9069:9000"
     volumes:
@@ -122,7 +122,7 @@ services:
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
-      SITE_NAME: erp.askexe.com
+      SITE_NAME: ${SITE_NAME:-erp.localhost}
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:
@@ -160,7 +160,7 @@ services:
       REDIS_CACHE: redis://redis:6379/3
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
-      SITE_NAME: erp.askexe.com
+      SITE_NAME: ${SITE_NAME:-erp.localhost}
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:

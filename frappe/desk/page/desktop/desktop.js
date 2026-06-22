@@ -471,7 +471,7 @@ class DesktopPage {
 				icon: "support",
 				label: "Exe ERP Support",
 				onClick: function () {
-					window.open("https://askexe.com/support", "_blank");
+					window.open("/support", "_blank");
 				},
 			},
 			{
