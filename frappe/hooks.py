@@ -497,7 +497,7 @@ standard_help_items = [
 	{
 		"item_label": "Exe ERP Support",
 		"item_type": "Route",
-		"route": "https://askexe.com/support",
+		"route": "/support",
 		"is_standard": 1,
 	},
 ]

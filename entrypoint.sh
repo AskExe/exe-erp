@@ -8,7 +8,7 @@ set -eo pipefail
 
 FRAPPE_BENCH="/home/frappe/frappe-bench"
 SITES_DIR="${FRAPPE_BENCH}/sites"
-SITE_NAME="${SITE_NAME:-erp.askexe.com}"
+SITE_NAME="${SITE_NAME:-erp.localhost}"
 SITE_DIR="${SITES_DIR}/${SITE_NAME}"
 
 cd "${FRAPPE_BENCH}"
