@@ -38,7 +38,8 @@
   "environment": {
     "required": [
       "POSTGRES_PASSWORD",
-      "ERP_ADMIN_PASSWORD"
+      "ERP_ADMIN_PASSWORD",
+      "SITE_NAME"
     ],
     "optional": [
       "EXE_ERP_ADMIN_TOKEN",
