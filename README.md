@@ -96,5 +96,3 @@ appropriate for a production or customer install.
 Exe ERP is derived from Frappe Framework and ERPNext. See [`attributions.md`](attributions.md),
 [`LICENSE`](LICENSE), and [`LICENSE.frappe`](LICENSE.frappe) for the full
 attribution and license terms.
-</content>
-</invoke>
