@@ -8,7 +8,16 @@ set -eo pipefail
 
 FRAPPE_BENCH="/home/frappe/frappe-bench"
 SITES_DIR="${FRAPPE_BENCH}/sites"
-SITE_NAME="${SITE_NAME:-erp.askexe.com}"
+# SITE_NAME must be set per-deployment (e.g. erp.acme.com). Production stacks
+# enforce this via docker-compose (${SITE_NAME:?...}) and stack.release.json
+# requiredEnv preflight. When the container is run directly without SITE_NAME,
+# fall back to the neutral dev host erp.localhost — never an AskExe-branded
+# default, which would break white-label/customer installs.
+if [ -z "${SITE_NAME:-}" ]; then
+    echo "WARNING: SITE_NAME not set — falling back to dev default 'erp.localhost'."
+    echo "         Set SITE_NAME to your ERP domain (e.g. erp.acme.com) for production."
+fi
+SITE_NAME="${SITE_NAME:-erp.localhost}"
 SITE_DIR="${SITES_DIR}/${SITE_NAME}"
 
 cd "${FRAPPE_BENCH}"
