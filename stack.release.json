@@ -27,8 +27,8 @@
       }
     ],
     "migrations": {
-      "command": "docker compose -f /opt/exe-erp/docker-compose.yml exec -T exe-erp bench --site erp.askexe.com migrate",
-      "description": "Run Frappe bench migrations"
+      "command": "docker compose -f /opt/exe-erp/docker-compose.yml exec -T exe-erp bench --site \"${SITE_NAME}\" migrate",
+      "description": "Run Frappe bench migrations for the configured site (SITE_NAME)"
     }
   },
   "dependencies": {
@@ -37,6 +37,7 @@
   },
   "environment": {
     "required": [
+      "SITE_NAME",
       "POSTGRES_PASSWORD",
       "ERP_ADMIN_PASSWORD"
     ],

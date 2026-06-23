@@ -1,139 +1,98 @@
 <div align="center" markdown="1">
-	<img src=".github/framework-logo-new.svg" width="80" height="80"/>
-	<h1>Frappe Framework</h1>
+	<h1>Exe ERP</h1>
 
- **Low Code Web Framework For Real World Applications, In Python And JavaScript**
+ **Self-hosted ERP for the Exe stack — a hardened fork of Frappe/ERPNext**
 </div>
 
 <div align="center">
-	<a target="_blank" href="LICENSE" title="License: MIT"><img src="https://img.shields.io/badge/License-MIT-success.svg"></a>
-	<a href="https://codecov.io/gh/frappe/frappe"><img src="https://codecov.io/gh/frappe/frappe/branch/develop/graph/badge.svg?token=XoTa679hIj"/></a>
-</div>
-<div align="center">
-	<img src=".github/hero-image.png" alt="Hero Image" />
-</div>
-<div align="center">
-    <a href="https://frappe.io/framework">Website</a>
+    <a href="https://askexe.com">Website</a>
     -
-    <a href="https://docs.frappe.io/framework">Documentation</a>
+    <a href="https://askexe.com/docs/erp">Documentation</a>
 </div>
 
-## Frappe Framework
-Full-stack web application framework that uses Python and MariaDB on the server side and a tightly integrated client side library. Built for ERPNext.
+## About
 
-## Philosophy
+Exe ERP is a hard fork of [Frappe Framework](https://github.com/frappe/frappe) and
+[ERPNext](https://github.com/frappe/erpnext), packaged to run as part of the Exe
+stack alongside exe-db, exe-crm, exe-wiki, and exe-gateway. It ships with Exe
+single sign-on (GoTrue), cross-database event bridging to `exedb`, and the Exe
+Foundry Bold design system.
 
-> The best code is the one that is not written
+> This README documents the **production / operator** workflow for Exe ERP. It is
+> intentionally not the upstream Frappe developer guide — do **not** follow generic
+> Frappe Docker instructions or use upstream default credentials.
 
-Started in 2005, Frappe Framework was inspired by the Semantic Web. The "big idea" behind semantic web was of a framework that not only described how information is shown (like headings, body etc), but also what it means, like name, address etc.
+## Production deployment
 
-By creating a web framework that allowed for easy definition of metadata, it made building complex applications easy. Applications are usually designed around how users interact with a system, but not based on semantics of the underlying system. Applications built on semantics end up being much more consistent and extensible. 
+Exe ERP is deployed as containers via `docker-compose.yml`, connecting to the
+shared `exe-db` (PostgreSQL) and `redis` services on the `exe-net` network. The
+recommended path is through the Exe stack updater, which performs preflight
+validation of required environment variables before deploying.
 
-The first application built on Framework was ERPNext, a beast with more than 700 object types. Framework is not for the light hearted - it is not the first thing you might want to learn if you are beginning to learn web programming, but if you are ready to do real work, then Framework is the right tool for the job.
+### 1. Configure environment
 
-### Key Features
-
-- **Full-Stack Framework**: Frappe covers both front-end and back-end development, allowing developers to build complete applications using a single framework.
-
-- **Built-in Admin Interface**: Provides a pre-built, customizable admin dashboard for managing application data, reducing development time and effort.
-
-- **Role-Based Permissions**: Comprehensive user and role management system to control access and permissions within the application.
-
-- **REST API**: Automatically generated RESTful API for all models, enabling easy integration with other systems and services.
-
-- **Customizable Forms and Views**: Flexible form and view customization using server-side scripting and client-side JavaScript.
-
-- **Report Builder**: Powerful reporting tool that allows users to create custom reports without writing any code.
-
-<details>
-<summary>Screenshots</summary>
-
-![List View](.github/fw-list-view.png)
-![Form View](.github/fw-form-view.png)
-![Role Permission Manager](.github/fw-rpm.png)
-</details>
-
-## Production Setup
-
-### Managed Hosting
-
-You can try [Frappe Cloud](https://frappecloud.com), a simple, user-friendly and sophisticated [open-source](https://github.com/frappe/press) platform to host Frappe applications with peace of mind.
-
-It takes care of installation, setup, upgrades, monitoring, maintenance and support of your Frappe deployments. It is a fully featured developer platform with an ability to manage and control multiple Frappe deployments.
-
-<div>
-    <a href="https://frappecloud.com/" target="_blank">
-        <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/try-on-fc-white.png">
-            <img src="https://frappe.io/files/try-on-fc-black.png" alt="Try on Frappe Cloud" height="28" />
-        </picture>
-    </a>
-</div>
-
-### Self Hosting
-
-### Docker
-Prerequisites: docker, docker-compose, git. Refer [Docker Documentation](https://docs.docker.com) for more details on Docker setup.
-
-Run the following commands:
+Copy the example file and set every value. There are no safe defaults for these:
 
 ```
-git clone https://github.com/frappe/frappe_docker
-cd frappe_docker
-docker compose -f pwd.yml up -d
+cp .env.example .env
 ```
 
-After a couple of minutes, site should be accessible on your localhost port: 8080. Use below default login credentials to access the site.
-- Username: Administrator
-- Password: admin
+Required variables (enforced by `stack.release.json` preflight and by
+`docker-compose.yml`; the stack will refuse to deploy if any is missing):
 
-See [Frappe Docker](https://github.com/frappe/frappe_docker?tab=readme-ov-file#to-run-on-arm64-architecture-follow-this-instructions) for ARM based docker setup.
+| Variable | Description |
+| --- | --- |
+| `SITE_NAME` | Your ERP site domain, e.g. `erp.acme.com`. No localhost/AskExe default in production. |
+| `POSTGRES_PASSWORD` | Password for the `exe-db` PostgreSQL user (12+ chars, mixed case, numbers, special). |
+| `ERP_ADMIN_PASSWORD` | Initial Administrator password (12+ chars, must include a special character; common defaults are rejected at boot). |
 
-## Development Setup
-### Manual Install
+Optional integration variables (GoTrue SSO, Exe Bridge, monitor/error
+forwarding, Sentry) are documented inline in `.env.example`.
 
-The Easy Way: our install script for bench will install all dependencies (e.g. MariaDB). See https://github.com/frappe/bench for more details.
+### 2. Deploy
 
-New passwords will be created for the Frappe "Administrator" user, the MariaDB root user, and the frappe user (the script displays the passwords and saves them to ~/frappe_passwords.txt).
+```
+docker compose up -d
+```
 
-### Local
+On first boot the configurator container creates the site for `SITE_NAME`,
+installs the ERPNext app, and writes `common_site_config.json`. Subsequent boots
+run `bench migrate`. The backend, websocket, queue worker, and scheduler each
+have healthchecks so silent failures surface during stack updates.
 
-To setup the repository locally follow the steps mentioned below:
+### 3. Run migrations (during upgrades)
 
-1. Setup bench by following the [Installation Steps](https://docs.frappe.io/framework/user/en/installation) and start the server
-   ```
-   bench start
-   ```
+The stack updater runs migrations automatically for the configured site:
 
-2. In a separate terminal window, run the following commands:
-   ```
-   # Create a new site
-   bench new-site frappe.localhost
-   ```
+```
+docker compose exec -T exe-erp bench --site "$SITE_NAME" migrate
+```
 
-3. Open the URL `http://frappe.localhost:8000/app` in your browser, you should see the app running
+## Security notes for operators
 
-## Learning and community
+- **No default credentials.** Unlike upstream Frappe, Exe ERP does **not** ship
+  with a working `Administrator` / `admin` login. The Administrator password is
+  taken from `ERP_ADMIN_PASSWORD`; the entrypoint rejects short passwords,
+  passwords without a special character, and common defaults
+  (`admin`, `password`, `changeme`, `administrator`, …).
+- **Set a real domain.** `SITE_NAME` must be your own domain. Do not deploy with
+  `erp.localhost` (development only) or any AskExe-owned host in production.
+- **Single sign-on.** When `GOTRUE_URL` is configured, the login page resolves
+  your SSO tenant from the request host (e.g. `erp.acme.com` → `auth.acme.com`).
+  Override with `EXE_AUTH_URL` (full URL) or `AUTH_DOMAIN` (bare host) if your
+  auth domain differs.
+- **Rotate the admin password** after first login and create per-user accounts
+  with appropriate roles rather than sharing the Administrator account.
+- **Bind ports locally.** The compose file binds the API and websocket ports to
+  `127.0.0.1`; expose them only behind your own TLS-terminating reverse proxy.
 
-1. [Frappe School](https://frappe.school) - Learn Frappe Framework and ERPNext from the various courses by the maintainers or from the community.
-2. [Official documentation](https://docs.frappe.io/framework) - Extensive documentation for Frappe Framework.
-3. [Discussion Forum](https://discuss.frappe.io/) - Engage with community of Frappe Framework users and service providers.
-4. [buildwithhussain.com](https://buildwithhussain.com) - Watch Frappe Framework being used in the wild to build world-class web apps.
+## Local development
 
-## Contributing
+For local development only, you may set `SITE_NAME=erp.localhost`. This is never
+appropriate for a production or customer install.
 
-1. [Issue Guidelines](https://github.com/frappe/erpnext/wiki/Issue-Guidelines)
-1. [Report Security Vulnerabilities](https://frappe.io/security)
-1. [Pull Request Requirements](https://github.com/frappe/erpnext/wiki/Contribution-Guidelines)
-2. [Translations](https://crowdin.com/project/frappe)
+## Attribution & licensing
 
-<br>
-<br>
-<div align="center">
-	<a href="https://frappe.io" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/Frappe-white.png">
-			<img src="https://frappe.io/files/Frappe-black.png" alt="Frappe Technologies" height="28"/>
-		</picture>
-	</a>
-</div>
+Exe ERP is derived from Frappe Framework and ERPNext. See [`attributions.md`](attributions.md),
+[`LICENSE`](LICENSE), and [`LICENSE.frappe`](LICENSE.frappe) for the full
+attribution and license terms.
