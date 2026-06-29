@@ -3,15 +3,25 @@ import os
 from . import __version__ as app_version
 
 app_name = "frappe"
-app_title = "Exe ERP"
-app_publisher = "AskExe"
-app_description = "Exe ERP — inventory, orders, invoicing"
-app_license = "GPL-3.0"
-app_logo_url = "/assets/frappe/images/exe-erp-logo.svg"
+
+# ── White-label / branding (config-driven) ──────────────────────────────
+# All user-facing branding is overridable via environment variables so the
+# product can be white-labelled without forking. Defaults reproduce the
+# stock Exe ERP branding, so behavior is identical when unset.
+# Pattern mirrors frappe.www.login (EXE_AUTH_URL) and exe_bridge env config.
+app_title = os.environ.get("EXE_APP_TITLE", "Exe ERP")
+app_publisher = os.environ.get("EXE_APP_PUBLISHER", "AskExe")
+app_description = os.environ.get(
+	"EXE_APP_DESCRIPTION", "Exe ERP — inventory, orders, invoicing"
+)
+app_license = os.environ.get("EXE_APP_LICENSE", "GPL-3.0")
+app_logo_url = os.environ.get(
+	"EXE_APP_LOGO_URL", "/assets/frappe/images/exe-erp-logo.svg"
+)
 develop_version = "17.x.x-develop"
 app_home = "/app/build"
 
-app_email = "support@askexe.com"  # Exe ERP fork
+app_email = os.environ.get("EXE_APP_EMAIL", "support@askexe.com")  # Exe ERP fork
 
 before_install = "frappe.utils.install.before_install"
 after_install = "frappe.utils.install.after_install"

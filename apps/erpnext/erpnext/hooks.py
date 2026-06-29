@@ -1,19 +1,29 @@
+import os
+
 app_name = "erpnext"  # Internal name — keep for Frappe framework compatibility
-app_title = "Exe ERP"
-app_publisher = "AskExe"
-app_description = """ERP for small businesses"""
+
+# ── White-label / branding (config-driven) ──────────────────────────────
+# All user-facing branding is overridable via environment variables so the
+# product can be white-labelled without forking. Defaults reproduce the
+# stock Exe ERP branding, so behavior is identical when unset.
+# Pattern mirrors frappe.www.login (EXE_AUTH_URL) and exe_bridge env config.
+app_title = os.environ.get("EXE_APP_TITLE", "Exe ERP")
+app_publisher = os.environ.get("EXE_APP_PUBLISHER", "AskExe")
+app_description = os.environ.get("EXE_APP_DESCRIPTION", "ERP for small businesses")
 app_icon = "fa fa-th"
-app_color = "#F5D76E"  # Exe Foundry Bold gold
-app_email = "support@askexe.com"
-app_license = "GNU General Public License (v3)"
-source_link = "https://github.com/AskExe/exe-erp"
-app_logo_url = "/assets/frappe/images/exe-erp-logo.svg"
+app_color = os.environ.get("EXE_APP_COLOR", "#F5D76E")  # Exe Foundry Bold gold
+app_email = os.environ.get("EXE_APP_EMAIL", "support@askexe.com")
+app_license = os.environ.get("EXE_APP_LICENSE", "GNU General Public License (v3)")
+source_link = os.environ.get("EXE_APP_SOURCE_LINK", "https://github.com/AskExe/exe-erp")
+app_logo_url = os.environ.get(
+	"EXE_APP_LOGO_URL", "/assets/frappe/images/exe-erp-logo.svg"
+)
 app_home = "/desk"
 
 add_to_apps_screen = [
 	{
 		"name": app_name,
-		"logo": "/assets/frappe/images/exe-erp-logo.svg",
+		"logo": app_logo_url,
 		"title": app_title,
 		"route": app_home,
 		"has_permission": "erpnext.check_app_permission",
