@@ -7,8 +7,9 @@ Scraped by exe-monitor (Beszel hub) for dashboards and alerting.
 Endpoint: GET /api/method/erpnext.exe_bridge.metrics.get_metrics
 """
 
-import frappe
 from datetime import datetime, timedelta
+
+import frappe
 
 
 @frappe.whitelist(allow_guest=False)
@@ -52,7 +53,6 @@ def get_metrics():
 		gauge("erp_total_users", total_users, "Total enabled system users")
 
 		# ── Business metrics ──────────────────────────────────
-		today = datetime.now().strftime("%Y-%m-%d")
 		month_start = datetime.now().replace(day=1).strftime("%Y-%m-%d")
 
 		# Sales orders (this month)

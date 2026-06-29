@@ -18,10 +18,11 @@ Configuration (site_config.json):
 
 import hmac
 import os
+
 import frappe
 import requests
-from frappe.website.utils import get_home_page
 from frappe.rate_limiter import rate_limit
+from frappe.website.utils import get_home_page
 
 
 @frappe.whitelist(allow_guest=True)

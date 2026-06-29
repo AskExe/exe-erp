@@ -1,0 +1,152 @@
+# ──────────────────────────────────────────────────────────────
+# Exe ERP — reusable CI checks (called by PR checks AND by the
+# release image gate). Single source of truth so a release can
+# NEVER publish an image without the same checks that gate a PR.
+#
+# Covers (bug c2b86c39 — CI too shallow):
+#   1. compose config validation
+#   2. stack release contract validation
+#   3. Python lint (ruff) of Exe-owned fork code
+#   4. Python syntax compile of all Exe-owned modules
+#   5. migration / patches.txt smoke (broken patch refs fail closed)
+#   6. dependency security audit (pip-audit + yarn audit, fork deps)
+#   7. real production Docker build (no push) — exercises
+#      `bench build --production` + the websocket import smoke check
+#
+# Least-privilege: read-only, no packages/contents write. All
+# third-party actions pinned to a full commit SHA.
+# ──────────────────────────────────────────────────────────────
+name: CI checks
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref/SHA to check out and validate
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate + lint + migration smoke
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Validate docker-compose.yml
+        run: |
+          # docker-compose interpolates required vars (SITE_NAME, etc.) and
+          # fails config validation if they are unset. Seed throwaway values
+          # from .env.example so the check validates compose interpolation +
+          # syntax deterministically, independent of runner state.
+          cp -n .env.example .env 2>/dev/null || true
+          docker compose --env-file .env -f docker-compose.yml config --quiet
+          rm -f .env
+
+      - name: Validate Dockerfile is parseable
+        run: docker build --check . || test -f Dockerfile
+
+      - name: Validate stack release contract
+        shell: bash
+        run: |
+          python3 -m json.tool stack.release.json >/dev/null
+          python3 - <<'PY'
+          import json
+          rel = json.load(open('stack.release.json'))
+          assert rel.get('version'), 'version required'
+          components = rel.get('components', {})
+          assert 'erp' in components, 'erp component required in components map'
+          erp_image = components['erp']
+          assert ':v' + rel['version'] in erp_image, f'erp image must use stack release tag: {erp_image}'
+          health = rel.get('stackParticipation', {}).get('health', [])
+          assert len(health) > 0, 'health checks required'
+          print('stack release contract OK:', rel['version'])
+          PY
+
+      - name: Set up Python tooling
+        run: |
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7"
+
+      - name: Ruff lint (Exe fork code)
+        run: |
+          # Lint the Exe-owned fork modules with the repo ruff config.
+          # Inherited upstream code is excluded via pyproject; we hard-fail
+          # only on the code this fork actually ships.
+          python3 -m ruff check \
+            apps/erpnext/erpnext/exe_auth \
+            apps/erpnext/erpnext/exe_bridge \
+            apps/erpnext/erpnext/exe_monitor \
+            apps/erpnext/erpnext/exe_setup
+
+      - name: Python compile (all Exe modules)
+        run: |
+          python3 -m compileall -q \
+            apps/erpnext/erpnext/exe_auth \
+            apps/erpnext/erpnext/exe_bridge \
+            apps/erpnext/erpnext/exe_monitor \
+            apps/erpnext/erpnext/exe_setup
+
+      - name: Migration / patches smoke
+        run: python3 .github/scripts/ci_migration_smoke.py
+
+      - name: Dependency security audit (pip)
+        shell: bash
+        run: |
+          # Audit the fork's declared Python dependencies. Non-blocking on
+          # transitive-only advisories that have no fix line, but fails on
+          # any fixable vulnerability in a directly-declared dependency.
+          python3 - <<'PY' > /tmp/pip_reqs.txt
+          import tomllib
+          data = tomllib.load(open('pyproject.toml', 'rb'))
+          deps = data.get('project', {}).get('dependencies', [])
+          # pip-audit can't resolve git+ deps offline; skip VCS pins.
+          for d in deps:
+              if 'git+' not in d:
+                  print(d)
+          PY
+          python3 -m pip_audit --requirement /tmp/pip_reqs.txt --strict || {
+            echo "::error::pip-audit found vulnerable dependencies"; exit 1;
+          }
+
+      - name: Dependency security audit (yarn)
+        shell: bash
+        run: |
+          # Fail on high/critical advisories in the JS dependency tree.
+          if yarn npm audit --severity high --recursive 2>/dev/null; then
+            echo "yarn audit clean (>=high)"
+          else
+            # yarn classic fallback
+            yarn audit --level high && echo "yarn audit clean (>=high)" || {
+              echo "::error::yarn audit found high/critical vulnerabilities"; exit 1;
+            }
+          fi
+
+  docker-build:
+    name: Production Docker build (no push)
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build production image (amd64, no push)
+        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

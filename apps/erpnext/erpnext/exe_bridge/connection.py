@@ -8,9 +8,9 @@ Connection is lazy-initialized and pooled per worker process.
 Falls back gracefully if exedb is unavailable — never blocks ERP operations.
 """
 
+import logging
 import os
 import threading
-import logging
 
 logger = logging.getLogger("exe_bridge")
 
