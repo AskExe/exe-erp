@@ -7,10 +7,11 @@ for exe-os stack-update health checks and exe-monitor dashboard.
 Endpoint: GET /api/method/erpnext.exe_monitor.health.check
 """
 
-import os
 import logging
-import frappe
+import os
 from datetime import datetime, timezone
+
+import frappe
 
 logger = logging.getLogger("exe_monitor")
 
@@ -31,7 +32,7 @@ def check():
 
 	# ── Database ──────────────────────────────────────────────
 	try:
-		result = frappe.db.sql("SELECT 1", as_list=True)
+		frappe.db.sql("SELECT 1", as_list=True)
 		components["database"] = {
 			"status": "healthy",
 			"type": "postgres",

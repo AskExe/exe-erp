@@ -115,7 +115,7 @@ def _build_payload(doc):
 			data.pop(field, None)
 
 		# Remove child table internal fields
-		for key, value in list(data.items()):
+		for _key, value in list(data.items()):
 			if isinstance(value, list):
 				for row in value:
 					if isinstance(row, dict):

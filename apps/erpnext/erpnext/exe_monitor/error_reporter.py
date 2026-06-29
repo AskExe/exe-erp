@@ -14,9 +14,9 @@ Usage:
     after_request_error = "erpnext.exe_monitor.error_reporter.on_request_error"
 """
 
+import logging
 import os
 import re
-import logging
 import traceback
 from datetime import datetime, timezone
 

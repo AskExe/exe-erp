@@ -1,14 +1,18 @@
 # ──────────────────────────────────────────────────────────────
-# Exe ERP — minimal AskExe-controlled PR checks
+# Exe ERP — PR checks
+#
 # Replaces the inherited Frappe CI (server/ui tests, linters,
 # release/backport/label/lock workflows) which carried supply-chain
 # and self-hosted runner-load risk (bug 10e980cb):
 #   - tmate debug shells, scheduled jobs queueing for hours,
 #     pull_request_target with write tokens, external dispatch,
 #     unpinned third-party actions.
-# This workflow validates only what this fork ships: the Docker
-# build context, the compose manifest, and the stack release
-# contract. All actions are pinned to a full commit SHA.
+#
+# PR checks now run the SAME deep CI suite that gates a release
+# image publish (bug c2b86c39 — CI was too shallow). The shared
+# suite lives in ci-checks.yml (workflow_call) so a release can
+# never publish an image without passing exactly what a PR must.
+# All actions are pinned to a full commit SHA.
 # ──────────────────────────────────────────────────────────────
 name: PR checks
 
@@ -25,32 +29,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Validate compose + release contract
-    runs-on: [self-hosted, linux, x64]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Validate docker-compose.yml
-        run: docker compose -f docker-compose.yml config --quiet
-
-      - name: Validate Dockerfile is parseable
-        run: docker build --check . || test -f Dockerfile
-
-      - name: Validate stack release contract
-        shell: bash
-        run: |
-          python -m json.tool stack.release.json >/dev/null
-          python - <<'PY'
-          import json
-          rel = json.load(open('stack.release.json'))
-          assert rel.get('version'), 'version required'
-          components = rel.get('components', {})
-          assert 'erp' in components, 'erp component required in components map'
-          erp_image = components['erp']
-          assert ':v' + rel['version'] in erp_image, f'erp image must use stack release tag: {erp_image}'
-          health = rel.get('stackParticipation', {}).get('health', [])
-          assert len(health) > 0, 'health checks required'
-          print('stack release contract OK:', rel['version'])
-          PY
+  ci:
+    name: CI checks
+    uses: ./.github/workflows/ci-checks.yml
+    permissions:
+      contents: read

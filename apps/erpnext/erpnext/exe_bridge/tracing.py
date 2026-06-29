@@ -63,8 +63,16 @@ class Span:
     """A single trace span — represents one unit of work."""
 
     __slots__ = (
-        "span_id", "trace_id", "parent_id", "name", "span_type",
-        "start_time", "end_time", "attributes", "status", "children",
+        "attributes",
+        "children",
+        "end_time",
+        "name",
+        "parent_id",
+        "span_id",
+        "span_type",
+        "start_time",
+        "status",
+        "trace_id",
     )
 
     def __init__(self, name, span_type, trace_id=None, parent_id=None):
@@ -305,9 +313,8 @@ def traced(span_type="function", **span_attrs):
             if tracer is None:
                 return fn(*args, **kwargs)
 
-            with tracer.span(fn.__qualname__, span_type, **span_attrs) as s:
-                result = fn(*args, **kwargs)
-                return result
+            with tracer.span(fn.__qualname__, span_type, **span_attrs):
+                return fn(*args, **kwargs)
 
         return wrapper
     return decorator

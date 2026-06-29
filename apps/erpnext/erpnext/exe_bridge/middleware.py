@@ -16,8 +16,8 @@ Installation (in hooks.py or wsgi.py):
     application = TracingMiddleware(application)
 """
 
-import os
 import logging
+import os
 import time
 
 logger = logging.getLogger("exe_bridge.middleware")
@@ -60,8 +60,8 @@ class TracingMiddleware:
         # Import here to avoid circular imports during module load
         from erpnext.exe_bridge.tracing import (
             RequestTracer,
-            set_current_tracer,
             clear_current_tracer,
+            set_current_tracer,
         )
 
         # Create tracer (propagates X-Trace-Id if present)
