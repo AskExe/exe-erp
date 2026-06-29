@@ -5,7 +5,13 @@
 # ──────────────────────────────────────────────────────────────
 
 # ── Stage 1: Base runtime ────────────────────────────────────
-FROM python:3.14-slim-bookworm AS base
+# Pin the base image by immutable digest (not the mutable 3.14-slim-bookworm
+# tag) so builds are reproducible and cannot be silently re-pointed at a
+# different image. Multi-arch index digest covers linux/amd64 + linux/arm64.
+# To update: docker manifest inspect python:3.14-slim-bookworm, take the
+# docker-content-digest, and bump the comment tag below.
+# Tag at pin time: python:3.14-slim-bookworm (resolved 2026-06-29)
+FROM python:3.14-slim-bookworm@sha256:4ff4b92a68355dbdb52584ab3391dff8d371a61d4e063468bfd0130e3189c6d9 AS base
 
 # System deps for runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -23,6 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
+    # xz-utils — needed to unpack the official Node.js .tar.xz below
+    xz-utils \
     # Locale
     locales \
     && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
@@ -32,14 +40,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
 
-# Install Node.js 24 via NodeSource (pinned version for reproducibility)
-# Pin: NodeSource setup_24.x as of 2026-06 — review and update periodically
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x -o /tmp/nodesource_setup.sh \
-    && bash /tmp/nodesource_setup.sh \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -f /tmp/nodesource_setup.sh \
-    && npm install -g yarn@1.22.22 \
-    && rm -rf /var/lib/apt/lists/*
+# Install Node.js 24 from the official nodejs.org binary distribution with a
+# SHA256 checksum check.
+#
+# We deliberately do NOT use the NodeSource `curl | bash` setup script: piping
+# a remote installer straight into a root shell with no integrity check means a
+# compromised/MITM'd script executes arbitrary code at build time. Instead we
+# download the pinned, prebuilt tarball and verify it against the published
+# SHA256 from nodejs.org's signed SHASUMS256.txt before unpacking.
+#
+# To update: bump NODE_VERSION and refresh both checksums from
+#   https://nodejs.org/dist/${NODE_VERSION}/SHASUMS256.txt
+ARG NODE_VERSION=v24.18.0
+ARG NODE_SHA256_AMD64=55aa7153f9d88f28d765fcdad5ae6945b5c0f98a36881703817e4c450fa76742
+ARG NODE_SHA256_ARM64=58c9520501f6ae2b52d5b210444e24b9d0c029a58c5011b797bc1fe7105886f6
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+        amd64) node_arch=x64; node_sha="${NODE_SHA256_AMD64}" ;; \
+        arm64) node_arch=arm64; node_sha="${NODE_SHA256_ARM64}" ;; \
+        *) echo "Unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
+    esac; \
+    tarball="node-${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    curl -fsSLo "/tmp/${tarball}" "https://nodejs.org/dist/${NODE_VERSION}/${tarball}"; \
+    echo "${node_sha}  /tmp/${tarball}" | sha256sum -c -; \
+    tar -xJf "/tmp/${tarball}" -C /usr/local --strip-components=1 --no-same-owner; \
+    rm -f "/tmp/${tarball}"; \
+    node --version; \
+    npm --version; \
+    npm install -g yarn@1.22.22; \
+    rm -rf /var/lib/apt/lists/*
 
 # Create frappe user
 RUN groupadd -g 1000 frappe \
