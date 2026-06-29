@@ -1,0 +1,148 @@
+# ──────────────────────────────────────────────────────────────
+# Exe ERP — Vulnerability scan (Python · Node · container)
+#
+# Feature 2a9c53a5-b7b6-4917-b421-10b57c490a88
+#
+# ADDITIVE — does NOT modify ci-checks.yml or pr-checks.yml.
+# The existing blocking CI already covers:
+#   • pip-audit on root pyproject.toml
+#   • yarn audit --level high
+#
+# This workflow extends that coverage with:
+#   1. python-vuln-scan  — pip-audit on apps/erpnext/pyproject.toml
+#                          (upstream ERPNext app deps, not in existing scan)
+#   2. node-vuln-scan    — npm audit on root + apps/erpnext
+#                          (complementary to yarn audit; different advisory DB)
+#   3. container-vuln-scan — Trivy filesystem vuln scan + Dockerfile
+#                            misconfiguration scan (entirely new capability)
+#
+# NON-BLOCKING (continue-on-error: true) — pre-existing vulnerabilities in
+# upstream ERPNext/Frappe dependencies would red these jobs immediately if
+# they blocked. Results are reported as annotations; fix-up PRs can harden
+# severity thresholds over time.
+#
+# Least-privilege: read-only, no packages/contents write.
+# All third-party actions pinned to a full commit SHA.
+# ──────────────────────────────────────────────────────────────
+name: Vulnerability Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 3 * * 1'   # Weekly Monday 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Python — apps/erpnext dependency audit ─────────────────
+  python-vuln-scan:
+    name: Python vulnerability scan (pip-audit)
+    runs-on: [self-hosted, linux, x64]
+    continue-on-error: true   # non-blocking: upstream deps may carry known CVEs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install pip-audit
+        run: python3 -m pip install --quiet --upgrade pip "pip-audit~=2.7"
+
+      - name: pip-audit — apps/erpnext/pyproject.toml
+        shell: bash
+        run: |
+          # Extract resolvable (non-VCS) deps from the ERPNext app pyproject.
+          # The root pyproject.toml is already audited in ci-checks.yml (blocking);
+          # this scan covers the upstream ERPNext app dependency tree.
+          python3 - <<'PY' > /tmp/erpnext_reqs.txt
+          import tomllib, pathlib, sys
+          p = pathlib.Path('apps/erpnext/pyproject.toml')
+          if not p.exists():
+              sys.exit(0)
+          data = tomllib.load(p.open('rb'))
+          deps = data.get('project', {}).get('dependencies', [])
+          for d in deps:
+              if 'git+' not in d:
+                  print(d)
+          PY
+          if [ ! -s /tmp/erpnext_reqs.txt ]; then
+            echo "No resolvable deps found in apps/erpnext/pyproject.toml — skipping"
+            exit 0
+          fi
+          python3 -m pip_audit --requirement /tmp/erpnext_reqs.txt --strict \
+            || echo "::warning::pip-audit found vulnerabilities in apps/erpnext/pyproject.toml — see job output"
+
+  # ── 2. Node — npm audit (complements existing yarn audit) ─────
+  node-vuln-scan:
+    name: Node vulnerability scan (npm audit)
+    runs-on: [self-hosted, linux, x64]
+    continue-on-error: true   # non-blocking: upstream Frappe JS deps may carry known CVEs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: npm audit — root package.json
+        shell: bash
+        run: |
+          # npm audit requires package-lock.json; generate a lock-only manifest
+          # without installing packages (--ignore-scripts = no postinstall hooks).
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only --ignore-scripts --legacy-peer-deps 2>/dev/null || true
+          fi
+          npm audit --audit-level=high \
+            || echo "::warning::npm audit (root) found high/critical vulnerabilities — see job output"
+
+      - name: npm audit — apps/erpnext/package.json
+        shell: bash
+        run: |
+          cd apps/erpnext
+          if [ ! -f package.json ]; then
+            echo "No package.json in apps/erpnext — skipping"
+            exit 0
+          fi
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only --ignore-scripts --legacy-peer-deps 2>/dev/null || true
+          fi
+          npm audit --audit-level=high \
+            || echo "::warning::npm audit (apps/erpnext) found high/critical vulnerabilities — see job output"
+
+  # ── 3. Container — Trivy filesystem + Dockerfile config ───────
+  container-vuln-scan:
+    name: Container vulnerability scan (Trivy)
+    runs-on: [self-hosted, linux, x64]
+    continue-on-error: true   # non-blocking: upstream image layers likely carry known CVEs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin v0.57.0
+          trivy --version
+
+      - name: Trivy filesystem scan (Python + Node package manifests)
+        run: |
+          # Scans pyproject.toml / requirements*.txt / package.json / yarn.lock
+          # for known CVEs. Skips large vendored dirs to keep runtime short.
+          # --exit-code 0 keeps step green regardless of findings; the
+          # continue-on-error job gate is the safety net.
+          trivy fs . \
+            --exit-code 0 \
+            --severity HIGH,CRITICAL \
+            --scanners vuln \
+            --format table \
+            --skip-dirs ".git,node_modules,apps/frappe,apps/erpnext/node_modules" \
+            || echo "::warning::Trivy fs scan reported vulnerabilities — see job output"
+
+      - name: Trivy Dockerfile misconfiguration scan
+        run: |
+          # Scans Dockerfile and docker-compose.yml for security misconfigurations
+          # (e.g. running as root, ADD vs COPY, HEALTHCHECK missing).
+          trivy config . \
+            --exit-code 0 \
+            --severity HIGH,CRITICAL \
+            --format table \
+            || echo "::warning::Trivy config scan reported Dockerfile issues — see job output"
