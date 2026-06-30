@@ -37,15 +37,30 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs (bug 03faf797): rapid PR pushes piled up redundant
+# scans on the shared self-hosted slots — only the latest commit matters.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── 1. Python — apps/erpnext dependency audit ─────────────────
   python-vuln-scan:
     name: Python vulnerability scan (pip-audit)
-    runs-on: [self-hosted, linux, x64]
+    # Hybrid routing (FR 17efa619): non-blocking, no secrets, no Docker —
+    # runs on GitHub-hosted to free the 2 shared self-hosted slots.
+    runs-on: ubuntu-latest
     continue-on-error: true   # non-blocking: upstream deps may carry known CVEs
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python (with pip cache)
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/erpnext/pyproject.toml
 
       - name: Install pip-audit
         run: python3 -m pip install --quiet --upgrade pip "pip-audit~=2.7"
@@ -77,7 +92,8 @@ jobs:
   # ── 2. Node — npm audit (complements existing yarn audit) ─────
   node-vuln-scan:
     name: Node vulnerability scan (npm audit)
-    runs-on: [self-hosted, linux, x64]
+    # Hybrid routing (FR 17efa619): non-blocking, no secrets, no Docker.
+    runs-on: ubuntu-latest
     continue-on-error: true   # non-blocking: upstream Frappe JS deps may carry known CVEs
     steps:
       - name: Checkout
@@ -111,7 +127,11 @@ jobs:
   # ── 3. Container — Trivy filesystem + Dockerfile config ───────
   container-vuln-scan:
     name: Container vulnerability scan (Trivy)
-    runs-on: [self-hosted, linux, x64]
+    # Hybrid routing (FR 17efa619): Trivy here scans the filesystem
+    # (`trivy fs`) and Dockerfile config (`trivy config`) only — it does
+    # NOT scan a built image, so no local Docker build artifact is needed.
+    # No secrets, non-blocking → GitHub-hosted.
+    runs-on: ubuntu-latest
     continue-on-error: true   # non-blocking: upstream image layers likely carry known CVEs
     steps:
       - name: Checkout
