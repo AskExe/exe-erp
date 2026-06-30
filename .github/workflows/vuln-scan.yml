@@ -47,9 +47,7 @@ jobs:
   # ── 1. Python — apps/erpnext dependency audit ─────────────────
   python-vuln-scan:
     name: Python vulnerability scan (pip-audit)
-    # Hybrid routing (FR 17efa619): non-blocking, no secrets, no Docker —
-    # runs on GitHub-hosted to free the 2 shared self-hosted slots.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     continue-on-error: true   # non-blocking: upstream deps may carry known CVEs
     steps:
       - name: Checkout
@@ -92,8 +90,7 @@ jobs:
   # ── 2. Node — npm audit (complements existing yarn audit) ─────
   node-vuln-scan:
     name: Node vulnerability scan (npm audit)
-    # Hybrid routing (FR 17efa619): non-blocking, no secrets, no Docker.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     continue-on-error: true   # non-blocking: upstream Frappe JS deps may carry known CVEs
     steps:
       - name: Checkout
@@ -127,11 +124,7 @@ jobs:
   # ── 3. Container — Trivy filesystem + Dockerfile config ───────
   container-vuln-scan:
     name: Container vulnerability scan (Trivy)
-    # Hybrid routing (FR 17efa619): Trivy here scans the filesystem
-    # (`trivy fs`) and Dockerfile config (`trivy config`) only — it does
-    # NOT scan a built image, so no local Docker build artifact is needed.
-    # No secrets, non-blocking → GitHub-hosted.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     continue-on-error: true   # non-blocking: upstream image layers likely carry known CVEs
     steps:
       - name: Checkout
