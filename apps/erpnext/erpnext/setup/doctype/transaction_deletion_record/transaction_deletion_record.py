@@ -531,21 +531,29 @@ class TransactionDeletionRecord(Document):
 				continue
 
 			db_company_fields = self._get_company_link_fields(doctype_name)
+			if not db_company_fields:
+				# SECURITY (bug 4a25fcb8): refuse DocTypes that have NO Company link
+				# field. Transaction deletion is a company-scoped operation; a DocType
+				# with no company field would otherwise fall through to selecting and
+				# deleting EVERY row (an unscoped, catastrophic delete). Such DocTypes
+				# are out of scope — skip them instead of importing.
+				skipped.append(
+					_("{0}: No Company link field — not company-scoped, refusing").format(doctype_name)
+				)
+				continue
+
 			import_company_field = ""
-			if not db_company_fields:  # Case no company field exists
-				details = self._get_to_delete_row_infos(doctype_name)
-			elif (
+			if (
 				company_field and company_field in db_company_fields
 			):  # Case it is provided by export and valid
 				details = self._get_to_delete_row_infos(doctype_name, company_field)
 				import_company_field = company_field
-			else:  # Company field exists but not provided by export or invalid
-				if "company" in db_company_fields:  # Check if 'company' is a valid field
-					details = self._get_to_delete_row_infos(doctype_name, "company")
-					import_company_field = "company"
-				else:  # Fallback to first valid company field
-					details = self._get_to_delete_row_infos(doctype_name, db_company_fields[0])
-					import_company_field = db_company_fields[0]
+			elif "company" in db_company_fields:  # Prefer the canonical 'company' field
+				details = self._get_to_delete_row_infos(doctype_name, "company")
+				import_company_field = "company"
+			else:  # Fallback to first valid company field
+				details = self._get_to_delete_row_infos(doctype_name, db_company_fields[0])
+				import_company_field = db_company_fields[0]
 
 			self.append(
 				"doctypes_to_delete",
@@ -789,25 +797,30 @@ class TransactionDeletionRecord(Document):
 					# Get company_field from stored value (could be any Company link field)
 					company_field = docfield.docfield_name
 
-					if company_field:
-						no_of_docs = self.get_number_of_docs_linked_with_specified_company(
-							docfield.doctype_name, company_field
+					if not company_field:
+						# SECURITY (bug 4a25fcb8): defense-in-depth. Never perform an
+						# unscoped delete. A tracker row with no company field must not
+						# fall through to counting/deleting EVERY document of the DocType.
+						# Refuse it, log loudly, and mark done without touching any data.
+						frappe.log_error(
+							f"Refused unscoped transaction deletion for DocType "
+							f"'{docfield.doctype_name}' (no company field on tracker row).",
+							"Transaction Deletion Security",
 						)
-					else:
-						no_of_docs = frappe.db.count(docfield.doctype_name)
+						frappe.db.set_value(docfield.doctype, docfield.name, "done", 1)
+						continue
+
+					no_of_docs = self.get_number_of_docs_linked_with_specified_company(
+						docfield.doctype_name, company_field
+					)
 
 					if no_of_docs > 0:
-						if company_field:
-							reference_docs = frappe.get_all(
-								docfield.doctype_name,
-								filters={company_field: self.company},
-								fields=["name"],
-								limit=self.batch_size,
-							)
-						else:
-							reference_docs = frappe.get_all(
-								docfield.doctype_name, fields=["name"], limit=self.batch_size
-							)
+						reference_docs = frappe.get_all(
+							docfield.doctype_name,
+							filters={company_field: self.company},
+							fields=["name"],
+							limit=self.batch_size,
+						)
 
 						reference_doc_names = [r.name for r in reference_docs]
 

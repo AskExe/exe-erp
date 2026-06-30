@@ -25,6 +25,41 @@ from frappe.rate_limiter import rate_limit
 from frappe.website.utils import get_home_page
 
 
+def _assert_provisioning_allowed(email: str) -> None:
+	"""Fail-closed tenant/domain gate for SSO auto-provisioning.
+
+	bug 7b4bbe12: ERP SSO must NOT auto-provision arbitrary valid GoTrue users.
+	A valid GoTrue credential proves identity, not tenant membership — without a
+	binding to this ERP tenant any GoTrue user (including cross-tenant ones) would
+	otherwise get a Frappe account here.
+
+	Provisioning is therefore REFUSED unless one of the following is configured in
+	site_config.json:
+	  - allowed_email_domains: list of domains authorized for this tenant (preferred)
+	  - gotrue_allow_all_domains: true to explicitly opt into open provisioning
+	    (single-tenant deployments where every GoTrue user is trusted)
+
+	When allowed_email_domains is set, the email's domain must be on the list.
+	"""
+	allowed_domains = frappe.conf.get("allowed_email_domains") or []
+	allow_all = frappe.conf.get("gotrue_allow_all_domains", False)
+	email_domain = email.split("@")[1] if "@" in email else ""
+
+	if not allowed_domains and not allow_all:
+		frappe.throw(
+			"User auto-provisioning is disabled: no tenant domain allowlist is "
+			"configured. Set allowed_email_domains in site_config.json (or "
+			"gotrue_allow_all_domains=true to explicitly allow all domains).",
+			frappe.AuthenticationError,
+		)
+
+	if allowed_domains and email_domain not in allowed_domains:
+		frappe.throw(
+			f"Email domain '{email_domain}' is not allowed. Contact your administrator.",
+			frappe.AuthenticationError,
+		)
+
+
 @frappe.whitelist(allow_guest=True)
 @rate_limit(key="gotrue_login", limit=5, seconds=900)
 def gotrue_login(
@@ -77,15 +112,10 @@ def gotrue_login(
 
 	# GoTrue accepted — find or create Frappe User
 	if not frappe.db.exists("User", email):
+		# SECURITY (bug 7b4bbe12): fail closed — require a tenant/domain allowlist
+		# (or an explicit allow-all opt-in) before auto-provisioning any user.
+		_assert_provisioning_allowed(email)
 		first_name = email.split("@")[0]
-		# Default to System User for internal domains, Website User for external
-		allowed_domains = frappe.conf.get("allowed_email_domains", [])
-		email_domain = email.split("@")[1] if "@" in email else ""
-		if allowed_domains and email_domain not in allowed_domains:
-			frappe.throw(
-				f"Email domain '{email_domain}' is not allowed. Contact your administrator.",
-				frappe.AuthenticationError,
-			)
 		default_user_type = frappe.conf.get("default_gotrue_user_type", "Website User")
 		user_doc = frappe.get_doc(
 			{
@@ -180,14 +210,10 @@ def gotrue_login_callback():
 
 	# Auto-provision Frappe User if needed (same logic as gotrue_login)
 	if not frappe.db.exists("User", email):
+		# SECURITY (bug 7b4bbe12): fail closed — require a tenant/domain allowlist
+		# (or an explicit allow-all opt-in) before auto-provisioning any user.
+		_assert_provisioning_allowed(email)
 		first_name = email.split("@")[0]
-		allowed_domains = frappe.conf.get("allowed_email_domains", [])
-		email_domain = email.split("@")[1] if "@" in email else ""
-		if allowed_domains and email_domain not in allowed_domains:
-			frappe.throw(
-				f"Email domain '{email_domain}' is not allowed. Contact your administrator.",
-				frappe.AuthenticationError,
-			)
 		default_user_type = frappe.conf.get("default_gotrue_user_type", "Website User")
 		user_doc = frappe.get_doc(
 			{
