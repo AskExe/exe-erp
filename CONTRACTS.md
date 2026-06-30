@@ -37,6 +37,22 @@ Errors are forwarded to exe-monitor-hub via the `exe_bridge` tracing module:
 - `exe_bridge.events` writes trace events to `raw.raw_events` with `X-Trace-Id` propagation
 - Controlled by `SENTRY_DSN` environment variable
 
+### Raw event landing pad — `EXE_BRIDGE_DATABASE_URL`
+
+`exe_bridge` writes trace events to `raw.raw_events` on the shared **exedb** instance
+via a dedicated psycopg2 connection (independent of Frappe's ORM, which targets
+`exe_erp`). This connection is configured **only** by `EXE_BRIDGE_DATABASE_URL`:
+
+| Env Var | Required for raw events | Behavior when unset |
+|---|---|---|
+| `EXE_BRIDGE_DATABASE_URL` | Yes | Bridge **fails closed**: raw event emission is disabled and a single warning is logged. ERP operations are never blocked. |
+
+The bridge no longer guesses credentials (the old implicit `user=exe`/`$DB_PASSWORD`
+fallback failed silently — bug 12f4c334). It is wired into the `exe-erp`,
+`exe-erp-queue`, and `exe-erp-scheduler` services in `docker-compose.yml`. Set it to
+the exedb bridge DSN (e.g. `postgres://exe_bridge:***@exe-db:5432/exedb`) to enable
+forwarding; leave unset to explicitly disable it.
+
 ## UI Section States
 
 All major UI sections must implement:

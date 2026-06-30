@@ -58,6 +58,10 @@ services:
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
       GOTRUE_ADMIN_TOKEN: ${GOTRUE_ADMIN_TOKEN:-}
+      # Raw-events landing pad (bug 12f4c334). When unset the exe_bridge fails
+      # closed and visibly disables raw.raw_events emission instead of silently
+      # guessing credentials. Set to the exedb bridge DSN to enable forwarding.
+      EXE_BRIDGE_DATABASE_URL: ${EXE_BRIDGE_DATABASE_URL:-}
     ports:
       - "127.0.0.1:8069:8000"
     volumes:
@@ -123,6 +127,9 @@ services:
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
       SITE_NAME: ${SITE_NAME:?SITE_NAME is required — set your ERP site domain (e.g. erp.acme.com). No localhost/AskExe default for production.}
+      # Raw-events landing pad (bug 12f4c334) — background jobs/scheduled tasks
+      # emit trace events; bridge fails closed + visible when this is unset.
+      EXE_BRIDGE_DATABASE_URL: ${EXE_BRIDGE_DATABASE_URL:-}
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:
@@ -161,6 +168,9 @@ services:
       REDIS_QUEUE: redis://redis:6379/4
       REDIS_SOCKETIO: redis://redis:6379/5
       SITE_NAME: ${SITE_NAME:?SITE_NAME is required — set your ERP site domain (e.g. erp.acme.com). No localhost/AskExe default for production.}
+      # Raw-events landing pad (bug 12f4c334) — background jobs/scheduled tasks
+      # emit trace events; bridge fails closed + visible when this is unset.
+      EXE_BRIDGE_DATABASE_URL: ${EXE_BRIDGE_DATABASE_URL:-}
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:
