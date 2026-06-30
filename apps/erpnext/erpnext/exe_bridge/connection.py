@@ -17,6 +17,10 @@ logger = logging.getLogger("exe_bridge")
 # Thread-local connection pool (one connection per worker/thread)
 _local = threading.local()
 
+# Emit the "bridge unconfigured" warning at most once per process to keep the
+# failure visible without spamming logs on every event (bug 12f4c334).
+_warned_unconfigured = False
+
 
 def get_connection():
 	"""Get or create a psycopg2 connection to exedb.
@@ -39,23 +43,30 @@ def get_connection():
 				pass
 			_local.bridge_conn = None
 
+	# Require an explicit, fully-specified DSN. The previous implicit fallback
+	# (host=exe-db, dbname=exedb, user=exe, password=$DB_PASSWORD) guessed
+	# credentials that almost never matched the exedb bridge user, so raw event
+	# emission failed SILENTLY (bug 12f4c334). Fail closed + visible instead:
+	# if EXE_BRIDGE_DATABASE_URL is unset, the bridge is explicitly disabled and
+	# we log a single clear warning rather than attempting a wrong-credential
+	# connection on every event.
+	global _warned_unconfigured
+	dsn = os.environ.get("EXE_BRIDGE_DATABASE_URL")
+	if not dsn:
+		if not _warned_unconfigured:
+			logger.warning(
+				"exe_bridge: EXE_BRIDGE_DATABASE_URL is not set — raw.raw_events "
+				"emission is DISABLED. Set EXE_BRIDGE_DATABASE_URL to the exedb "
+				"bridge DSN to enable trace/event forwarding."
+			)
+			_warned_unconfigured = True
+		return None
+
 	# Create new connection
 	try:
 		import psycopg2
 
-		# Use keyword args instead of DSN to avoid password in a single string
-		dsn = os.environ.get("EXE_BRIDGE_DATABASE_URL")
-		if dsn:
-			conn = psycopg2.connect(dsn, connect_timeout=5)
-		else:
-			host = os.environ.get("DB_HOST", "exe-db")
-			port = os.environ.get("DB_PORT", "5432")
-			password = os.environ.get("DB_PASSWORD", "")
-			conn = psycopg2.connect(
-				host=host, port=port, dbname="exedb",
-				user="exe", password=password,
-				connect_timeout=5,
-			)
+		conn = psycopg2.connect(dsn, connect_timeout=5)
 		conn.autocommit = True  # Each event is an independent write
 		_local.bridge_conn = conn
 		logger.info("exe_bridge: Connected to exedb for event emission")
