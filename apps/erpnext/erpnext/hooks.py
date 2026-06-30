@@ -4,19 +4,20 @@ app_name = "erpnext"  # Internal name — keep for Frappe framework compatibilit
 
 # ── White-label / branding (config-driven) ──────────────────────────────
 # All user-facing branding is overridable via environment variables so the
-# product can be white-labelled without forking. Defaults reproduce the
-# stock Exe ERP branding, so behavior is identical when unset.
+# product can be white-labelled without forking. Defaults are vendor-neutral
+# so a fresh deployment carries no operator-specific company, URL, or contact
+# branding unless explicitly configured.
 # Pattern mirrors frappe.www.login (EXE_AUTH_URL) and exe_bridge env config.
-app_title = os.environ.get("EXE_APP_TITLE", "Exe ERP")
-app_publisher = os.environ.get("EXE_APP_PUBLISHER", "AskExe")
+app_title = os.environ.get("EXE_APP_TITLE", "ERP")
+app_publisher = os.environ.get("EXE_APP_PUBLISHER", "ERP")
 app_description = os.environ.get("EXE_APP_DESCRIPTION", "ERP for small businesses")
 app_icon = "fa fa-th"
-app_color = os.environ.get("EXE_APP_COLOR", "#F5D76E")  # Exe Foundry Bold gold
-app_email = os.environ.get("EXE_APP_EMAIL", "support@askexe.com")
+app_color = os.environ.get("EXE_APP_COLOR", "#7575FF")
+app_email = os.environ.get("EXE_APP_EMAIL", "")  # vendor-neutral; set via env
 app_license = os.environ.get("EXE_APP_LICENSE", "GNU General Public License (v3)")
-source_link = os.environ.get("EXE_APP_SOURCE_LINK", "https://github.com/AskExe/exe-erp")
+source_link = os.environ.get("EXE_APP_SOURCE_LINK", "")  # set to your source repo
 app_logo_url = os.environ.get(
-	"EXE_APP_LOGO_URL", "/assets/frappe/images/exe-erp-logo.svg"
+	"EXE_APP_LOGO_URL", "/assets/erpnext/images/erpnext-logo.svg"
 )
 app_home = "/desk"
 
@@ -125,8 +126,12 @@ calendars = ["Task", "Work Order", "Sales Order", "Holiday List", "ToDo"]
 website_generators = ["BOM", "Sales Partner"]
 
 website_context = {
-	"favicon": "/assets/frappe/images/exe-erp-favicon.svg",
-	"splash_image": "/assets/frappe/images/exe-erp-splash.svg",
+	"favicon": os.environ.get(
+		"EXE_APP_FAVICON_URL", "/assets/erpnext/images/erpnext-favicon.svg"
+	),
+	"splash_image": os.environ.get(
+		"EXE_APP_SPLASH_URL", "/assets/erpnext/images/erpnext-logo.svg"
+	),
 }
 
 # Exe ERP — GoTrue SSO endpoints
@@ -544,15 +549,25 @@ scheduler_events = {
 	],
 }
 
-email_brand_image = "assets/frappe/images/exe-erp-logo.svg"
+email_brand_image = os.environ.get(
+	"EXE_APP_EMAIL_BRAND_IMAGE", "assets/erpnext/images/erpnext-logo.svg"
+)
 
-default_mail_footer = """
+# Vendor-neutral, config-driven mail footer. With no env override the footer
+# shows only the (neutral) app title and no operator-specific URL/company.
+_mail_footer_url = os.environ.get("EXE_APP_MAIL_FOOTER_URL", "")
+if _mail_footer_url:
+	default_mail_footer = f"""
 	<span>
 		Sent via
-		<a class="text-muted" href="https://askexe.com?source=via_email_footer" target="_blank">
-			Exe ERP
+		<a class="text-muted" href="{_mail_footer_url}" target="_blank">
+			{app_title}
 		</a>
 	</span>
+"""
+else:
+	default_mail_footer = f"""
+	<span>Sent via {app_title}</span>
 """
 
 get_translated_dict = {("doctype", "Global Defaults"): "frappe.geo.country_info.get_translated_dict"}
