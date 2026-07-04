@@ -61,7 +61,13 @@ jobs:
           cache-dependency-path: apps/erpnext/pyproject.toml
 
       - name: Install pip-audit
-        run: python3 -m pip install --quiet --upgrade pip "pip-audit~=2.7"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .venv-ci
+          . .venv-ci/bin/activate
+          python -m pip install --quiet --upgrade pip "pip-audit~=2.7"
+          echo "$PWD/.venv-ci/bin" >> "$GITHUB_PATH"
 
       - name: pip-audit — apps/erpnext/pyproject.toml
         shell: bash
@@ -84,7 +90,7 @@ jobs:
             echo "No resolvable deps found in apps/erpnext/pyproject.toml — skipping"
             exit 0
           fi
-          python3 -m pip_audit --requirement /tmp/erpnext_reqs.txt --strict \
+          python -m pip_audit --requirement /tmp/erpnext_reqs.txt --strict \
             || echo "::warning::pip-audit found vulnerabilities in apps/erpnext/pyproject.toml — see job output"
 
   # ── 2. Node — npm audit (complements existing yarn audit) ─────
@@ -131,10 +137,14 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Trivy
+        shell: bash
         run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-            | sh -s -- -b /usr/local/bin v0.57.0
-          trivy --version
+            | sh -s -- -b "$HOME/.local/bin" v0.72.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/trivy" --version
 
       - name: Trivy filesystem scan (Python + Node package manifests)
         run: |

@@ -1,0 +1,50 @@
+title = "exe-erp gitleaks configuration"
+
+[extend]
+useDefault = true
+
+# Inherited Frappe/ERPNext fixtures and DocType metadata contain static test
+# passwords and field-name strings that the default generic-api-key rule treats
+# as secrets. Keep these allowlists scoped to the generic-api-key rule, exact
+# inherited paths, and exact fixture strings so new Exe-owned secrets still fail.
+[[allowlists]]
+description = "Inherited Frappe/ERPNext static test password fixtures"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^apps/erpnext/erpnext/tests/utils\.py$''',
+  '''^frappe/core/doctype/role_profile/test_role_profile\.py$''',
+  '''^frappe/core/doctype/user/test_records\.json$''',
+  '''^frappe/core/doctype/user/test_user\.py$''',
+  '''^frappe/integrations/doctype/connected_app/test_connected_app\.py$''',
+  '''^frappe/tests/test_oauth20\.py$''',
+  '''^frappe/tests/test_password\.py$''',
+]
+regexes = [
+  '''new_password["'[:space:]]*[:=][[:space:]]*["']Eastern_43A1W(?:-new)?["']''',
+  '''old_password[[:space:]]*=[[:space:]]*["']Eastern_43A1W["']''',
+  '''user\.new_password[[:space:]]*=[[:space:]]*["']Eastern_43A1W["']''',
+  '''self\.user_password[[:space:]]*=[[:space:]]*["']Eastern_43A1W["']''',
+  '''"password"[[:space:]]*:[[:space:]]*"Eastern_43A1W"''',
+]
+
+[[allowlists]]
+description = "Inherited Frappe/ERPNext DocType field-name false positives"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^apps/erpnext/erpnext/erpnext_integrations/doctype/plaid_settings/plaid_settings\.json$''',
+  '''^apps/erpnext/erpnext/support/doctype/support_settings/support_settings\.json$''',
+  '''^frappe/core/doctype/system_settings/system_settings\.json$''',
+  '''^frappe/email/doctype/email_account/email_account\.json$''',
+  '''^frappe/integrations/doctype/google_settings/google_settings\.json$''',
+]
+regexes = [
+  '''"plaid_secret"''',
+  '''"response_key_list"''',
+  '''"password_reset_limit"''',
+  '''"ascii_encode_password"''',
+  '''"api_key"''',
+]

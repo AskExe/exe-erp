@@ -11,7 +11,7 @@ from frappe.contacts.doctype.address.address import get_address_display
 from frappe.model.workflow import get_workflow_name, is_transition_condition_satisfied
 from frappe.query_builder import Criterion, DocType
 from frappe.query_builder.custom import ConstantColumn
-from frappe.query_builder.functions import Abs, Sum
+from frappe.query_builder.functions import Abs, Cast, NullIf, Sum
 from frappe.utils import (
 	DateTimeLikeObject,
 	add_days,
@@ -3505,6 +3505,12 @@ def get_common_query(
 	return q
 
 
+def _safe_date(field):
+	"""Return a date expression that ignores Postgres-hostile empty/zero date strings."""
+	field_as_text = Cast(field, "varchar" if frappe.db.db_type == "postgres" else "char")
+	return Cast(NullIf(NullIf(field_as_text, ""), "0000-00-00"), "date")
+
+
 def update_invoice_status():
 	"""Updates status as Overdue for applicable invoices. Runs daily."""
 	today = getdate()
@@ -3519,10 +3525,13 @@ def update_invoice_status():
 			.else_(payment_schedule.payment_amount)
 		)
 
+		payment_schedule_due_date = _safe_date(payment_schedule.due_date)
+		invoice_due_date = _safe_date(invoice.due_date)
+
 		payable_amount = (
 			frappe.qb.from_(payment_schedule)
 			.select(Sum(payment_amount))
-			.where((payment_schedule.parent == invoice.name) & (payment_schedule.due_date < today))
+			.where((payment_schedule.parent == invoice.name) & (payment_schedule_due_date < today))
 		)
 
 		total = (
@@ -3546,7 +3555,7 @@ def update_invoice_status():
 			& (invoice.outstanding_amount > 0)
 			& (invoice.status.like("Unpaid%") | invoice.status.like("Partly Paid%"))
 			& (
-				((invoice.is_pos & invoice.due_date < today) | is_overdue)
+				((invoice.is_pos & (invoice_due_date < today)) | is_overdue)
 				if doctype == "Sales Invoice"
 				else is_overdue
 			)
