@@ -6,6 +6,7 @@ from math import ceil
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Cast, NullIf
 from frappe.utils import add_days, cint, escape_html, flt, nowdate
 
 import erpnext
@@ -110,9 +111,17 @@ def _reorder_item():
 		return create_material_request(material_requests)
 
 
+def _safe_date(field):
+	"""Return a date expression that ignores Postgres-hostile empty/zero date strings."""
+	field_as_text = Cast(field, "varchar" if frappe.db.db_type == "postgres" else "char")
+	return Cast(NullIf(NullIf(field_as_text, ""), "0000-00-00"), "date")
+
+
 def get_items_for_reorder() -> dict[str, list]:
 	reorder_table = frappe.qb.DocType("Item Reorder")
 	item_table = frappe.qb.DocType("Item")
+
+	end_of_life = _safe_date(item_table.end_of_life)
 
 	query = (
 		frappe.qb.from_(reorder_table)
@@ -138,11 +147,7 @@ def get_items_for_reorder() -> dict[str, list]:
 		.where(
 			(item_table.disabled == 0)
 			& (item_table.is_stock_item == 1)
-			& (
-				(item_table.end_of_life.isnull())
-				| (item_table.end_of_life > nowdate())
-				| (item_table.end_of_life == "0000-00-00")
-			)
+			& (end_of_life.isnull() | (end_of_life > nowdate()))
 		)
 	)
 
@@ -159,6 +164,8 @@ def get_items_for_reorder() -> dict[str, list]:
 def get_reorder_levels_for_variants(itemwise_reorder):
 	item_table = frappe.qb.DocType("Item")
 
+	end_of_life = _safe_date(item_table.end_of_life)
+
 	query = (
 		frappe.qb.from_(item_table)
 		.select(
@@ -168,11 +175,7 @@ def get_reorder_levels_for_variants(itemwise_reorder):
 		.where(
 			(item_table.disabled == 0)
 			& (item_table.is_stock_item == 1)
-			& (
-				(item_table.end_of_life.isnull())
-				| (item_table.end_of_life > nowdate())
-				| (item_table.end_of_life == "0000-00-00")
-			)
+			& (end_of_life.isnull() | (end_of_life > nowdate()))
 			& (item_table.variant_of.notnull())
 		)
 	)
