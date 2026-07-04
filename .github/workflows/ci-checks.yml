@@ -246,8 +246,8 @@ jobs:
         run: |
           # Scan the full working tree AND git history. Any committed secret
           # fails the build closed.
-          ./gitleaks dir . --no-banner --redact --exit-code 1
-          ./gitleaks git . --no-banner --redact --exit-code 1
+          ./gitleaks dir . --config .gitleaks.toml --no-banner --redact --exit-code 1
+          ./gitleaks git . --config .gitleaks.toml --no-banner --redact --exit-code 1
 
   trivy-scan:
     name: Container/deps scan (trivy)
