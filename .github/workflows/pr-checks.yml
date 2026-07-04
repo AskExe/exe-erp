@@ -18,6 +18,7 @@ name: PR checks
 
 on:
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 # Least-privilege: read-only, no packages/contents write.
