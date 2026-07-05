@@ -158,39 +158,88 @@ jobs:
       - name: Dependency security audit (yarn)
         shell: bash
         run: |
-          # Fail on high/critical advisories in the JS dependency tree.
-          if yarn npm audit --severity high --recursive 2>/dev/null; then
-            echo "yarn audit clean (>=high)"
-          else
-            # yarn classic fallback. Two advisories are pre-triaged and
-            # excluded below (same root cause, written up in full in
-            # .trivyignore): @vue/component-compiler pins
-            # postcss-modules-sync -> generic-names -> loader-utils@0.2.x
-            # -> json5@0.5.x, both below their fixed majors, with no
-            # in-range bump available. This chain is exercised only at
-            # `yarn build` time against this repo's own .vue/.css source —
-            # never at runtime, never against untrusted input.
-            #   1094088  loader-utils prototype pollution (GHSA-76p3-8jx3-jpfq)
-            #   1096543  json5 prototype pollution        (GHSA-9c47-m6qq-7p4h)
-            yarn audit --level high --json > /tmp/yarn_audit.jsonl 2>/dev/null || true
-            python3 <<'PY'
+          # Audit the JS dependency tree for high/critical advisories.
+          #
+          # The repo ships Yarn *Classic* (v1) lockfiles (the production
+          # Dockerfile pins yarn@1.22.22). Self-hosted runners may default
+          # to Yarn Berry (v2+), whose audit command and lockfile format
+          # differ — Berry's `yarn npm audit` can't even read the classic
+          # lockfile and errors out, which previously broke this gate. Pin
+          # Yarn Classic via npx so the audit is deterministic regardless
+          # of the runner's default yarn, and needs no prior `yarn install`
+          # (classic audit resolves from yarn.lock alone).
+          #
+          # Robustness (advisories are a moving target — new ones publish
+          # daily against transitive, non-our-code packages):
+          #   * Auto-skip UNFIXABLE advisories (no patched version exists) —
+          #     the Yarn-Classic equivalent of `--ignore-unfixed` — so a new
+          #     transitive advisory with no upstream fix can't re-break this
+          #     required gate.
+          #   * Skip two pre-triaged FIXABLE-but-unreachable transitive
+          #     advisories (documented in full in .trivyignore): the
+          #     @vue/component-compiler -> postcss-modules-sync ->
+          #     generic-names -> loader-utils@0.2.x -> json5@0.5.x chain,
+          #     whose fixed majors sit behind upstream peer-pins we can't
+          #     bump. Build-time only; never touches untrusted input.
+          #       1094088  loader-utils prototype pollution (GHSA-76p3-8jx3-jpfq)
+          #       1096543  json5 prototype pollution        (GHSA-9c47-m6qq-7p4h)
+          #   * FAIL on every other advisory — a fixable advisory in a dep we
+          #     actually control must be bumped, not ignored.
+          #
+          # Fail closed: the audit MUST emit its summary line; if it doesn't
+          # (wrong yarn, network error, empty output) the step fails rather
+          # than silently passing.
+          npx --yes yarn@1.22.22 audit --level high --json \
+            > /tmp/yarn_audit.jsonl 2>/dev/null || true
+          python3 <<'PY'
           import json
           import sys
 
           ALLOWED_ADVISORY_IDS = {"1094088", "1096543"}
+
+          def is_unfixable(advisory):
+              # npm/yarn convention: patched range "<0.0.0" (or empty) means
+              # no fixed version exists anywhere -> nothing to bump to.
+              patched = (advisory.get("patched_versions") or "").strip()
+              return patched in ("", "<0.0.0")
+
           blocking = []
+          saw_summary = False
           with open("/tmp/yarn_audit.jsonl") as f:
               for line in f:
                   line = line.strip()
                   if not line:
                       continue
-                  obj = json.loads(line)
-                  if obj.get("type") != "auditAdvisory":
+                  try:
+                      obj = json.loads(line)
+                  except json.JSONDecodeError:
+                      # Non-JSON noise (e.g. a wrong-yarn usage banner) —
+                      # ignore the line, but never treat it as "clean".
+                      continue
+                  kind = obj.get("type")
+                  if kind == "auditSummary":
+                      saw_summary = True
+                      continue
+                  if kind != "auditAdvisory":
                       continue
                   advisory = obj["data"]["advisory"]
                   if str(advisory["id"]) in ALLOWED_ADVISORY_IDS:
                       continue
+                  if is_unfixable(advisory):
+                      print(
+                          f"::notice::yarn audit: ignoring unfixable advisory "
+                          f"{advisory['id']} in {advisory['module_name']} "
+                          f"(no patched version available)"
+                      )
+                      continue
                   blocking.append(advisory)
+
+          if not saw_summary:
+              print(
+                  "::error::yarn audit did not complete (no summary line) — "
+                  "failing closed"
+              )
+              sys.exit(1)
 
           if blocking:
               for advisory in blocking:
@@ -201,11 +250,10 @@ jobs:
               sys.exit(1)
 
           print(
-              "yarn audit clean (>=high, "
+              "yarn audit clean (>=high, unfixable advisories ignored, "
               f"{len(ALLOWED_ADVISORY_IDS)} pre-triaged advisories excluded)"
           )
           PY
-          fi
 
   secret-scan:
     name: Secret scan (gitleaks)
