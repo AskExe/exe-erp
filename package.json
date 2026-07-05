@@ -96,6 +96,9 @@
   "resolutions": {
     "esbuild-plugin-vue3/esbuild": "^0.28.0",
     "ws": "^8.21.0",
+    "json5": "^2.2.2",
+    "launch-editor": "^2.9.0",
+    "loader-utils": "^2.0.3",
     "lodash": "^4.18.0",
     "shell-quote": "^1.8.4",
     "tmp": "^0.2.6"

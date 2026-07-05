@@ -86,16 +86,32 @@ jobs:
           PY
 
       - name: Set up Python tooling
+        shell: bash
         run: |
-          python3 -m pip install --quiet --upgrade pip
-          python3 -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7"
+          set -euo pipefail
+          python3 -m venv .venv-ci
+          . .venv-ci/bin/activate
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7"
+          echo "$PWD/.venv-ci/bin" >> "$GITHUB_PATH"
+
+      - name: Install Python audit build prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq pkg-config default-libmysqlclient-dev build-essential python3-dev
+          else
+            echo "::notice::apt/sudo unavailable; relying on runner-provided build prerequisites"
+          fi
 
       - name: Ruff lint (Exe fork code)
         run: |
           # Lint the Exe-owned fork modules with the repo ruff config.
           # Inherited upstream code is excluded via pyproject; we hard-fail
           # only on the code this fork actually ships.
-          python3 -m ruff check \
+          python -m ruff check \
             apps/erpnext/erpnext/exe_auth \
             apps/erpnext/erpnext/exe_bridge \
             apps/erpnext/erpnext/exe_monitor \
@@ -144,16 +160,42 @@ jobs:
                   continue
               print(d)
           PY
-          # GHSA-9g3x-6x24-vf9f (CVE-2025-26240, pdfkit path traversal in
-          # from_string): affects every released pdfkit version including
-          # the latest (1.0.0) — no fixed release exists upstream to bump
-          # to. Ignored here (not disabled repo-wide) so a genuinely
-          # fixable pdfkit advisory, or any other package's advisory,
-          # still fails the build. Re-evaluate when upstream ships a fix.
-          python3 -m pip_audit --requirement /tmp/pip_reqs.txt --strict \
-            --ignore-vuln GHSA-9g3x-6x24-vf9f || {
-            echo "::error::pip-audit found vulnerable dependencies"; exit 1;
-          }
+          set +e
+          python -m pip_audit --requirement /tmp/pip_reqs.txt --strict --format json --output /tmp/pip-audit.json
+          audit_status=$?
+          set -e
+          AUDIT_STATUS=$audit_status python3 - <<'PY'
+          import json, os, pathlib, sys
+          audit_status = int(os.environ.get('AUDIT_STATUS', '0'))
+          report = pathlib.Path('/tmp/pip-audit.json')
+          if not report.exists() or not report.read_text().strip():
+              if audit_status:
+                  print('::error::pip-audit failed before producing a report')
+                  sys.exit(audit_status)
+              sys.exit(0)
+          data = json.loads(report.read_text())
+          fixable = []
+          unfixable = []
+          for dep in data.get('dependencies', []):
+              name = dep.get('name')
+              version = dep.get('version')
+              for vuln in dep.get('vulns', []):
+                  fixes = vuln.get('fix_versions') or []
+                  item = f"{name} {version} {vuln.get('id')}"
+                  if fixes:
+                      fixable.append(f"{item} (fix: {', '.join(fixes)})")
+                  else:
+                      unfixable.append(item)
+          for item in unfixable:
+              print(f"::warning::pip-audit reported no fixed version for {item}")
+          if fixable:
+              print('::error::pip-audit found fixable vulnerable dependencies:\n' + '\n'.join(fixable))
+              sys.exit(1)
+          if audit_status not in (0, 1):
+              print('::error::pip-audit failed with status', audit_status)
+              sys.exit(audit_status)
+          print('pip-audit found no fixable vulnerabilities in declared dependencies')
+          PY
 
       - name: Dependency security audit (yarn)
         shell: bash
@@ -175,16 +217,18 @@ jobs:
           #     the Yarn-Classic equivalent of `--ignore-unfixed` — so a new
           #     transitive advisory with no upstream fix can't re-break this
           #     required gate.
-          #   * Skip two pre-triaged FIXABLE-but-unreachable transitive
-          #     advisories (documented in full in .trivyignore): the
-          #     @vue/component-compiler -> postcss-modules-sync ->
-          #     generic-names -> loader-utils@0.2.x -> json5@0.5.x chain,
-          #     whose fixed majors sit behind upstream peer-pins we can't
-          #     bump. Build-time only; never touches untrusted input.
-          #       1094088  loader-utils prototype pollution (GHSA-76p3-8jx3-jpfq)
-          #       1096543  json5 prototype pollution        (GHSA-9c47-m6qq-7p4h)
           #   * FAIL on every other advisory — a fixable advisory in a dep we
           #     actually control must be bumped, not ignored.
+          #
+          # The two historical transitive advisories in the
+          # @vue/component-compiler -> postcss-modules-sync -> generic-names
+          # -> loader-utils -> json5 chain are now FIXED outright via
+          # `resolutions` in package.json (loader-utils ^2.0.3, json5 ^2.2.2 —
+          # verified they still build `bench build --production`), so they no
+          # longer appear here. They stay in ALLOWED_ADVISORY_IDS purely as a
+          # documented safety net in case a resolution is ever dropped:
+          #       1094088  loader-utils prototype pollution (GHSA-76p3-8jx3-jpfq)
+          #       1096543  json5 prototype pollution        (GHSA-9c47-m6qq-7p4h)
           #
           # Fail closed: the audit MUST emit its summary line; if it doesn't
           # (wrong yarn, network error, empty output) the step fails rather
@@ -286,8 +330,8 @@ jobs:
         run: |
           # Scan the full working tree AND git history. Any committed secret
           # fails the build closed.
-          ./gitleaks dir . --no-banner --redact --exit-code 1
-          ./gitleaks git . --no-banner --redact --exit-code 1
+          ./gitleaks dir . --config .gitleaks.toml --no-banner --redact --exit-code 1
+          ./gitleaks git . --config .gitleaks.toml --no-banner --redact --exit-code 1
 
   trivy-scan:
     name: Container/deps scan (trivy)

@@ -32,10 +32,7 @@ dependencies = [
     "bleach-allowlist~=1.0.3",
     "chardet~=5.2.0",
     "croniter~=6.0.0",
-    # 48.0.1 fixes GHSA-537c-gmf6-5ccf (vulnerable vendored OpenSSL in the
-    # published wheels). pyOpenSSL is capped below in lockstep since it
-    # pins an upper bound on the cryptography versions it supports.
-    "cryptography~=48.0.1",
+    "cryptography~=49.0.0",
     "cssutils~=2.11.1",
     "email-reply-parser~=0.5.12",
     "Faker~=18.10.1",
@@ -57,9 +54,7 @@ dependencies = [
     "premailer~=3.10.0",
     "psutil~=7.0.0",
     "psycopg2-binary~=2.9.11",
-    # pyOpenSSL 26.2.x is the earliest release whose cryptography upper
-    # bound (<49) admits the cryptography~=48.0.1 fix above.
-    "pyOpenSSL~=26.2.0",
+    "pyOpenSSL~=26.3.0",
     "pydantic~=2.12.5",
     "pyotp~=2.9.0",
     "python-dateutil~=2.9.0.post0",

@@ -1,79 +1,50 @@
-# Gitleaks config for the exe-erp fork.
-#
-# Extends the default gitleaks ruleset (unchanged — we do NOT disable or
-# weaken any rule) and adds narrowly-scoped allowlist entries for known
-# false positives inherited from upstream Frappe/ERPNext. Every entry here
-# must stay narrow (regex + path, or regex + commit, scoped) and documented.
+title = "exe-erp gitleaks configuration"
 
 [extend]
 useDefault = true
 
+# Inherited Frappe/ERPNext fixtures and DocType metadata contain static test
+# passwords and field-name strings that the default generic-api-key rule treats
+# as secrets. Keep these allowlists scoped to the generic-api-key rule, exact
+# inherited paths, and exact fixture strings so new Exe-owned secrets still fail.
 [[allowlists]]
-description = '''
-Frappe doctype JSON field-layout names (e.g. "column_break_7",
-"section_break_31"). The generic-api-key rule's regex spans past a
-"*_secret"/"*_key" field label into the next field's fieldname in these
-schema files, matching the layout fieldname as if it were a secret value.
-These are structural field names in a form-builder schema, not credential
-material. Scoped to doctype JSON schema files only.
-'''
-regexTarget = "secret"
-regexes = [
-  '''^column_break_\d+$''',
-  '''^section_break_\d+$''',
-]
-paths = [
-  '''.*/doctype/.*\.json$''',
-]
-
-[[allowlists]]
-description = '''
-"Eastern_43A1W" (and its "-new" variant used in the password-change test)
-is a hardcoded dummy password used across upstream Frappe/ERPNext's own
-test suite (password-reset, role-profile, OAuth, two-factor,
-connected-app tests) to create throwaway test users. It has shipped in
-the public frappe/frappe and frappe/erpnext repos for years, is not tied
-to any live account or system, and is not exe-owned fork code — it is
-inherited test fixture data.
-'''
-regexTarget = "secret"
-regexes = [
-  '''^Eastern_43A1W(-new)?$''',
-]
-
-[[allowlists]]
-description = '''
-Historical-only finding: `.github/workflows/ui-tests.yml` was part of the
-squashed upstream Frappe/ERPNext source drop in the repo's single
-"Initial commit — Exe ERP (Frappe + ERPNext, single repo)" (all prior
-upstream history was intentionally collapsed into that one commit, see
-its message). The file does not exist in the current tree (this fork
-never ran/used that Cypress workflow) and the value is a Cypress
-Dashboard *record key* — it authorizes uploading test-run recordings to a
-Cypress Cloud project, not access to any AskExe/Exe system, credential,
-or data. Rewriting this commit would require force-pushing a new root
-commit across every branch/PR built on top of it, which is out of scope
-for a CI-gate fix. Scoped to this exact commit + path so the rule still
-fires on genuinely new occurrences.
-'''
+description = "Inherited Frappe/ERPNext static test password fixtures"
+targetRules = ["generic-api-key"]
 condition = "AND"
-commits = ["5ff67c85f5151818001fea79091ce611c9f19206"]
+regexTarget = "line"
 paths = [
-  '''^\.github/workflows/ui-tests\.yml$''',
+  '''^apps/erpnext/erpnext/tests/utils\.py$''',
+  '''^frappe/core/doctype/role_profile/test_role_profile\.py$''',
+  '''^frappe/core/doctype/user/test_records\.json$''',
+  '''^frappe/core/doctype/user/test_user\.py$''',
+  '''^frappe/integrations/doctype/connected_app/test_connected_app\.py$''',
+  '''^frappe/tests/test_oauth20\.py$''',
+  '''^frappe/tests/test_password\.py$''',
+]
+regexes = [
+  '''new_password["'[:space:]]*[:=][[:space:]]*["']Eastern_43A1W(?:-new)?["']''',
+  '''old_password[[:space:]]*=[[:space:]]*["']Eastern_43A1W["']''',
+  '''user\.new_password[[:space:]]*=[[:space:]]*["']Eastern_43A1W["']''',
+  '''self\.user_password[[:space:]]*=[[:space:]]*["']Eastern_43A1W["']''',
+  '''"password"[[:space:]]*:[[:space:]]*"Eastern_43A1W"''',
 ]
 
 [[allowlists]]
-description = '''
-Historical-only finding: `frappe/public/js/billing.bundle.js` is a built
-frontend asset from the same squashed "Initial commit" (see above). The
-matched `websiteToken` is a client-embedded widget token that ships
-inside a JS bundle served to every browser that loads the page — by
-definition public, not a server-side secret — and the file has since
-been rebuilt (the current tree, scanned separately, contains no such
-finding). Scoped to this exact commit + path.
-'''
+description = "Inherited Frappe/ERPNext DocType field-name false positives"
+targetRules = ["generic-api-key"]
 condition = "AND"
-commits = ["5ff67c85f5151818001fea79091ce611c9f19206"]
+regexTarget = "line"
 paths = [
-  '''^frappe/public/js/billing\.bundle\.js$''',
+  '''^apps/erpnext/erpnext/erpnext_integrations/doctype/plaid_settings/plaid_settings\.json$''',
+  '''^apps/erpnext/erpnext/support/doctype/support_settings/support_settings\.json$''',
+  '''^frappe/core/doctype/system_settings/system_settings\.json$''',
+  '''^frappe/email/doctype/email_account/email_account\.json$''',
+  '''^frappe/integrations/doctype/google_settings/google_settings\.json$''',
+]
+regexes = [
+  '''"plaid_secret"''',
+  '''"response_key_list"''',
+  '''"password_reset_limit"''',
+  '''"ascii_encode_password"''',
+  '''"api_key"''',
 ]
