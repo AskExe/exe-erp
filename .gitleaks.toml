@@ -1,0 +1,79 @@
+# Gitleaks config for the exe-erp fork.
+#
+# Extends the default gitleaks ruleset (unchanged — we do NOT disable or
+# weaken any rule) and adds narrowly-scoped allowlist entries for known
+# false positives inherited from upstream Frappe/ERPNext. Every entry here
+# must stay narrow (regex + path, or regex + commit, scoped) and documented.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = '''
+Frappe doctype JSON field-layout names (e.g. "column_break_7",
+"section_break_31"). The generic-api-key rule's regex spans past a
+"*_secret"/"*_key" field label into the next field's fieldname in these
+schema files, matching the layout fieldname as if it were a secret value.
+These are structural field names in a form-builder schema, not credential
+material. Scoped to doctype JSON schema files only.
+'''
+regexTarget = "secret"
+regexes = [
+  '''^column_break_\d+$''',
+  '''^section_break_\d+$''',
+]
+paths = [
+  '''.*/doctype/.*\.json$''',
+]
+
+[[allowlists]]
+description = '''
+"Eastern_43A1W" (and its "-new" variant used in the password-change test)
+is a hardcoded dummy password used across upstream Frappe/ERPNext's own
+test suite (password-reset, role-profile, OAuth, two-factor,
+connected-app tests) to create throwaway test users. It has shipped in
+the public frappe/frappe and frappe/erpnext repos for years, is not tied
+to any live account or system, and is not exe-owned fork code — it is
+inherited test fixture data.
+'''
+regexTarget = "secret"
+regexes = [
+  '''^Eastern_43A1W(-new)?$''',
+]
+
+[[allowlists]]
+description = '''
+Historical-only finding: `.github/workflows/ui-tests.yml` was part of the
+squashed upstream Frappe/ERPNext source drop in the repo's single
+"Initial commit — Exe ERP (Frappe + ERPNext, single repo)" (all prior
+upstream history was intentionally collapsed into that one commit, see
+its message). The file does not exist in the current tree (this fork
+never ran/used that Cypress workflow) and the value is a Cypress
+Dashboard *record key* — it authorizes uploading test-run recordings to a
+Cypress Cloud project, not access to any AskExe/Exe system, credential,
+or data. Rewriting this commit would require force-pushing a new root
+commit across every branch/PR built on top of it, which is out of scope
+for a CI-gate fix. Scoped to this exact commit + path so the rule still
+fires on genuinely new occurrences.
+'''
+condition = "AND"
+commits = ["5ff67c85f5151818001fea79091ce611c9f19206"]
+paths = [
+  '''^\.github/workflows/ui-tests\.yml$''',
+]
+
+[[allowlists]]
+description = '''
+Historical-only finding: `frappe/public/js/billing.bundle.js` is a built
+frontend asset from the same squashed "Initial commit" (see above). The
+matched `websiteToken` is a client-embedded widget token that ships
+inside a JS bundle served to every browser that loads the page — by
+definition public, not a server-side secret — and the file has since
+been rebuilt (the current tree, scanned separately, contains no such
+finding). Scoped to this exact commit + path.
+'''
+condition = "AND"
+commits = ["5ff67c85f5151818001fea79091ce611c9f19206"]
+paths = [
+  '''^frappe/public/js/billing\.bundle\.js$''',
+]

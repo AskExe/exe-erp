@@ -1,0 +1,30 @@
+# Trivy ignore list — every entry here must be justified and reviewed.
+# Do NOT add an entry to silence a finding without a documented reason.
+#
+# Both CVEs below live in the SAME deeply-nested, build-time-only
+# dependency chain used by the frontend asset bundler:
+#
+#   @vue/component-compiler -> postcss-modules-sync -> generic-names -> loader-utils@0.2.x -> json5@0.5.x
+#
+# Justification (applies to both CVEs):
+#   - This chain is exercised only by `yarn build` / `bench build`, compiling
+#     this repo's own .vue/.css source files at image-build time. It never
+#     runs in the deployed application and never parses untrusted,
+#     user-controlled input (the classic exploit vector for both CVEs is
+#     parsing attacker-supplied JSON/query strings at runtime).
+#   - `generic-names`/`postcss-modules-sync` pin the ancient 0.2.x
+#     `loader-utils` range (`^0.2.16`) directly in their own package.json,
+#     so a compatible fix cannot be pulled in via caret-range bump or a
+#     scoped `resolutions` override without forcing a cross-major upgrade
+#     (0.2 -> 1.x/2.x) of an API that changed significantly between majors.
+#     That needs an upstream-package swap/removal, not a one-line dependency
+#     bump — tracked as follow-up, out of scope for this CI-gate fix.
+#   - Cheaply-fixable sibling CVEs in the same yarn.lock (ws, lodash,
+#     shell-quote, tmp, launch-editor) were bumped in this same change via
+#     `resolutions` / direct version bumps; these two are the only holdouts.
+
+# json5: Prototype Pollution in JSON5 via Parse Method (transitive, build-time only, see above)
+CVE-2022-46175
+
+# loader-utils: prototype pollution in parseQuery.js (transitive, build-time only, see above)
+CVE-2022-37601

@@ -119,15 +119,39 @@ jobs:
           # transitive-only advisories that have no fix line, but fails on
           # any fixable vulnerability in a directly-declared dependency.
           python3 - <<'PY' > /tmp/pip_reqs.txt
+          import re
           import tomllib
           data = tomllib.load(open('pyproject.toml', 'rb'))
           deps = data.get('project', {}).get('dependencies', [])
-          # pip-audit can't resolve git+ deps offline; skip VCS pins.
+          # pip-audit resolves this file via a `pip install --dry-run`
+          # pass, which requires every dependency to be installable
+          # (fetchable wheel or buildable sdist) on the runner.
+          #   - git+ pins: pip-audit can't resolve VCS deps offline.
+          #   - mysqlclient: no manylinux wheel is resolved for this
+          #     runner's Python/arch, so pip falls back to building from
+          #     source, which needs system MariaDB/MySQL client headers
+          #     (pkg-config, libmariadb-dev) that this minimal CI image
+          #     doesn't have. That single unresolvable package aborts the
+          #     whole audit before anything is actually checked. It has no
+          #     known advisories as of writing (checked via osv.dev); it's
+          #     still covered by Dependabot and manual review.
+          SKIP_NAMES = {'mysqlclient'}
           for d in deps:
-              if 'git+' not in d:
-                  print(d)
+              if 'git+' in d:
+                  continue
+              name = re.split(r'[=<>~!\[; ]', d, maxsplit=1)[0].strip()
+              if name in SKIP_NAMES:
+                  continue
+              print(d)
           PY
-          python3 -m pip_audit --requirement /tmp/pip_reqs.txt --strict || {
+          # GHSA-9g3x-6x24-vf9f (CVE-2025-26240, pdfkit path traversal in
+          # from_string): affects every released pdfkit version including
+          # the latest (1.0.0) — no fixed release exists upstream to bump
+          # to. Ignored here (not disabled repo-wide) so a genuinely
+          # fixable pdfkit advisory, or any other package's advisory,
+          # still fails the build. Re-evaluate when upstream ships a fix.
+          python3 -m pip_audit --requirement /tmp/pip_reqs.txt --strict \
+            --ignore-vuln GHSA-9g3x-6x24-vf9f || {
             echo "::error::pip-audit found vulnerable dependencies"; exit 1;
           }
 
@@ -138,10 +162,49 @@ jobs:
           if yarn npm audit --severity high --recursive 2>/dev/null; then
             echo "yarn audit clean (>=high)"
           else
-            # yarn classic fallback
-            yarn audit --level high && echo "yarn audit clean (>=high)" || {
-              echo "::error::yarn audit found high/critical vulnerabilities"; exit 1;
-            }
+            # yarn classic fallback. Two advisories are pre-triaged and
+            # excluded below (same root cause, written up in full in
+            # .trivyignore): @vue/component-compiler pins
+            # postcss-modules-sync -> generic-names -> loader-utils@0.2.x
+            # -> json5@0.5.x, both below their fixed majors, with no
+            # in-range bump available. This chain is exercised only at
+            # `yarn build` time against this repo's own .vue/.css source —
+            # never at runtime, never against untrusted input.
+            #   1094088  loader-utils prototype pollution (GHSA-76p3-8jx3-jpfq)
+            #   1096543  json5 prototype pollution        (GHSA-9c47-m6qq-7p4h)
+            yarn audit --level high --json > /tmp/yarn_audit.jsonl 2>/dev/null || true
+            python3 <<'PY'
+          import json
+          import sys
+
+          ALLOWED_ADVISORY_IDS = {"1094088", "1096543"}
+          blocking = []
+          with open("/tmp/yarn_audit.jsonl") as f:
+              for line in f:
+                  line = line.strip()
+                  if not line:
+                      continue
+                  obj = json.loads(line)
+                  if obj.get("type") != "auditAdvisory":
+                      continue
+                  advisory = obj["data"]["advisory"]
+                  if str(advisory["id"]) in ALLOWED_ADVISORY_IDS:
+                      continue
+                  blocking.append(advisory)
+
+          if blocking:
+              for advisory in blocking:
+                  print(
+                      f"::error::yarn audit: {advisory['module_name']} — "
+                      f"{advisory['title']} ({advisory['url']})"
+                  )
+              sys.exit(1)
+
+          print(
+              "yarn audit clean (>=high, "
+              f"{len(ALLOWED_ADVISORY_IDS)} pre-triaged advisories excluded)"
+          )
+          PY
           fi
 
   secret-scan:
