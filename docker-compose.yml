@@ -31,6 +31,9 @@ services:
       EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
+      # Public auth URL for browser SSO redirects (https://auth.<domain>).
+      # Distinct from GOTRUE_URL (internal service address).
+      GOTRUE_EXTERNAL_URL: ${GOTRUE_EXTERNAL_URL:-}
       GOTRUE_ADMIN_TOKEN: ${GOTRUE_ADMIN_TOKEN:-}
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
@@ -71,6 +74,10 @@ services:
       EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
+      # Public auth URL for browser SSO redirects (https://auth.<domain>).
+      # Read at request time by login.py:get_exe_auth_url() as a fallback to
+      # site_config; distinct from GOTRUE_URL (internal service address).
+      GOTRUE_EXTERNAL_URL: ${GOTRUE_EXTERNAL_URL:-}
       GOTRUE_ADMIN_TOKEN: ${GOTRUE_ADMIN_TOKEN:-}
       # Raw-events landing pad (bug 12f4c334). When unset the exe_bridge fails
       # closed and visibly disables raw.raw_events emission instead of silently

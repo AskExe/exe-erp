@@ -194,6 +194,9 @@ create_site() {
     # Only mark complete once install-app actually succeeded (set -e aborts above
     # on failure, so reaching here means the install returned 0).
     touch "${INSTALL_MARKER}"
+    # Seed the admin-password marker so the rotation check (bug 43854b31) treats
+    # the just-created password as current and won't spuriously rotate next boot.
+    printf '%s' "$(admin_password_hash "${ADMIN_PASSWORD}")" > "${ADMIN_PW_MARKER}"
     echo "Site created and erpnext installed."
 }
 
@@ -202,6 +205,55 @@ run_migrations() {
     echo "Existing site found — running migrations..."
     bench --site "${SITE_NAME}" migrate
     echo "Migrations complete."
+}
+
+# ── Rotate Administrator password when ERP_ADMIN_PASSWORD changes ─
+# The Administrator password is only set at first `bench new-site`. If an
+# operator later changes ERP_ADMIN_PASSWORD, the running site keeps the OLD
+# password forever — confusing and a lockout/security risk (bug 43854b31).
+#
+# We rotate ONLY when the value actually changed, detected via a SHA-256 marker
+# of the current password (never the plaintext) stored beside the site. On a
+# match we no-op (no needless reset every boot); on a mismatch — or no marker —
+# we run `bench set-admin-password` and refresh the marker.
+#
+# Note: the marker is seeded on first creation (in create_site) so existing
+# installs that already match don't get a spurious first-boot rotation. If the
+# marker is absent on an upgraded install, we conservatively rotate once to
+# converge state to the configured password, then write the marker.
+ADMIN_PW_MARKER="${SITE_DIR}/.exe_admin_pw_hash"
+
+admin_password_hash() {
+    # SHA-256 of the password; salted with the site name so the marker isn't a
+    # bare reusable hash. Reads the password from stdin to keep it off argv.
+    printf '%s' "${1}:${SITE_NAME}" | sha256sum | cut -d' ' -f1
+}
+
+rotate_admin_password_if_changed() {
+    local current_hash stored_hash=""
+    current_hash="$(admin_password_hash "${ADMIN_PASSWORD}")"
+
+    if [ -f "${ADMIN_PW_MARKER}" ]; then
+        stored_hash="$(cat "${ADMIN_PW_MARKER}" 2>/dev/null || true)"
+    fi
+
+    if [ "${current_hash}" = "${stored_hash}" ]; then
+        # Unchanged — do not reset every boot.
+        return 0
+    fi
+
+    if [ -n "${stored_hash}" ]; then
+        echo "ERP_ADMIN_PASSWORD changed — rotating Administrator password..."
+    else
+        echo "No admin-password marker found — applying ERP_ADMIN_PASSWORD to Administrator..."
+    fi
+
+    # Validate the new password before applying (same rules as first boot).
+    validate_admin_password
+    bench --site "${SITE_NAME}" set-admin-password "${ADMIN_PASSWORD}"
+    # Refresh the marker only after a successful reset (set -e aborts on failure).
+    printf '%s' "${current_hash}" > "${ADMIN_PW_MARKER}"
+    echo "Administrator password rotated."
 }
 
 # ── Main ─────────────────────────────────────────────────────
@@ -233,13 +285,23 @@ main() {
         run_migrations
     fi
 
+    # Apply a changed ERP_ADMIN_PASSWORD to the live Administrator (bug 43854b31).
+    # Only meaningful where the password is provided (the configurator service);
+    # migrate-only services (gunicorn/worker/scheduler) don't pass ADMIN_PASSWORD,
+    # so skip rotation there rather than fail validation.
+    if [ -n "${ADMIN_PASSWORD:-}" ]; then
+        rotate_admin_password_if_changed
+    fi
+
     # Write currentsite.txt so Frappe knows the default site
     echo "${SITE_NAME}" > "${SITES_DIR}/currentsite.txt"
 
-    # ── Configure GoTrue SSO (if GOTRUE_URL is set) ─────────────
+    # ── Configure GoTrue SSO (if GOTRUE_URL or GOTRUE_EXTERNAL_URL set) ──
     # Enables single sign-on across exe-crm, exe-wiki, and exe-erp.
     # The exe_auth module reads these from site_config.json.
-    if [ -n "${GOTRUE_URL:-}" ]; then
+    # GOTRUE_URL alone (internal address) or GOTRUE_EXTERNAL_URL alone (public
+    # redirect target) is enough to need the config written — handle either.
+    if [ -n "${GOTRUE_URL:-}" ] || [ -n "${GOTRUE_EXTERNAL_URL:-}" ]; then
         echo "Configuring GoTrue SSO..."
         local site_config="${SITE_DIR}/site_config.json"
         if [ -f "${site_config}" ]; then
@@ -251,6 +313,13 @@ try:
     with open(config_path) as f:
         config = json.load(f)
     config['gotrue_url'] = os.environ.get('GOTRUE_URL', '')
+    # Public GoTrue URL for browser SSO redirects (https://auth.<customer-domain>).
+    # Distinct from gotrue_url (internal service address). Only write when set so
+    # login.py:get_exe_auth_url() reads the customer's own auth domain instead of
+    # falling back to host-derivation or the auth.askexe.com default (bug effc3a14).
+    _gotrue_external = os.environ.get('GOTRUE_EXTERNAL_URL', '')
+    if _gotrue_external:
+        config['gotrue_external_url'] = _gotrue_external
     _admin_token = os.environ.get('EXE_ERP_ADMIN_TOKEN', '') or os.environ.get('EXE_ADMIN_TOKEN', '')
     if _admin_token:
         config['exe_admin_token'] = _admin_token
