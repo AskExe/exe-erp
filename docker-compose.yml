@@ -6,8 +6,15 @@
 services:
   # ── First-boot configurator (runs once, creates site) ──────
   exe-erp-configurator:
-    build: .
-    image: ghcr.io/askexe/exe-erp:v0.2.0-final8
+    # Production: pull the published, immutable image only — never build from
+    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
+    # so the tag cannot be silently re-pushed under us.
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e
+    # Hardening: drop all Linux capabilities and block privilege escalation.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
     command: ["echo", "Site configured successfully"]
     environment:
@@ -33,8 +40,15 @@ services:
 
   # ── Gunicorn backend ───────────────────────────────────────
   exe-erp:
-    build: .
-    image: ghcr.io/askexe/exe-erp:v0.2.0-final8
+    # Production: pull the published, immutable image only — never build from
+    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
+    # so the tag cannot be silently re-pushed under us.
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e
+    # Hardening: drop all Linux capabilities and block privilege escalation.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
     command:
       - gunicorn
@@ -81,8 +95,15 @@ services:
 
   # ── Socket.io for realtime events ──────────────────────────
   exe-erp-websocket:
-    build: .
-    image: ghcr.io/askexe/exe-erp:v0.2.0-final8
+    # Production: pull the published, immutable image only — never build from
+    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
+    # so the tag cannot be silently re-pushed under us.
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e
+    # Hardening: drop all Linux capabilities and block privilege escalation.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     entrypoint: []
     command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
     environment:
@@ -110,8 +131,15 @@ services:
 
   # ── RQ worker for background jobs ──────────────────────────
   exe-erp-queue:
-    build: .
-    image: ghcr.io/askexe/exe-erp:v0.2.0-final8
+    # Production: pull the published, immutable image only — never build from
+    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
+    # so the tag cannot be silently re-pushed under us.
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e
+    # Hardening: drop all Linux capabilities and block privilege escalation.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     entrypoint: []
     command:
       - bench
@@ -152,8 +180,15 @@ services:
 
   # ── Frappe scheduler (cron-like background tasks) ──────────
   exe-erp-scheduler:
-    build: .
-    image: ghcr.io/askexe/exe-erp:v0.2.0-final8
+    # Production: pull the published, immutable image only — never build from
+    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
+    # so the tag cannot be silently re-pushed under us.
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e
+    # Hardening: drop all Linux capabilities and block privilege escalation.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     entrypoint: []
     command:
       - bench

@@ -6,22 +6,23 @@ app_name = "frappe"
 
 # ── White-label / branding (config-driven) ──────────────────────────────
 # All user-facing branding is overridable via environment variables so the
-# product can be white-labelled without forking. Defaults reproduce the
-# stock Exe ERP branding, so behavior is identical when unset.
+# product can be white-labelled without forking. Defaults are vendor-neutral
+# so a fresh deployment carries no operator-specific company, URL, or contact
+# branding unless explicitly configured.
 # Pattern mirrors frappe.www.login (EXE_AUTH_URL) and exe_bridge env config.
-app_title = os.environ.get("EXE_APP_TITLE", "Exe ERP")
-app_publisher = os.environ.get("EXE_APP_PUBLISHER", "AskExe")
+app_title = os.environ.get("EXE_APP_TITLE", "ERP")
+app_publisher = os.environ.get("EXE_APP_PUBLISHER", "ERP")
 app_description = os.environ.get(
-	"EXE_APP_DESCRIPTION", "Exe ERP — inventory, orders, invoicing"
+	"EXE_APP_DESCRIPTION", "ERP — inventory, orders, invoicing"
 )
 app_license = os.environ.get("EXE_APP_LICENSE", "GPL-3.0")
 app_logo_url = os.environ.get(
-	"EXE_APP_LOGO_URL", "/assets/frappe/images/exe-erp-logo.svg"
+	"EXE_APP_LOGO_URL", "/assets/frappe/images/frappe-framework-logo.svg"
 )
 develop_version = "17.x.x-develop"
 app_home = "/app/build"
 
-app_email = os.environ.get("EXE_APP_EMAIL", "support@askexe.com")  # Exe ERP fork
+app_email = os.environ.get("EXE_APP_EMAIL", "")  # vendor-neutral; set via env
 
 before_install = "frappe.utils.install.before_install"
 after_install = "frappe.utils.install.after_install"
@@ -504,13 +505,20 @@ standard_help_items = [
 		"route": "/desk/system-health-report",
 		"is_standard": 1,
 	},
-	{
-		"item_label": "Exe ERP Support",
-		"item_type": "Route",
-		"route": "https://askexe.com/support",
-		"is_standard": 1,
-	},
 ]
+
+# Support link is vendor-neutral and config-driven: only surfaced when the
+# operator sets EXE_APP_SUPPORT_URL (no hardcoded company/URL leak).
+_support_url = os.environ.get("EXE_APP_SUPPORT_URL", "")
+if _support_url:
+	standard_help_items.append(
+		{
+			"item_label": os.environ.get("EXE_APP_SUPPORT_LABEL", f"{app_title} Support"),
+			"item_type": "Route",
+			"route": _support_url,
+			"is_standard": 1,
+		}
+	)
 
 # log doctype cleanups to automatically add in log settings
 default_log_clearing_doctypes = {
