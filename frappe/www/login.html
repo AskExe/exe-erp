@@ -230,7 +230,10 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 	// in login.py:get_exe_auth_url, never hardcoded) with callback to our GoTrue endpoint.
 	var ssoLink = document.getElementById('exe-sso-link');
 	if (ssoLink) {
-		var exeAuthUrl = {{ (exe_auth_url or "https://auth.askexe.com") | tojson }};
+		var exeAuthUrl = {{ exe_auth_url | tojson }} || (function() {
+			var h = window.location.hostname.split('.'); var d = h.length >= 2 ? h.slice(1).join('.') : h[0];
+			return window.location.protocol + '//auth.' + d + (window.location.port ? ':' + window.location.port : '');
+		})();
 		var callbackUrl = window.location.origin + '/api/method/erpnext.exe_auth.api.gotrue_login_callback';
 		ssoLink.href = exeAuthUrl.replace(/\/+$/, '') + '/login?product=ERP&redirect=' + encodeURIComponent(callbackUrl);
 	}
