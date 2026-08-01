@@ -24,6 +24,8 @@ import requests
 from frappe.rate_limiter import rate_limit
 from frappe.website.utils import get_home_page
 
+from erpnext.exe_auth import exe_perms as _exe_perms
+
 
 def _assert_provisioning_allowed(email: str) -> None:
 	"""Fail-closed tenant/domain gate for SSO auto-provisioning.
@@ -58,6 +60,140 @@ def _assert_provisioning_allowed(email: str) -> None:
 			f"Email domain '{email_domain}' is not allowed. Contact your administrator.",
 			frappe.AuthenticationError,
 		)
+
+
+# ---------------------------------------------------------------------------
+# P3 — Unified permissions: map the GoTrue exe_perms claim to Frappe roles.
+# See UNIFIED-PERMISSIONS-DESIGN.md §3 and exe_auth/exe_perms.py.
+# ---------------------------------------------------------------------------
+
+
+def _configured_org_id() -> str | None:
+	"""This single-tenant ERP's org id: site_config `exe_org_id`, env fallback."""
+	return frappe.conf.get("exe_org_id") or os.environ.get("EXE_ORG_ID") or None
+
+
+def _role_config():
+	"""(admin_role, write_roles) overridable via site_config for white-label."""
+	return (
+		frappe.conf.get("exe_erp_admin_role"),
+		frappe.conf.get("exe_erp_write_roles"),
+	)
+
+
+def _fetch_gotrue_user(gotrue_url: str, access_token: str) -> dict:
+	"""Fetch authoritative user (incl. app_metadata) from GoTrue /user.
+
+	GoTrue /user returns app_metadata in its JSON. This is the authoritative
+	source for the exe_perms claim on BOTH login paths (the callback already
+	hits /user; the password-grant path calls it here with the issued token).
+	Returns {} on any failure — callers treat that as "no claim" (unmanaged),
+	preserving backward-compatible behavior rather than failing the login.
+	"""
+	if not access_token:
+		return {}
+	try:
+		resp = requests.get(
+			f"{gotrue_url.rstrip('/')}/user",
+			headers={"Authorization": f"Bearer {access_token}"},
+			timeout=10,
+		)
+	except requests.RequestException as e:
+		frappe.log_error(title="GoTrue exe_perms fetch error", message=str(e))
+		return {}
+	if resp.status_code != 200:
+		return {}
+	try:
+		return resp.json() or {}
+	except ValueError:
+		return {}
+
+
+def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
+	"""Reconcile a user's Frappe roles to the caps in their exe_perms claim.
+
+	Returns True if the user is MANAGED (a decision was applied), False if the
+	claim is ABSENT/unmanaged (caller keeps existing bootstrap behavior — fully
+	backward compatible).
+
+	MANAGED path:
+	  - Reconcile roles to EXACTLY the mapped set: add missing, and REMOVE only
+	    managed-owned roles (decision["managed"]) that are no longer granted.
+	    Roles outside the managed allowlist are never touched (design R5).
+	  - Flip user_type (System User <-> Website User).
+	  - MANAGED-DENY (role `none` / empty erp caps): disable the Frappe user
+	    (enabled=0) and deny login. Fail closed — never leave a usable default.
+
+	PROPAGATION SEAM: roles reconcile at each login/refresh. Immediate fan-out
+	(a control-plane-called role-sync endpoint that re-runs this without a
+	login) is a later phase; it would call `_apply_managed_roles(email,
+	fetched_app_metadata)` directly. Hook it here.
+	"""
+	admin_role, write_roles = _role_config()
+	decision, status = _exe_perms.compute_decision(
+		app_metadata,
+		_configured_org_id(),
+		admin_role=admin_role,
+		write_roles=write_roles,
+	)
+	if decision is None:
+		# Unmanaged: absent claim, multi-org-without-config, or no claim for
+		# this org. Leave existing behavior untouched.
+		frappe.logger().debug("exe_perms: user %s unmanaged (%s)", email, status)
+		return False
+
+	user_doc = frappe.get_doc("User", email)
+
+	# MANAGED-DENY -> fail closed: disable and refuse login.
+	if decision["deny"]:
+		if user_doc.enabled:
+			user_doc.enabled = 0
+			user_doc.flags.ignore_permissions = True
+			user_doc.save(ignore_permissions=True)
+		frappe.logger().warning(
+			"exe_perms: managed-deny for %s (role=%s) — access disabled",
+			email,
+			decision.get("role_preset"),
+		)
+		frappe.throw(
+			"Your account has no ERP access in this organization.",
+			frappe.AuthenticationError,
+		)
+
+	target = decision["roles"]
+	managed = decision["managed"]
+	current = {r.role for r in user_doc.get("roles")}
+
+	to_add = target - current
+	# Scope removal to managed-owned roles only — never strip roles an ERP
+	# admin assigned by hand outside the caps model.
+	to_remove = (current & managed) - target
+
+	if to_add:
+		user_doc.add_roles(*sorted(to_add))
+	if to_remove:
+		user_doc.remove_roles(*sorted(to_remove))
+
+	changed = False
+	if decision["user_type"] and user_doc.user_type != decision["user_type"]:
+		user_doc.user_type = decision["user_type"]
+		changed = True
+	# Re-enable if a prior managed-deny disabled this user and access returned.
+	if not user_doc.enabled:
+		user_doc.enabled = 1
+		changed = True
+	if changed:
+		user_doc.flags.ignore_permissions = True
+		user_doc.save(ignore_permissions=True)
+
+	frappe.logger().info(
+		"exe_perms: reconciled %s -> level=%s roles+%s roles-%s",
+		email,
+		decision["level"],
+		sorted(to_add),
+		sorted(to_remove),
+	)
+	return True
 
 
 @frappe.whitelist(allow_guest=True)
@@ -110,6 +246,17 @@ def gotrue_login(
 			)
 		frappe.throw("Invalid email or password", frappe.AuthenticationError)
 
+	# P3: obtain authoritative app_metadata (incl. exe_perms) via GoTrue /user,
+	# using the access_token the password grant just issued.
+	try:
+		token_data = resp.json()
+	except ValueError:
+		token_data = {}
+	app_metadata = _fetch_gotrue_user(gotrue_url, token_data.get("access_token")).get(
+		"app_metadata"
+	)
+	managed = _exe_perms.compute_decision(app_metadata, _configured_org_id(), *_role_config())[0] is not None
+
 	# GoTrue accepted — find or create Frappe User
 	if not frappe.db.exists("User", email):
 		# SECURITY (bug 7b4bbe12): fail closed — require a tenant/domain allowlist
@@ -130,23 +277,32 @@ def gotrue_login(
 		user_doc.flags.no_welcome_mail = True
 		user_doc.insert()
 
-		# First user gets System Manager role ONLY in bootstrap mode.
-		# In production (default), first user gets a standard role.
-		bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
-		user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
-		if user_count <= 1 and bootstrap_mode:
-			frappe.logger().warning(
-				"BOOTSTRAP MODE ACTIVE: Auto-promoting first user %s to System Manager. "
-				"Disable ERP_BOOTSTRAP_MODE after initial setup.",
-				email,
-			)
-			user_doc.add_roles("System Manager")
-		elif user_count <= 1:
-			frappe.logger().info(
-				"First user %s created with standard role. "
-				"Set ERP_BOOTSTRAP_MODE=true to auto-promote to System Manager.",
-				email,
-			)
+		# First-user/bootstrap heuristic runs ONLY for UNMANAGED users (no
+		# exe_perms claim). When caps are present, _apply_managed_roles below is
+		# the single source of truth for roles/user_type.
+		if not managed:
+			# First user gets System Manager role ONLY in bootstrap mode.
+			# In production (default), first user gets a standard role.
+			bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
+			user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
+			if user_count <= 1 and bootstrap_mode:
+				frappe.logger().warning(
+					"BOOTSTRAP MODE ACTIVE: Auto-promoting first user %s to System Manager. "
+					"Disable ERP_BOOTSTRAP_MODE after initial setup.",
+					email,
+				)
+				user_doc.add_roles("System Manager")
+			elif user_count <= 1:
+				frappe.logger().info(
+					"First user %s created with standard role. "
+					"Set ERP_BOOTSTRAP_MODE=true to auto-promote to System Manager.",
+					email,
+				)
+
+	# P3: reconcile Frappe roles from the exe_perms claim (managed users only).
+	# Fails closed (throws) on managed-deny, so login below never runs for a
+	# denied user.
+	_apply_managed_roles(email, app_metadata)
 
 	# Login the user
 	frappe.local.login_manager.login_as(email)
@@ -208,6 +364,10 @@ def gotrue_login_callback():
 	if not email:
 		frappe.throw("No email in SSO token", frappe.AuthenticationError)
 
+	# P3: /user already returns app_metadata — read the exe_perms claim from it.
+	app_metadata = user_data.get("app_metadata")
+	managed = _exe_perms.compute_decision(app_metadata, _configured_org_id(), *_role_config())[0] is not None
+
 	# Auto-provision Frappe User if needed (same logic as gotrue_login)
 	if not frappe.db.exists("User", email):
 		# SECURITY (bug 7b4bbe12): fail closed — require a tenant/domain allowlist
@@ -228,10 +388,16 @@ def gotrue_login_callback():
 		user_doc.flags.no_welcome_mail = True
 		user_doc.insert()
 
-		bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
-		user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
-		if user_count <= 1 and bootstrap_mode:
-			user_doc.add_roles("System Manager")
+		# Bootstrap heuristic runs ONLY for UNMANAGED users (no exe_perms claim).
+		if not managed:
+			bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
+			user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
+			if user_count <= 1 and bootstrap_mode:
+				user_doc.add_roles("System Manager")
+
+	# P3: reconcile Frappe roles from the exe_perms claim (managed users only).
+	# Fails closed (throws) on managed-deny, so login below never runs.
+	_apply_managed_roles(email, app_metadata)
 
 	# Login and redirect to desk
 	frappe.local.login_manager.login_as(email)
