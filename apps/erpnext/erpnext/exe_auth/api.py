@@ -80,6 +80,68 @@ def _role_config():
 		frappe.conf.get("exe_erp_write_roles"),
 	)
 
+# --- Managed-disable marker + one-shot bootstrap flag (P1) -------------------
+# Durable, schema-free markers in Frappe's DefaultValue store (no migration).
+_MANAGED_DISABLED_PREFIX = "exe_managed_disabled::"
+_BOOTSTRAP_FLAG = "exe_bootstrap_admin_granted"
+# CSRF state cookie for the SSO callback (P1 login-CSRF).
+_OAUTH_STATE_COOKIE = "exe_sso_state"
+
+
+def _mark_managed_disabled(email: str) -> None:
+	"""Record that the MANAGED system (not an admin) disabled this user."""
+	frappe.db.set_default(f"{_MANAGED_DISABLED_PREFIX}{email}", "1")
+
+
+def _clear_managed_disabled(email: str) -> None:
+	frappe.db.set_default(f"{_MANAGED_DISABLED_PREFIX}{email}", "0")
+
+
+def _is_managed_disabled(email: str) -> bool:
+	return frappe.db.get_default(f"{_MANAGED_DISABLED_PREFIX}{email}") == "1"
+
+
+def _try_bootstrap_first_admin(user_doc, email: str) -> None:
+	"""Atomically grant System Manager to the FIRST user, at most ONCE.
+
+	RACE FIX (P1): the old `user_count <= 1` check-then-act let two concurrent
+	first-logins both read count<=1 (before either committed) and BOTH
+	self-promote to System Manager. We serialize on a global filelock and gate
+	on a durable single-use flag committed INSIDE the lock, so only one user
+	can ever bootstrap. LIVE-BENCH / MULTI-SERVER: filelock is per-bench; a
+	multi-node deployment needs a shared lock or a DB unique constraint on the
+	bootstrap flag (see bench plan).
+	"""
+	from frappe.utils.file_lock import LockTimeoutError
+	from frappe.utils.synchronization import filelock
+
+	bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
+	try:
+		with filelock("exe_bootstrap_admin", timeout=30, is_global=True):
+			if frappe.db.get_default(_BOOTSTRAP_FLAG) == "1":
+				return  # already claimed by another first-login
+			user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
+			if user_count > 1:
+				return
+			if bootstrap_mode:
+				frappe.logger().warning(
+					"BOOTSTRAP MODE ACTIVE: Auto-promoting first user %s to System "
+					"Manager. Disable ERP_BOOTSTRAP_MODE after initial setup.",
+					email,
+				)
+				user_doc.add_roles("System Manager")
+				# Claim the one-shot slot durably, inside the lock, before release.
+				frappe.db.set_default(_BOOTSTRAP_FLAG, "1")
+				frappe.db.commit()
+			else:
+				frappe.logger().info(
+					"First user %s created with standard role. Set "
+					"ERP_BOOTSTRAP_MODE=true to auto-promote to System Manager.",
+					email,
+				)
+	except LockTimeoutError:
+		frappe.log_error(title="exe bootstrap: lock timeout", message=email)
+
 
 class GoTrueUserFetchError(Exception):
 	"""GoTrue /user could not be fetched or returned a non-200 / bad body.
@@ -178,6 +240,10 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 			user_doc.enabled = 0
 			user_doc.flags.ignore_permissions = True
 			user_doc.save(ignore_permissions=True)
+		# Record that the MANAGED system disabled this user (durable marker), so a
+		# later re-grant may re-enable them — WITHOUT ever overriding a manual
+		# admin disable (offboarding/incident), which carries no marker.
+		_mark_managed_disabled(email)
 		# Kill any existing Frappe sessions so deny takes effect IMMEDIATELY
 		# (not just on next login). We MUST use frappe.sessions.clear_sessions,
 		# NOT a bare `frappe.db.delete("Sessions", ...)`: Frappe resumes sessions
@@ -226,9 +292,12 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 	if decision["user_type"] and user_doc.user_type != decision["user_type"]:
 		user_doc.user_type = decision["user_type"]
 		changed = True
-	# Re-enable if a prior managed-deny disabled this user and access returned.
-	if not user_doc.enabled:
+	# Re-enable ONLY if the MANAGED system is what disabled this user (marker
+	# set on managed-deny). A user disabled by hand by an ERP admin carries no
+	# marker and is NEVER silently revived on their next GoTrue login (P1).
+	if _exe_perms.should_reenable(user_doc.enabled, _is_managed_disabled(email)):
 		user_doc.enabled = 1
+		_clear_managed_disabled(email)
 		changed = True
 	if changed:
 		user_doc.flags.ignore_permissions = True
@@ -375,23 +444,9 @@ def gotrue_login(
 		# exe_perms claim). When caps are present, _apply_managed_roles below is
 		# the single source of truth for roles/user_type.
 		if not managed:
-			# First user gets System Manager role ONLY in bootstrap mode.
-			# In production (default), first user gets a standard role.
-			bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
-			user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
-			if user_count <= 1 and bootstrap_mode:
-				frappe.logger().warning(
-					"BOOTSTRAP MODE ACTIVE: Auto-promoting first user %s to System Manager. "
-					"Disable ERP_BOOTSTRAP_MODE after initial setup.",
-					email,
-				)
-				user_doc.add_roles("System Manager")
-			elif user_count <= 1:
-				frappe.logger().info(
-					"First user %s created with standard role. "
-					"Set ERP_BOOTSTRAP_MODE=true to auto-promote to System Manager.",
-					email,
-				)
+			# First user MAY be promoted to System Manager — atomically, ONCE
+			# (race-safe; see _try_bootstrap_first_admin).
+			_try_bootstrap_first_admin(user_doc, email)
 
 	# P3: reconcile Frappe roles from the exe_perms claim (managed users only).
 	# Fails closed (throws) on managed-deny, so login below never runs for a
@@ -411,16 +466,73 @@ def gotrue_login(
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])
+@rate_limit(key="gotrue_login_start", limit=10, seconds=900)
+def gotrue_login_start():
+	"""Begin the SSO login flow WITH CSRF protection.
+
+	Generates a random `state` nonce, stores it in an httpOnly SameSite=Lax
+	cookie, and redirects the browser to the configured auth domain carrying
+	that `state`. The auth domain MUST echo `state` back to
+	gotrue_login_callback, which verifies it against this cookie (double-submit)
+	to defeat login-CSRF. This is the SUPPORTED entry point for the SSO flow.
+	"""
+	import secrets
+
+	auth_redirect = frappe.conf.get("gotrue_auth_redirect_url")
+	if not auth_redirect:
+		frappe.throw(
+			"SSO not configured. Set gotrue_auth_redirect_url in site_config.json",
+			frappe.ValidationError,
+		)
+	state = secrets.token_urlsafe(32)
+	frappe.local.cookie_manager.set_cookie(
+		_OAUTH_STATE_COOKIE, state, httponly=True, samesite="Lax", max_age=600
+	)
+	sep = "&" if "?" in auth_redirect else "?"
+	frappe.local.response["type"] = "redirect"
+	frappe.local.response["location"] = f"{auth_redirect}{sep}state={state}"
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
 @rate_limit(key="gotrue_callback", limit=10, seconds=900)
 def gotrue_login_callback():
 	"""Handle redirect from the Exe SSO auth domain with JWT token.
 
-	The auth domain (e.g. auth.acme.com) redirects to:
-	  /api/method/erpnext.exe_auth.api.gotrue_login_callback?access_token=JWT&refresh_token=REFRESH
+	The auth domain (e.g. auth.acme.com) redirects back with `state` (echoed
+	from gotrue_login_start) and the access token. We verify the CSRF state,
+	validate the JWT against GoTrue's /user endpoint, auto-provision a Frappe
+	User if needed, log them in, and redirect to /desk.
 
-	We validate the JWT against GoTrue's /user endpoint, auto-provision
-	a Frappe User if needed, log them in, and redirect to /desk.
+	SECURITY — CSRF state is enforced here (see below). TWO transport issues
+	remain and need broader auth-flow coordination (NOT fixed here, flagged):
+	  (1) the access token still arrives in the URL QUERY on a GET, so it can
+	      land in nginx/Frappe access logs and Referer headers (replay risk);
+	      moving it to a URL fragment or a POST one-time-code exchange changes
+	      the shared GoTrue redirect contract.
+	  (2) the issued Frappe session outlives the ~1h JWT TTL; binding session
+	      expiry to the JWT `exp` is a follow-up.
 	"""
+	# CSRF STATE (P1 login-CSRF): require a `state` nonce that matches the signed
+	# cookie set by gotrue_login_start. Without it, a GET callback carrying an
+	# attacker's token could bind a victim's browser to the attacker's account,
+	# and email link-scanners would auto-detonate the callback. Gate is on by
+	# default; operators mid-rollout (auth domain not yet echoing state) may set
+	# gotrue_require_callback_state=false in site_config while they migrate.
+	require_state = frappe.conf.get("gotrue_require_callback_state", True)
+	received_state = frappe.form_dict.get("state")
+	cookie_state = (
+		frappe.request.cookies.get(_OAUTH_STATE_COOKIE) if frappe.request else None
+	)
+	# One-time use: always drop the state cookie once we have read it.
+	if cookie_state and getattr(frappe.local, "cookie_manager", None):
+		frappe.local.cookie_manager.delete_cookie(_OAUTH_STATE_COOKIE)
+	if require_state and not _exe_perms.oauth_state_matches(received_state, cookie_state):
+		frappe.log_error(
+			title="GoTrue SSO callback: CSRF state mismatch",
+			message="missing or non-matching state on SSO callback",
+		)
+		frappe.throw("Invalid or missing login state", frappe.AuthenticationError)
+
 	access_token = frappe.form_dict.get("access_token")
 	if not access_token:
 		frappe.throw("No access token provided", frappe.AuthenticationError)
@@ -484,10 +596,8 @@ def gotrue_login_callback():
 
 		# Bootstrap heuristic runs ONLY for UNMANAGED users (no exe_perms claim).
 		if not managed:
-			bootstrap_mode = os.environ.get("ERP_BOOTSTRAP_MODE", "false").lower() == "true"
-			user_count = frappe.db.count("User", {"user_type": "System User", "enabled": 1})
-			if user_count <= 1 and bootstrap_mode:
-				user_doc.add_roles("System Manager")
+			# Atomic, single-use first-admin promotion (race-safe).
+			_try_bootstrap_first_admin(user_doc, email)
 
 	# P3: reconcile Frappe roles from the exe_perms claim (managed users only).
 	# Fails closed (throws) on managed-deny, so login below never runs.

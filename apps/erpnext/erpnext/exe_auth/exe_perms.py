@@ -181,6 +181,35 @@ def map_erp_roles(caps, admin_role=None, write_roles=None):
     }
 
 
+def should_reenable(currently_enabled, disabled_by_managed):
+    """Whether the allow path may re-enable a currently-disabled Frappe user.
+
+    P1 (manual-disable override): the reconcile allow path used to blindly flip
+    enabled=1 for any disabled user whose caps still grant access — silently
+    reviving a user an ERP admin disabled FOR CAUSE (offboarding / incident) on
+    their next GoTrue login. We now re-enable ONLY when the MANAGED system is
+    what disabled them (a durable marker set on managed-deny). A user disabled
+    manually by an admin carries no marker and is NEVER auto-revived.
+    """
+    return (not currently_enabled) and bool(disabled_by_managed)
+
+
+def oauth_state_matches(received_state, expected_state):
+    """Constant-time double-submit check for the SSO callback CSRF state.
+
+    Both the URL `state` param and the state stored in the browser's signed
+    nonce cookie must be present and equal. An attacker cannot both set a
+    victim's cookie and know the random nonce, so a matching pair proves the
+    callback was initiated by this browser (login-CSRF defense). Empty/missing
+    values never match (fail closed).
+    """
+    import hmac
+
+    if not received_state or not expected_state:
+        return False
+    return hmac.compare_digest(str(received_state), str(expected_state))
+
+
 def subject_binding_ok(gotrue_email, submitted_email):
     """True iff the authoritative /user email is PRESENT and MATCHES.
 

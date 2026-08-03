@@ -141,6 +141,7 @@ website_context = {
 # nosemgrep
 website_route_rules = [
 	{"from_route": "/api/auth/gotrue-login", "to_route": "erpnext.exe_auth.api.gotrue_login"},
+	{"from_route": "/api/auth/gotrue-start", "to_route": "erpnext.exe_auth.api.gotrue_login_start"},
 	{"from_route": "/api/auth/admin-token", "to_route": "erpnext.exe_auth.api.admin_token"},
 	{"from_route": "/orders", "to_route": "Sales Order"},
 	{

@@ -327,6 +327,47 @@ class TestSubjectBinding(unittest.TestCase):
 		self.assertFalse(ep.subject_binding_ok("user@acme.com", None))
 
 
+class TestShouldReenable(unittest.TestCase):
+	"""P1: re-enable a disabled user ONLY when the managed system disabled
+	them — never override a manual admin disable."""
+
+	def testManagedDisabledIsReenabled(self):
+		# Disabled by managed-deny (marker set), access re-granted -> re-enable.
+		self.assertTrue(ep.should_reenable(currently_enabled=0, disabled_by_managed=True))
+
+	def testManualDisableNotReenabledFail(self):
+		# Disabled by an admin by hand (NO marker) -> must stay disabled.
+		self.assertFalse(ep.should_reenable(currently_enabled=0, disabled_by_managed=False))
+
+	def testEnabledUserNotTouched(self):
+		# Already enabled -> no re-enable action regardless of marker.
+		self.assertFalse(ep.should_reenable(currently_enabled=1, disabled_by_managed=True))
+		self.assertFalse(ep.should_reenable(currently_enabled=1, disabled_by_managed=False))
+
+
+class TestOAuthStateMatches(unittest.TestCase):
+	"""P1 login-CSRF: SSO callback state must match the signed nonce cookie."""
+
+	def testMatchingStateOk(self):
+		self.assertTrue(ep.oauth_state_matches("abc123", "abc123"))
+
+	def testMismatchDeniedFail(self):
+		self.assertFalse(ep.oauth_state_matches("attacker", "victim"))
+
+	def testMissingReceivedDeniedFail(self):
+		self.assertFalse(ep.oauth_state_matches(None, "cookie"))
+		self.assertFalse(ep.oauth_state_matches("", "cookie"))
+
+	def testMissingExpectedDeniedFail(self):
+		# No cookie present (e.g. cross-site GET / link-scanner) -> fail closed.
+		self.assertFalse(ep.oauth_state_matches("urlstate", None))
+		self.assertFalse(ep.oauth_state_matches("urlstate", ""))
+
+	def testBothEmptyDeniedFail(self):
+		self.assertFalse(ep.oauth_state_matches("", ""))
+		self.assertFalse(ep.oauth_state_matches(None, None))
+
+
 if __name__ == "__main__":
 	unittest.main()
 
@@ -373,3 +414,16 @@ if __name__ == "__main__":
 #      <sid>) are gone, so resume() cannot revive it. Verify via
 #      clear_sessions(user, force=True) against real Redis — a bare DB delete
 #      would leave the cached session usable until cache expiry.
+#  14. MANUAL-DISABLE OVERRIDE (P1): admin sets User.enabled=0 by hand (no
+#      managed marker). Managed login whose caps still grant access -> user is
+#      NOT re-enabled (should_reenable False). Contrast: managed-denied user
+#      (marker set) then re-granted -> IS re-enabled and marker cleared.
+#  15. BOOTSTRAP RACE (P1): two concurrent first-logins (ERP_BOOTSTRAP_MODE=1,
+#      allow-all domains) -> exactly ONE gets System Manager. The filelock +
+#      one-shot _BOOTSTRAP_FLAG (committed inside the lock) serialize the
+#      claim. Multi-server needs a shared lock / DB unique constraint.
+#  16. CSRF STATE (P1 login-CSRF): callback with no/mismatched `state` vs the
+#      exe_sso_state cookie -> AuthenticationError (when
+#      gotrue_require_callback_state is on). gotrue_login_start sets the cookie
+#      + redirects with matching state; happy path logs in. NOTE: token-in-URL
+#      transport + session-outlives-JWT still need auth-flow coordination.
