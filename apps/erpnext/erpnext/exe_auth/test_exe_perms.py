@@ -131,24 +131,33 @@ class TestResolveOrgId(unittest.TestCase):
 		self.assertEqual(org, "acme")  # normalized lowercase
 		self.assertEqual(status, ep.ORG_RESOLVED)
 
-	def testSingleOrgAutoResolves(self):
+	def testSingleOrgWithoutConfigDeniesFail(self):
+		# SECURITY: a single-org token must NOT auto-resolve when exe_org_id is
+		# unset — inferring org X here would grant org-X caps on tenant Y.
 		meta = {"exe_perms": {"orgs": {"solo": {"caps": ["erp:read"]}}}}
 		org, status = ep.resolve_org_id(meta, None)
-		self.assertEqual(org, "solo")
-		self.assertEqual(status, ep.ORG_RESOLVED)
+		self.assertIsNone(org)
+		self.assertEqual(status, ep.ORG_DENY_UNRESOLVED)
 
-	def testMultiOrgWithoutConfigIsUnmanaged(self):
+	def testMultiOrgWithoutConfigDeniesFail(self):
+		# Present claim + no configured org -> fail closed, never guess.
 		org, status = ep.resolve_org_id(PER_ORG_META, None)
 		self.assertIsNone(org)
-		self.assertEqual(status, ep.ORG_UNMANAGED_MULTI)
+		self.assertEqual(status, ep.ORG_DENY_UNRESOLVED)
 
 	def testAbsentClaimIsUnmanaged(self):
 		org, status = ep.resolve_org_id({}, None)
 		self.assertIsNone(org)
 		self.assertEqual(status, ep.ORG_UNMANAGED_ABSENT)
 
-	def testLegacyFlatResolvesFromOrg(self):
+	def testLegacyFlatWithoutConfigDeniesFail(self):
+		# Legacy flat shape is no longer allowed to self-resolve its org.
 		org, status = ep.resolve_org_id(LEGACY_FLAT_META, None)
+		self.assertIsNone(org)
+		self.assertEqual(status, ep.ORG_DENY_UNRESOLVED)
+
+	def testLegacyFlatResolvesWithConfig(self):
+		org, status = ep.resolve_org_id(LEGACY_FLAT_META, "acme")
 		self.assertEqual(org, "acme")
 		self.assertEqual(status, ep.ORG_RESOLVED)
 
@@ -177,7 +186,8 @@ class TestComputeDecision(unittest.TestCase):
 		self.assertEqual(d["org_id"], "acme")
 
 	def testManagedLegacyAdmin(self):
-		d, status = ep.compute_decision(LEGACY_FLAT_META, None)
+		d, status = ep.compute_decision(LEGACY_FLAT_META, "acme")
+		self.assertEqual(status, ep.ORG_RESOLVED)
 		self.assertEqual(d["level"], ep.LEVEL_ADMIN)
 		self.assertIn("System Manager", d["roles"])
 
@@ -190,15 +200,21 @@ class TestComputeDecision(unittest.TestCase):
 		d, status = ep.compute_decision(None, "acme")
 		self.assertIsNone(d)
 
-	def testMultiOrgUnmanaged(self):
+	def testMultiOrgWithoutConfigDeniesFail(self):
+		# Present claim + exe_org_id unset -> DENY decision (fail closed),
+		# not unmanaged/stale.
 		d, status = ep.compute_decision(PER_ORG_META, None)
-		self.assertIsNone(d)
-		self.assertEqual(status, ep.ORG_UNMANAGED_MULTI)
+		self.assertIsNotNone(d)
+		self.assertTrue(d["deny"])
+		self.assertEqual(status, ep.ORG_DENY_UNRESOLVED)
 
-	def testOrgResolvedButNoClaimIsUnmanaged(self):
+	def testOrgConfiguredNoClaimDeniesFail(self):
+		# Configured org, but this user has NO claim for it -> DENY (a removed
+		# org claim is a downgrade, not a bypass to stale legacy roles).
 		d, status = ep.compute_decision(PER_ORG_META, "nosuchorg")
-		self.assertIsNone(d)
-		self.assertEqual(status, ep.ORG_UNMANAGED_NO_CLAIM)
+		self.assertIsNotNone(d)
+		self.assertTrue(d["deny"])
+		self.assertEqual(status, ep.ORG_DENY_NO_CLAIM)
 
 	def testRoleNoneIsManagedDeny(self):
 		meta = {"exe_perms": {"orgs": {"acme": {"role": "none", "caps": ["erp:admin"]}}}}
@@ -211,6 +227,81 @@ class TestComputeDecision(unittest.TestCase):
 		meta = {"exe_perms": {"orgs": {"acme": {"role": "member", "caps": ["wiki:write"]}}}}
 		d, status = ep.compute_decision(meta, "acme")
 		self.assertTrue(d["deny"])
+
+
+class TestDenyDecision(unittest.TestCase):
+	"""The fail-closed decision shape used for org cases that cannot bind."""
+
+	def testDenyShapeIsFailClosed(self):
+		d = ep.deny_decision()
+		self.assertTrue(d["deny"])
+		self.assertEqual(d["roles"], set())
+		self.assertEqual(d["level"], ep.LEVEL_NONE)
+		self.assertEqual(d["user_type"], ep.WEBSITE_USER_TYPE)
+
+	def testDenyManagedAllowlistPreserved(self):
+		# managed set still names the roles we own, so the disable path can
+		# reason about removal scope consistently.
+		d = ep.deny_decision()
+		self.assertEqual(d["managed"], ep.managed_roles())
+
+
+class TestFailClosedOrgScoping(unittest.TestCase):
+	"""The 3-case org model (mirrors the wiki fix): absent->unmanaged,
+	present+configured+claim->managed, everything-else->deny (fail closed)."""
+
+	def testCase1AbsentIsUnmanagedLegacy(self):
+		# No claim at all -> unmanaged (None), legacy behavior preserved.
+		d, status = ep.compute_decision({}, "acme")
+		self.assertIsNone(d)
+		self.assertEqual(status, ep.ORG_UNMANAGED_ABSENT)
+
+	def testCase2PresentConfiguredClaimedIsManaged(self):
+		d, status = ep.compute_decision(PER_ORG_META, "acme")
+		self.assertEqual(status, ep.ORG_RESOLVED)
+		self.assertFalse(d["deny"])
+		self.assertEqual(d["level"], ep.LEVEL_WRITE)
+
+	def testCase3aPresentUnconfiguredDeniesFail(self):
+		# The wrong-org hole: single-org token, exe_org_id unset -> DENY.
+		meta = {"exe_perms": {"orgs": {"attacker": {"caps": ["erp:admin"]}}}}
+		d, status = ep.compute_decision(meta, None)
+		self.assertTrue(d["deny"])
+		self.assertEqual(status, ep.ORG_DENY_UNRESOLVED)
+
+	def testCase3bWrongOrgAdminDoesNotGrantHereFail(self):
+		# erp:admin for org X must NOT yield admin on tenant Y (configured=Y).
+		meta = {"exe_perms": {"orgs": {"orgx": {"caps": ["erp:admin"]}}}}
+		d, status = ep.compute_decision(meta, "orgy")
+		self.assertTrue(d["deny"])
+		self.assertNotIn(ep.DEFAULT_ADMIN_ROLE, d["roles"])
+		self.assertEqual(status, ep.ORG_DENY_NO_CLAIM)
+
+	def testDowngradeRemovingOrgClaimIsDenyNotStaleFail(self):
+		# A user whose org claim was REVOKED (present claim, but not for this
+		# tenant) must be denied — never fall through to stale roles.
+		meta = {"exe_perms": {"orgs": {"former": {"caps": ["erp:read"]}}}}
+		d, status = ep.compute_decision(meta, "current")
+		self.assertTrue(d["deny"])
+		self.assertEqual(status, ep.ORG_DENY_NO_CLAIM)
+
+
+class TestManagedDenyPersistenceIntent(unittest.TestCase):
+	"""Pure-layer intent behind the api.py managed-deny persistence fix.
+
+	The PURE mapping guarantees a deny DECISION is produced for every
+	fail-closed case; api.py then commits enabled=0 + kills sessions BEFORE
+	raising (that DB durability is bench-only — see plan at bottom)."""
+
+	def testEveryFailClosedCaseYieldsDenyDecision(self):
+		role_none = {"exe_perms": {"orgs": {"acme": {"role": "none", "caps": []}}}}
+		empty_caps = {"exe_perms": {"orgs": {"acme": {"role": "m", "caps": ["wiki:x"]}}}}
+		no_claim = PER_ORG_META  # configured org absent from claim
+		for meta, org in ((role_none, "acme"), (empty_caps, "acme"), (no_claim, "zzz")):
+			d, _ = ep.compute_decision(meta, org)
+			self.assertIsNotNone(d)
+			self.assertTrue(d["deny"])
+			self.assertEqual(d["roles"], set())
 
 
 if __name__ == "__main__":
@@ -234,10 +325,23 @@ if __name__ == "__main__":
 #      write bundle retained (remove_roles scoped to managed allowlist).
 #   5. hand-assigned unmanaged role (e.g. "Accounts Manager" or "HR User")
 #      set outside caps -> SURVIVES reconcile (never stripped).
-#   6. managed-deny (role "none" / empty erp caps) -> User.enabled == 0 and
-#      login raises AuthenticationError (fail-closed).
+#   6. managed-deny (role "none" / empty erp caps) -> User.enabled == 0 AND it
+#      PERSISTS after the AuthenticationError (frappe.db.commit before raise;
+#      the request rollback must NOT re-enable the user). Verify enabled == 0
+#      by reloading the doc in a fresh transaction.
 #   7. re-grant after deny -> User re-enabled on next login.
 #   8. ABSENT exe_perms -> unchanged legacy behavior: first-user +
 #      ERP_BOOTSTRAP_MODE path still promotes; _assert_provisioning_allowed
 #      still gates provisioning.
-#   9. multi-org token with exe_org_id UNSET -> treated as unmanaged (legacy).
+#   9. present exe_perms with exe_org_id UNSET -> DENY (fail closed), NOT legacy
+#      login with stale roles (the wrong-org hole is closed).
+#  10. exe_org_id configured but token's exe_perms has NO claim for it -> DENY
+#      (removing a user's org claim is a downgrade, not a bypass).
+#  11. FAIL-CLOSED ON /user ERROR: /token 200 but /user 5xx/network-error, with
+#      exe_org_id CONFIGURED -> login raises AuthenticationError (no stale sid).
+#      With exe_org_id UNSET (legacy tenant) -> login still succeeds.
+#  12. SUBJECT BINDING: /user returns a DIFFERENT email than the submitted one
+#      -> login raises AuthenticationError; no roles applied.
+#  13. managed-deny SESSION KILL: a user with an existing Frappe session who is
+#      then denied -> their rows in the Sessions table are deleted (deny is
+#      immediate, not only next login).

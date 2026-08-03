@@ -24,11 +24,19 @@ A LEGACY FLAT shape is also accepted as a fallback (what P2/wiki shipped first):
 ERP-relevant capabilities: erp:read | erp:write | erp:admin, plus the
 cross-cutting org:admin. wiki:* / crm:* are ignored here.
 
-Single-tenant org resolution (this ERP serves ONE org):
-  1. site_config `exe_org_id`, else env `EXE_ORG_ID`;
-  2. if unset and the token carries exactly one org -> use it;
-  3. if unset and the token carries multiple orgs -> UNMANAGED (legacy path,
-     backward-compatible — we do not guess which org applies).
+Single-tenant org resolution (this ERP serves ONE org). Managed enforcement
+requires exe_org_id (site_config `exe_org_id`, else env `EXE_ORG_ID`) to be
+EXPLICITLY configured. We NEVER infer the tenant's org from the token: a
+single-org token for org X must not silently grant org-X caps on tenant Y
+(the "wrong-org" hole). Three cases, mirroring the wiki fix:
+
+  1. exe_perms ABSENT                        -> UNMANAGED (legacy, back-compat).
+  2. exe_perms PRESENT, exe_org_id configured AND this org is claimed
+                                             -> MANAGED (reconcile roles).
+  3. exe_perms PRESENT but (a) exe_org_id UNSET/unresolvable, or (b) configured
+     but this user has NO claim for it       -> DENY (fail closed — never fall
+     through to stale/legacy roles; removing a user's org claim is a downgrade,
+     not a bypass).
 """
 
 from __future__ import annotations
@@ -58,9 +66,11 @@ LEVEL_NONE = "none"
 
 # Org-resolution status
 ORG_RESOLVED = "resolved"
-ORG_UNMANAGED_ABSENT = "unmanaged_absent"      # no exe_perms claim at all
-ORG_UNMANAGED_MULTI = "unmanaged_multi"        # multiple orgs, none configured
-ORG_UNMANAGED_NO_CLAIM = "unmanaged_no_claim"  # org resolved but no claim for it
+ORG_UNMANAGED_ABSENT = "unmanaged_absent"  # no exe_perms claim at all -> legacy
+# Fail-closed (DENY) statuses: a claim EXISTS but we cannot safely bind it to
+# THIS tenant. These must NEVER fall through to stale/legacy roles.
+ORG_DENY_UNRESOLVED = "deny_unresolved"    # claim present but exe_org_id UNSET
+ORG_DENY_NO_CLAIM = "deny_no_claim"        # org configured but no claim for it
 
 
 def role_config(admin_role=None, write_roles=None):
@@ -171,6 +181,26 @@ def map_erp_roles(caps, admin_role=None, write_roles=None):
     }
 
 
+def deny_decision(admin_role=None, write_roles=None):
+    """A fail-closed decision: no roles, deny login, disable the Frappe user.
+
+    Used when a claim EXISTS but cannot be safely bound to this tenant (org
+    unconfigured/unresolvable, or configured but no claim for it). Shaped like
+    map_erp_roles' LEVEL_NONE result so the caller's managed-deny path handles
+    it uniformly (disable + fail closed).
+    """
+    admin, write = role_config(admin_role, write_roles)
+    return {
+        "level": LEVEL_NONE,
+        "roles": set(),
+        "user_type": WEBSITE_USER_TYPE,
+        "deny": True,
+        "managed": set(write) | {admin},
+        "org_id": None,
+        "role_preset": None,
+    }
+
+
 # --- Claim extraction --------------------------------------------------------
 
 def _exe_perms_root(app_metadata):
@@ -204,20 +234,22 @@ def resolve_org_id(app_metadata, configured_org_id):
     """Resolve which org id applies for this single-tenant ERP.
 
     Returns (org_id_or_None, status). See module docstring for the rules.
+
+    SECURITY: we do NOT infer the org from a single-org token when exe_org_id is
+    unset — that was the "wrong-org" hole (org X's erp:admin granting System
+    Manager on tenant Y). Managed enforcement REQUIRES exe_org_id. With a claim
+    present but exe_org_id unset we DENY (fail closed) rather than guess.
     """
     if app_metadata is None or _exe_perms_root(app_metadata) is None:
+        # No claim at all -> genuinely unmanaged, keep legacy behavior.
         return None, ORG_UNMANAGED_ABSENT
 
     if configured_org_id:
         return str(configured_org_id).strip().lower(), ORG_RESOLVED
 
-    orgs = list_claim_orgs(app_metadata)
-    if len(orgs) == 1:
-        return str(orgs[0]).strip().lower(), ORG_RESOLVED
-    if len(orgs) == 0:
-        return None, ORG_UNMANAGED_ABSENT
-    # Multiple orgs and no site config to disambiguate -> unmanaged (legacy).
-    return None, ORG_UNMANAGED_MULTI
+    # Claim present but no configured tenant org: we cannot classify this user
+    # for THIS tenant. Fail closed instead of inferring from the token.
+    return None, ORG_DENY_UNRESOLVED
 
 
 def select_org_claim(app_metadata, org_id):
@@ -251,21 +283,38 @@ def compute_decision(app_metadata, configured_org_id, admin_role=None, write_rol
     """Top-level: from raw app_metadata to a role decision.
 
     Returns (decision_or_None, status).
-      - decision is None  => UNMANAGED: caller keeps existing legacy behavior
-        (bootstrap / default_gotrue_user_type). Backward compatible.
-      - decision is a dict (see map_erp_roles) => MANAGED: caller reconciles.
+      - decision is None  => UNMANAGED (status ORG_UNMANAGED_ABSENT only):
+        caller keeps existing legacy behavior (bootstrap /
+        default_gotrue_user_type). Backward compatible.
+      - decision is a dict (see map_erp_roles) => MANAGED: caller reconciles,
+        or FAIL-CLOSED when decision["deny"] is True.
 
-    A MANAGED-DENY user (role none / empty erp caps) still returns a decision
-    with deny=True so the caller fails closed (disable, no usable default).
+    Three-case fail-closed model (see module docstring):
+      * absent claim                 -> (None, ORG_UNMANAGED_ABSENT)  [legacy]
+      * present + configured + claim -> (managed decision, ORG_RESOLVED)
+      * present + unconfigured org   -> (deny decision, ORG_DENY_UNRESOLVED)
+      * present + configured, no claim for this org -> (deny, ORG_DENY_NO_CLAIM)
+
+    A MANAGED-DENY user (role none / empty erp caps, OR either fail-closed org
+    case) returns a decision with deny=True so the caller disables and fails
+    closed — never a usable default and never stale/legacy roles.
     """
     org_id, status = resolve_org_id(app_metadata, configured_org_id)
-    if status != ORG_RESOLVED:
+    if status == ORG_UNMANAGED_ABSENT:
+        # Genuinely no claim -> unmanaged, legacy behavior.
         return None, status
+    if status != ORG_RESOLVED:
+        # Claim present but org unconfigured/unresolvable -> fail closed.
+        return deny_decision(admin_role, write_roles), status
 
     claim = select_org_claim(app_metadata, org_id)
     if claim is None:
-        # Org resolved but this user has no claim for it -> unmanaged.
-        return None, ORG_UNMANAGED_NO_CLAIM
+        # Org configured but this user has NO claim for it -> fail closed.
+        # (Removing a user's org claim must be a DOWNGRADE, not a bypass to
+        # stale legacy roles.)
+        d = deny_decision(admin_role, write_roles)
+        d["org_id"] = org_id
+        return d, ORG_DENY_NO_CLAIM
 
     # role == "none" is an explicit managed-deny even if caps somehow present.
     role = claim.get("role")

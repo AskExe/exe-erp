@@ -81,17 +81,29 @@ def _role_config():
 	)
 
 
+class GoTrueUserFetchError(Exception):
+	"""GoTrue /user could not be fetched or returned a non-200 / bad body.
+
+	Signals "identity may be proven but authoritative perms are UNKNOWN". On a
+	managed-enforcement tenant the caller MUST fail closed on this rather than
+	logging in with unknown/stale roles (see gotrue_login)."""
+
+
 def _fetch_gotrue_user(gotrue_url: str, access_token: str) -> dict:
 	"""Fetch authoritative user (incl. app_metadata) from GoTrue /user.
 
-	GoTrue /user returns app_metadata in its JSON. This is the authoritative
-	source for the exe_perms claim on BOTH login paths (the callback already
-	hits /user; the password-grant path calls it here with the issued token).
-	Returns {} on any failure — callers treat that as "no claim" (unmanaged),
-	preserving backward-compatible behavior rather than failing the login.
+	GoTrue /user returns app_metadata in its JSON — the authoritative source for
+	the exe_perms claim on the password-grant path (the callback path hits /user
+	itself). Returns the user dict on success.
+
+	RAISES GoTrueUserFetchError on ANY failure (no token, network error,
+	non-200, or unparseable body). It deliberately does NOT swallow errors into
+	{}: a fetch failure means perms are UNKNOWN, which is NOT the same as "no
+	claim" (unmanaged). The caller decides fail-open vs fail-closed based on
+	whether the tenant runs managed enforcement (exe_org_id configured).
 	"""
 	if not access_token:
-		return {}
+		raise GoTrueUserFetchError("no access token from password grant")
 	try:
 		resp = requests.get(
 			f"{gotrue_url.rstrip('/')}/user",
@@ -100,13 +112,13 @@ def _fetch_gotrue_user(gotrue_url: str, access_token: str) -> dict:
 		)
 	except requests.RequestException as e:
 		frappe.log_error(title="GoTrue exe_perms fetch error", message=str(e))
-		return {}
+		raise GoTrueUserFetchError(f"request failed: {e}") from e
 	if resp.status_code != 200:
-		return {}
+		raise GoTrueUserFetchError(f"non-200 from /user: {resp.status_code}")
 	try:
 		return resp.json() or {}
-	except ValueError:
-		return {}
+	except ValueError as e:
+		raise GoTrueUserFetchError("unparseable /user body") from e
 
 
 def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
@@ -124,10 +136,20 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 	  - MANAGED-DENY (role `none` / empty erp caps): disable the Frappe user
 	    (enabled=0) and deny login. Fail closed — never leave a usable default.
 
-	PROPAGATION SEAM: roles reconcile at each login/refresh. Immediate fan-out
-	(a control-plane-called role-sync endpoint that re-runs this without a
-	login) is a later phase; it would call `_apply_managed_roles(email,
-	fetched_app_metadata)` directly. Hook it here.
+	STALENESS BOUND (P2, documented): reconcile happens ONLY at login/callback.
+	An already-authenticated Frappe session slides on its own TTL and is NOT
+	re-checked against GoTrue mid-session, so a cap change made in the control
+	plane takes effect for an active user only on their NEXT login (or when
+	their session expires) — EXCEPT managed-deny, which kills existing sessions
+	immediately (see deny branch below). Worst-case stale window for a
+	downgrade-without-deny is therefore one session TTL.
+
+	PROPAGATION / ACTIVE FAN-OUT SEAM: to close that window for non-deny
+	downgrades, a later phase adds a control-plane -> ERP role-sync endpoint
+	that (a) re-runs this reconcile without a login and (b) kills the affected
+	user's Sessions so new roles apply at once. It would call
+	`_apply_managed_roles(email, fetched_app_metadata)` directly. Hook it here.
+	We deliberately do NOT build that fan-out in this module.
 	"""
 	admin_role, write_roles = _role_config()
 	decision, status = _exe_perms.compute_decision(
@@ -145,11 +167,27 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 	user_doc = frappe.get_doc("User", email)
 
 	# MANAGED-DENY -> fail closed: disable and refuse login.
+	#
+	# PERSISTENCE (P1): frappe.throw raises AuthenticationError, and Frappe
+	# ROLLS BACK the request transaction on that exception. Without an explicit
+	# commit the enabled=0 write is UNDONE, so a downgraded user would keep
+	# getting fresh sids with stale roles. We therefore commit the disable AND
+	# the session-kill BEFORE raising, so deny durably sticks in the DB.
 	if decision["deny"]:
 		if user_doc.enabled:
 			user_doc.enabled = 0
 			user_doc.flags.ignore_permissions = True
 			user_doc.save(ignore_permissions=True)
+		# Kill any existing Frappe sessions so deny takes effect IMMEDIATELY
+		# (not just on next login) — an already-authenticated sid is revoked.
+		try:
+			frappe.db.delete("Sessions", {"user": email})
+		except Exception as e:  # noqa: BLE001 — never let cleanup mask the deny
+			frappe.log_error(
+				title="exe_perms deny: session-kill failed", message=str(e)
+			)
+		# Durably persist BEFORE the raise-triggered rollback can undo it.
+		frappe.db.commit()
 		frappe.logger().warning(
 			"exe_perms: managed-deny for %s (role=%s) — access disabled",
 			email,
@@ -252,9 +290,48 @@ def gotrue_login(
 		token_data = resp.json()
 	except ValueError:
 		token_data = {}
-	app_metadata = _fetch_gotrue_user(gotrue_url, token_data.get("access_token")).get(
-		"app_metadata"
-	)
+
+	# FAIL-CLOSED ON /user ERROR (P1): the password grant already PROVED
+	# identity. If we then cannot fetch authoritative app_metadata, perms are
+	# UNKNOWN. On a managed-enforcement tenant (exe_org_id configured) we must
+	# NOT fall back to "no claim" and log in with STALE roles — a downgraded
+	# user could otherwise get a fresh sid with old roles during a brief /user
+	# outage. So we DENY this login. TRADEOFF: a GoTrue /user outage blocks
+	# managed logins — acceptable vs. granting stale privilege. The callback
+	# path already fails closed on /user non-200; this makes password consistent.
+	#
+	# A genuinely UNMANAGED / legacy tenant (no exe_org_id configured) is NOT
+	# doing managed enforcement, so a /user outage there must not block logins:
+	# we degrade to the legacy no-claim path only in that case.
+	try:
+		gotrue_user = _fetch_gotrue_user(gotrue_url, token_data.get("access_token"))
+	except GoTrueUserFetchError as e:
+		if _configured_org_id():
+			frappe.log_error(
+				title="GoTrue exe_perms unavailable — failing closed",
+				message=f"{email}: {e}",
+			)
+			frappe.throw(
+				"Unable to verify your access right now. Please try again.",
+				frappe.AuthenticationError,
+			)
+		# Unmanaged/legacy tenant: /user outage must not block login.
+		gotrue_user = {}
+
+	# SUBJECT BINDING (P2): the /user response is authoritative for identity.
+	# We provision/log in the SUBMITTED email, so verify /user's email matches
+	# before applying its roles — never apply org caps from a body that
+	# describes a different identity. (The callback path derives email from
+	# /user; this makes the password path consistent.)
+	gotrue_email = (gotrue_user.get("email") or "").strip().lower()
+	if gotrue_email and gotrue_email != (email or "").strip().lower():
+		frappe.log_error(
+			title="GoTrue subject-binding mismatch",
+			message=f"submitted={email} /user={gotrue_email}",
+		)
+		frappe.throw("Authentication identity mismatch", frappe.AuthenticationError)
+
+	app_metadata = gotrue_user.get("app_metadata")
 	managed = _exe_perms.compute_decision(app_metadata, _configured_org_id(), *_role_config())[0] is not None
 
 	# GoTrue accepted — find or create Frappe User
