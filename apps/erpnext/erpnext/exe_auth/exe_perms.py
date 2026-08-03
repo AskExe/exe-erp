@@ -181,6 +181,21 @@ def map_erp_roles(caps, admin_role=None, write_roles=None):
     }
 
 
+def subject_binding_ok(gotrue_email, submitted_email):
+    """True iff the authoritative /user email is PRESENT and MATCHES.
+
+    Subject binding (P2): the password path provisions/logs-in the SUBMITTED
+    email but reads roles from GoTrue /user's app_metadata. Before applying
+    those roles the /user body's own email must match the authenticated
+    identity. Case-insensitive, whitespace-trimmed. A missing/empty
+    gotrue_email is NOT ok (fail closed) — a malformed body carrying
+    app_metadata but no email must not have its roles applied.
+    """
+    g = (gotrue_email or "").strip().lower()
+    s = (submitted_email or "").strip().lower()
+    return bool(g) and g == s
+
+
 def deny_decision(admin_role=None, write_roles=None):
     """A fail-closed decision: no roles, deny login, disable the Frappe user.
 

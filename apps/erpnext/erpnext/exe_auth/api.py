@@ -179,9 +179,19 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 			user_doc.flags.ignore_permissions = True
 			user_doc.save(ignore_permissions=True)
 		# Kill any existing Frappe sessions so deny takes effect IMMEDIATELY
-		# (not just on next login) — an already-authenticated sid is revoked.
+		# (not just on next login). We MUST use frappe.sessions.clear_sessions,
+		# NOT a bare `frappe.db.delete("Sessions", ...)`: Frappe resumes sessions
+		# from the CACHE (frappe.cache.hget("session", sid)) BEFORE the DB
+		# lookup, so deleting only the DB row leaves a cached active session
+		# usable until cache expiry. clear_sessions -> delete_session clears BOTH
+		# the DB row AND frappe.cache.hdel("session", sid) for every sid, so
+		# revocation is truly immediate. force=True bypasses the
+		# simultaneous_sessions offset so ALL of the user's sessions go.
+		# LIVE-BENCH: the cache side must be confirmed against the real Redis
+		# session backend (the pure unit tests here cannot exercise cache/DB).
 		try:
-			frappe.db.delete("Sessions", {"user": email})
+			from frappe.sessions import clear_sessions
+			clear_sessions(user=email, keep_current=False, force=True)
 		except Exception as e:  # noqa: BLE001 — never let cleanup mask the deny
 			frappe.log_error(
 				title="exe_perms deny: session-kill failed", message=str(e)
@@ -305,6 +315,7 @@ def gotrue_login(
 	# we degrade to the legacy no-claim path only in that case.
 	try:
 		gotrue_user = _fetch_gotrue_user(gotrue_url, token_data.get("access_token"))
+		gotrue_fetched = True
 	except GoTrueUserFetchError as e:
 		if _configured_org_id():
 			frappe.log_error(
@@ -315,19 +326,25 @@ def gotrue_login(
 				"Unable to verify your access right now. Please try again.",
 				frappe.AuthenticationError,
 			)
-		# Unmanaged/legacy tenant: /user outage must not block login.
+		# Unmanaged/legacy tenant: /user outage must not block login. This is
+		# NOT an authoritative body, so subject binding below is skipped.
 		gotrue_user = {}
+		gotrue_fetched = False
 
 	# SUBJECT BINDING (P2): the /user response is authoritative for identity.
-	# We provision/log in the SUBMITTED email, so verify /user's email matches
-	# before applying its roles — never apply org caps from a body that
-	# describes a different identity. (The callback path derives email from
-	# /user; this makes the password path consistent.)
-	gotrue_email = (gotrue_user.get("email") or "").strip().lower()
-	if gotrue_email and gotrue_email != (email or "").strip().lower():
+	# We provision/log in the SUBMITTED email, so when we have an authoritative
+	# body its email must be PRESENT and MATCH before we apply its roles — never
+	# apply org caps from a body that is missing an email or describes a
+	# different identity. (Mirrors the callback path, which rejects "No email in
+	# SSO token" and derives email from /user.) Skipped only on the legacy
+	# fail-open path above, where gotrue_fetched is False and no roles apply.
+	if gotrue_fetched and not _exe_perms.subject_binding_ok(
+		gotrue_user.get("email"), email
+	):
+		gotrue_email = (gotrue_user.get("email") or "").strip().lower()
 		frappe.log_error(
 			title="GoTrue subject-binding mismatch",
-			message=f"submitted={email} /user={gotrue_email}",
+			message=f"submitted={email} /user={gotrue_email or '<missing>'}",
 		)
 		frappe.throw("Authentication identity mismatch", frappe.AuthenticationError)
 

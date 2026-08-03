@@ -304,6 +304,29 @@ class TestManagedDenyPersistenceIntent(unittest.TestCase):
 			self.assertEqual(d["roles"], set())
 
 
+class TestSubjectBinding(unittest.TestCase):
+	"""P2: /user body email must be PRESENT and MATCH the submitted email
+	before its roles are applied (fail closed on missing OR mismatched)."""
+
+	def testMatchingEmailOk(self):
+		self.assertTrue(ep.subject_binding_ok("user@acme.com", "user@acme.com"))
+
+	def testCaseAndWhitespaceInsensitiveOk(self):
+		self.assertTrue(ep.subject_binding_ok("  User@Acme.com ", "user@acme.com"))
+
+	def testMismatchDeniedFail(self):
+		self.assertFalse(ep.subject_binding_ok("attacker@acme.com", "victim@acme.com"))
+
+	def testMissingGotrueEmailDeniedFail(self):
+		# Malformed successful /user body: app_metadata present but NO email.
+		self.assertFalse(ep.subject_binding_ok(None, "user@acme.com"))
+		self.assertFalse(ep.subject_binding_ok("", "user@acme.com"))
+		self.assertFalse(ep.subject_binding_ok("   ", "user@acme.com"))
+
+	def testMissingSubmittedEmailDeniedFail(self):
+		self.assertFalse(ep.subject_binding_ok("user@acme.com", None))
+
+
 if __name__ == "__main__":
 	unittest.main()
 
@@ -340,8 +363,13 @@ if __name__ == "__main__":
 #  11. FAIL-CLOSED ON /user ERROR: /token 200 but /user 5xx/network-error, with
 #      exe_org_id CONFIGURED -> login raises AuthenticationError (no stale sid).
 #      With exe_org_id UNSET (legacy tenant) -> login still succeeds.
-#  12. SUBJECT BINDING: /user returns a DIFFERENT email than the submitted one
-#      -> login raises AuthenticationError; no roles applied.
-#  13. managed-deny SESSION KILL: a user with an existing Frappe session who is
-#      then denied -> their rows in the Sessions table are deleted (deny is
-#      immediate, not only next login).
+#  12. SUBJECT BINDING: /user returns a DIFFERENT email, OR a successful body
+#      with app_metadata but NO email -> login raises AuthenticationError; no
+#      roles applied. (subject_binding_ok is unit-tested; the api.py wiring +
+#      the gotrue_fetched skip on the legacy fail-open path need bench.)
+#  13. managed-deny SESSION KILL (needs live Redis backend): a user with an
+#      existing CACHED Frappe session who is then denied -> after deny, both
+#      the Sessions DB row AND the cached session (frappe.cache hget "session"
+#      <sid>) are gone, so resume() cannot revive it. Verify via
+#      clear_sessions(user, force=True) against real Redis — a bare DB delete
+#      would leave the cached session usable until cache expiry.
