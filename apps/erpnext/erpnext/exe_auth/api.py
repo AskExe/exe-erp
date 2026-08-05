@@ -43,9 +43,18 @@ def _assert_provisioning_allowed(email: str) -> None:
 
 	When allowed_email_domains is set, the email's domain must be on the list.
 	"""
-	allowed_domains = frappe.conf.get("allowed_email_domains") or []
+	raw_allowed = frappe.conf.get("allowed_email_domains") or []
+	# HARDENING (substring-match hole): allowed_email_domains MUST be a list for
+	# exact membership. entrypoint.sh writes a JSON list, but an operator editing
+	# site_config.json by hand could set a raw CSV STRING — and `"cme.com" in
+	# "acme.com,partner.org"` is a substring match, letting cme.com pass an
+	# acme.com allowlist. Coerce a str CSV to a list, and normalize case/space so
+	# the check is exact and domain-case-insensitive (matches entrypoint.sh).
+	if isinstance(raw_allowed, str):
+		raw_allowed = raw_allowed.split(",")
+	allowed_domains = [d.strip().lower() for d in raw_allowed if d and d.strip()]
 	allow_all = frappe.conf.get("gotrue_allow_all_domains", False)
-	email_domain = email.split("@")[1] if "@" in email else ""
+	email_domain = (email.split("@")[1] if "@" in email else "").strip().lower()
 
 	if not allowed_domains and not allow_all:
 		frappe.throw(
@@ -227,6 +236,17 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 		return False
 
 	user_doc = frappe.get_doc("User", email)
+	# SYSTEM-DRIVEN ROLE SYNC (P1): this reconcile runs during the login request
+	# while the actor is still Guest. User.add_roles()/remove_roles() call
+	# User.save() WITHOUT ignore_permissions (frappe user.py:725/737), so a
+	# Guest-context save is permission-checked and would FAIL — first login for a
+	# managed erp:write/erp:admin user could not be granted their roles, and a
+	# downgrade needing role removal would fail closed the wrong way. These roles
+	# come from a VERIFIED GoTrue exe_perms claim, not user input, so we set the
+	# ignore_permissions flag on the doc up front; the internal saves in
+	# add_roles/remove_roles (and the explicit saves below) then run with system
+	# privileges. The managed-DENY disable path already saves ignore_permissions.
+	user_doc.flags.ignore_permissions = True
 
 	# MANAGED-DENY -> fail closed: disable and refuse login.
 	#
@@ -471,26 +491,47 @@ def gotrue_login_start():
 	"""Begin the SSO login flow WITH CSRF protection.
 
 	Generates a random `state` nonce, stores it in an httpOnly SameSite=Lax
-	cookie, and redirects the browser to the configured auth domain carrying
+	cookie, and redirects the browser to this customer's auth domain carrying
 	that `state`. The auth domain MUST echo `state` back to
 	gotrue_login_callback, which verifies it against this cookie (double-submit)
-	to defeat login-CSRF. This is the SUPPORTED entry point for the SSO flow.
+	to defeat login-CSRF. This is the SUPPORTED entry point for the SSO flow —
+	the login page links HERE (never straight to the callback), so with the
+	secure default (gotrue_require_callback_state=True) the callback always has a
+	state cookie to verify.
+
+	The provider URL is built the same way the login page derives it
+	(login.py:get_exe_auth_url — customer auth domain, never hardcoded), plus the
+	`product` tag and our callback `redirect`, so a stock deploy needs NO extra
+	config. An explicit `gotrue_auth_redirect_url` in site_config still overrides
+	the whole target for operators who front SSO with a custom URL.
 	"""
 	import secrets
+	from urllib.parse import quote
+
+	state = secrets.token_urlsafe(32)
 
 	auth_redirect = frappe.conf.get("gotrue_auth_redirect_url")
-	if not auth_redirect:
-		frappe.throw(
-			"SSO not configured. Set gotrue_auth_redirect_url in site_config.json",
-			frappe.ValidationError,
+	if auth_redirect:
+		# Operator-provided full target (may already carry product/redirect params).
+		target = auth_redirect
+	else:
+		# Derive the customer auth domain + attach product tag and our callback.
+		from frappe.www.login import get_exe_auth_url
+
+		callback_url = frappe.utils.get_url(
+			"/api/method/erpnext.exe_auth.api.gotrue_login_callback"
 		)
-	state = secrets.token_urlsafe(32)
+		target = (
+			f"{get_exe_auth_url().rstrip('/')}/login"
+			f"?product=ERP&redirect={quote(callback_url, safe='')}"
+		)
+
 	frappe.local.cookie_manager.set_cookie(
 		_OAUTH_STATE_COOKIE, state, httponly=True, samesite="Lax", max_age=600
 	)
-	sep = "&" if "?" in auth_redirect else "?"
+	sep = "&" if "?" in target else "?"
 	frappe.local.response["type"] = "redirect"
-	frappe.local.response["location"] = f"{auth_redirect}{sep}state={state}"
+	frappe.local.response["location"] = f"{target}{sep}state={state}"
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])

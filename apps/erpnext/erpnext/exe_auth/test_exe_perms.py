@@ -382,7 +382,12 @@ if __name__ == "__main__":
 #
 # Cases to cover against a live User doctype:
 #   1. managed erp:admin  -> User gains "System Manager" + write bundle,
-#      user_type == "System User", enabled == 1.
+#      user_type == "System User", enabled == 1. NOTE: the reconcile runs while
+#      the actor is still Guest, so _apply_managed_roles sets
+#      user_doc.flags.ignore_permissions=True BEFORE add_roles/remove_roles (whose
+#      internal User.save() would otherwise be permission-checked as Guest and
+#      FAIL). Assert first login of a fresh managed user actually GAINS the roles
+#      (regression guard for the Guest-context role-grant failure).
 #   2. managed erp:write  -> gains write bundle, NOT "System Manager".
 #   3. managed erp:read   -> no desk roles, user_type == "Website User".
 #   4. downgrade admin->write on second login -> "System Manager" REMOVED,
