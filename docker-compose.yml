@@ -103,8 +103,8 @@ services:
       # closed and visibly disables raw.raw_events emission instead of silently
       # guessing credentials. Set to the exedb bridge DSN to enable forwarding.
       EXE_BRIDGE_DATABASE_URL: ${EXE_BRIDGE_DATABASE_URL:-}
-    ports:
-      - "127.0.0.1:8069:8000"
+    expose:
+      - "8000"
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:
@@ -196,10 +196,10 @@ services:
     # The RQ worker has no listening port; liveness = the worker process
     # is still running. Without this the container can wedge silently and
     # background jobs stop processing with no signal (bug 81a9b8ad).
-    # Uses Python (guaranteed in the image) to scan /proc — no extra apt
+    # Uses Python (guaranteed in the image) to inspect PID 1 — no extra apt
     # deps (procps/pgrep are not installed in the slim base).
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import glob;import sys;sys.exit(0 if any('worker' in open(f).read() for f in glob.glob('/proc/[0-9]*/cmdline')) else 1)\" 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import sys; cmd=open('/proc/1/cmdline','rb').read().replace(b'\\0', b' '); sys.exit(0 if b'bench worker' in cmd else 1)\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -244,11 +244,37 @@ services:
     # The scheduler has no listening port; liveness = the schedule process
     # is still running. Without this a stalled scheduler stops dispatching
     # cron jobs (enqueued_calls, daily/weekly tasks) silently (bug 81a9b8ad).
-    # Uses Python (guaranteed in the image) to scan /proc — no extra apt
+    # Uses Python (guaranteed in the image) to inspect PID 1 — no extra apt
     # deps (procps/pgrep are not installed in the slim base).
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import glob;import sys;sys.exit(0 if any('schedule' in open(f).read() for f in glob.glob('/proc/[0-9]*/cmdline')) else 1)\" 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import sys; cmd=open('/proc/1/cmdline','rb').read().replace(b'\\0', b' '); sys.exit(0 if b'bench schedule' in cmd else 1)\""]
       interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # -- Nginx reverse proxy ------------------------------------------------
+  exe-erp-nginx:
+    image: ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    entrypoint: []
+    command: ["nginx", "-c", "/etc/nginx/nginx.conf", "-g", "daemon off;"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "127.0.0.1:8069:8080"
+    networks:
+      - exe-net
+    depends_on:
+      exe-erp:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/method/ping || exit 1"]
+      interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
