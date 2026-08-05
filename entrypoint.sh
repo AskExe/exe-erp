@@ -326,6 +326,38 @@ try:
     _gotrue_admin_token = os.environ.get('GOTRUE_ADMIN_TOKEN', '')
     if _gotrue_admin_token:
         config['gotrue_admin_token'] = _gotrue_admin_token
+    # ── Unified permissions (bug 842ede7c) ──────────────────────────────
+    # exe_org_id activates managed/centralized role enforcement in
+    # exe_auth/exe_perms.py. Without it, roles stay Frappe-local (enforcement
+    # is inert) OR, if claims are stamped, ORG_DENY_UNRESOLVED denies+disables
+    # every user. Wire it from the deployment so enforcement is actually live.
+    _exe_org_id = os.environ.get('EXE_ORG_ID', '')
+    if _exe_org_id:
+        config['exe_org_id'] = _exe_org_id
+    # ── SSO auto-provisioning allowlist (bug b6f1cd7d) ───────────────────
+    # First SSO login is fail-closed until the tenant declares which email
+    # domains may auto-provision (api.py:_assert_provisioning_allowed).
+    # ALLOWED_EMAIL_DOMAINS is a CSV; write it as a JSON list so the
+    # membership check (email_domain not in allowed_domains) is exact.
+    _allowed_domains_raw = os.environ.get('ALLOWED_EMAIL_DOMAINS', '')
+    if _allowed_domains_raw:
+        config['allowed_email_domains'] = [
+            d.strip().lower() for d in _allowed_domains_raw.split(',') if d.strip()
+        ]
+    # Explicit single-tenant opt-in: trust every GoTrue user's domain.
+    _allow_all = os.environ.get('GOTRUE_ALLOW_ALL_DOMAINS', '').strip().lower()
+    if _allow_all in ('1', 'true', 'yes', 'on'):
+        config['gotrue_allow_all_domains'] = True
+    # ── SSO callback CSRF state (bug adf77179) ───────────────────────────
+    # gotrue_require_callback_state defaults TRUE (secure) in api.py — the auth
+    # domain MUST echo the `state` nonce. Only written here when an operator
+    # explicitly sets it (mid-rollout escape hatch); absence preserves the
+    # secure default. Never silently weaken CSRF.
+    _require_state = os.environ.get('GOTRUE_REQUIRE_CALLBACK_STATE', '').strip().lower()
+    if _require_state in ('0', 'false', 'no', 'off'):
+        config['gotrue_require_callback_state'] = False
+    elif _require_state in ('1', 'true', 'yes', 'on'):
+        config['gotrue_require_callback_state'] = True
     with open(config_path, 'w') as f:
         json.dump(config, f, indent=2)
     print('GoTrue SSO configured in site_config.json')
