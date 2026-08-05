@@ -1,9 +1,13 @@
 frappe.provide("frappe.help.help_links");
 
+// Docs base — configurable via site_config "docs_url" (System Settings → Exe),
+// defaults to Exe's hosted docs. White-label customers override this.
+const _docsBase = (frappe.boot && frappe.boot.docs_url) || "https://docs.askexe.com";
+
 frappe.help.help_links["data-import-tool"] = [
 	{
 		label: "Importing and Exporting Data",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/data",
+		url: _docsBase + "/erp/docs/user/manual/en/data",
 	},
 ];
 
@@ -14,24 +18,24 @@ frappe.help.help_links["modules/Setup"] = [
 	},
 	{
 		label: "System Settings",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/system-settings",
+		url: _docsBase + "/erp/docs/user/manual/en/system-settings",
 	},
 	{
 		label: "Data Management",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/data",
+		url: _docsBase + "/erp/docs/user/manual/en/data",
 	},
-	{ label: "Email", url: "https://askexe.com/docs/erp/docs/user/manual/en/email" },
-	{ label: "Printing and Branding", url: "https://askexe.com/docs/erp/docs/user/manual/en/print" },
+	{ label: "Email", url: _docsBase + "/erp/docs/user/manual/en/email" },
+	{ label: "Printing and Branding", url: _docsBase + "/erp/docs/user/manual/en/print" },
 ];
 
 frappe.help.help_links["List/User"] = [
 	{
 		label: "Adding Users",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/adding-users",
+		url: _docsBase + "/erp/docs/user/manual/en/adding-users",
 	},
 	{
 		label: "Rename User",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/renaming-documents",
+		url: _docsBase + "/erp/docs/user/manual/en/renaming-documents",
 	},
 ];
 
@@ -52,34 +56,34 @@ frappe.help.help_links["user-permissions"] = [
 frappe.help.help_links["Form/System Settings"] = [
 	{
 		label: "System Settings",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/system-settings",
+		url: _docsBase + "/erp/docs/user/manual/en/system-settings",
 	},
 ];
 
 frappe.help.help_links["List/Email Account"] = [
 	{
 		label: "Email Account",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/email-account",
+		url: _docsBase + "/erp/docs/user/manual/en/email-account",
 	},
 ];
 
 frappe.help.help_links["List/Notification"] = [
 	{
 		label: "Notification",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/notifications",
+		url: _docsBase + "/erp/docs/user/manual/en/notifications",
 	},
 ];
 
 frappe.help.help_links["Form/Print Settings"] = [
 	{
 		label: "Print Settings",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/print-settings",
+		url: _docsBase + "/erp/docs/user/manual/en/print-settings",
 	},
 ];
 
 frappe.help.help_links["print-format-builder"] = [
 	{
 		label: "Print Format Builder",
-		url: "https://askexe.com/docs/erp/docs/user/manual/en/print-format-builder",
+		url: _docsBase + "/erp/docs/user/manual/en/print-format-builder",
 	},
 ];

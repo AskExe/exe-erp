@@ -226,13 +226,15 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 		if (++_pollCount > 100) clearInterval(_pollTimer);
 	}, 200);
 
-	// Exe SSO link — redirect to THIS customer's auth domain (derived server-side
-	// in login.py:get_exe_auth_url, never hardcoded) with callback to our GoTrue endpoint.
+	// Exe SSO link — route through the server-side gotrue_login_start entry point.
+	// It sets the exe_sso_state CSRF cookie, derives THIS customer's auth domain
+	// (login.py:get_exe_auth_url, never hardcoded), and redirects to it carrying a
+	// matching `state`. Going straight to the callback would bypass the state-cookie
+	// initializer and fail the secure-default callback CSRF check
+	// (gotrue_require_callback_state=True). Keep CSRF ON — never link to the callback.
 	var ssoLink = document.getElementById('exe-sso-link');
 	if (ssoLink) {
-		var exeAuthUrl = {{ (exe_auth_url or "https://auth.askexe.com") | tojson }};
-		var callbackUrl = window.location.origin + '/api/method/erpnext.exe_auth.api.gotrue_login_callback';
-		ssoLink.href = exeAuthUrl.replace(/\/+$/, '') + '/login?product=ERP&redirect=' + encodeURIComponent(callbackUrl);
+		ssoLink.href = '/api/method/erpnext.exe_auth.api.gotrue_login_start';
 	}
 
 	// Token form submit
