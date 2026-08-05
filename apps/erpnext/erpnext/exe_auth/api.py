@@ -278,7 +278,7 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 		try:
 			from frappe.sessions import clear_sessions
 			clear_sessions(user=email, keep_current=False, force=True)
-		except Exception as e:  # noqa: BLE001 — never let cleanup mask the deny
+		except Exception as e:
 			frappe.log_error(
 				title="exe_perms deny: session-kill failed", message=str(e)
 			)
