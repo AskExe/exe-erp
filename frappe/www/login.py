@@ -127,12 +127,18 @@ def get_exe_auth_url() -> str:
 	Resolution order (first match wins):
 	  1. Explicit override — site_config "exe_auth_url" or env EXE_AUTH_URL
 	     (full URL, e.g. https://auth.acme.com). Lets operators point anywhere.
-	  2. Explicit auth domain — site_config "auth_domain" or env AUTH_DOMAIN
+	  2. Stack-injected public auth URL — site_config "gotrue_external_url" or
+	     env GOTRUE_EXTERNAL_URL (full URL, e.g. https://auth.acme.com). This is
+	     the PUBLIC GoTrue URL the exe-os stack passes into the container per
+	     deployment; it is distinct from "gotrue_url"/GOTRUE_URL, which is the
+	     INTERNAL service address (e.g. http://gotrue:9999) used for backend
+	     token/admin calls and must NOT be used for browser redirects.
+	  3. Explicit auth domain — site_config "auth_domain" or env AUTH_DOMAIN
 	     (bare host, e.g. auth.acme.com → https://auth.acme.com).
-	  3. Derived from the request host — replace the leading label with "auth"
+	  4. Derived from the request host — replace the leading label with "auth"
 	     (erp.acme.com → auth.acme.com), preserving scheme. Single-label hosts
 	     (e.g. "localhost") are prefixed (auth.localhost).
-	  4. Last resort — https://auth.askexe.com (AskExe's own tenant). Only hit
+	  5. Last resort — https://auth.askexe.com (AskExe's own tenant). Only hit
 	     when nothing else is configured/derivable; preserves legacy behavior.
 	"""
 	# 1. Full URL override
@@ -140,7 +146,16 @@ def get_exe_auth_url() -> str:
 	if explicit:
 		return explicit.rstrip("/")
 
-	# 2. Auth domain (bare host) → https scheme
+	# 2. Stack-injected public GoTrue URL (https://auth.<customer-domain>).
+	#    NOT gotrue_url — that's the internal service address for backend calls.
+	gotrue_external = frappe.conf.get("gotrue_external_url") or os.environ.get("GOTRUE_EXTERNAL_URL")
+	if gotrue_external:
+		gotrue_external = gotrue_external.strip()
+		if "://" in gotrue_external:
+			return gotrue_external.rstrip("/")
+		return f"https://{gotrue_external.rstrip('/')}"
+
+	# 3. Auth domain (bare host) → https scheme
 	auth_domain = frappe.conf.get("auth_domain") or os.environ.get("AUTH_DOMAIN")
 	if auth_domain:
 		auth_domain = auth_domain.strip()
@@ -148,7 +163,7 @@ def get_exe_auth_url() -> str:
 			return auth_domain.rstrip("/")
 		return f"https://{auth_domain.rstrip('/')}"
 
-	# 3. Derive from the request host (erp.acme.com → auth.acme.com)
+	# 4. Derive from the request host (erp.acme.com → auth.acme.com)
 	try:
 		parsed = urlparse(frappe.local.request.url)
 		host = parsed.hostname
@@ -166,7 +181,7 @@ def get_exe_auth_url() -> str:
 		# Request context may be unavailable in some render paths; fall through.
 		pass
 
-	# 4. Last-resort default (AskExe's own deployment)
+	# 5. Last-resort default (AskExe's own deployment)
 	return "https://auth.askexe.com"
 
 

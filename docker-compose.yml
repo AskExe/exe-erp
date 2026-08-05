@@ -31,7 +31,26 @@ services:
       EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
+      # Public auth URL for browser SSO redirects (https://auth.<domain>).
+      # Distinct from GOTRUE_URL (internal service address).
+      GOTRUE_EXTERNAL_URL: ${GOTRUE_EXTERNAL_URL:-}
       GOTRUE_ADMIN_TOKEN: ${GOTRUE_ADMIN_TOKEN:-}
+      # Unified permissions (bug 842ede7c): org id that activates managed/
+      # centralized role enforcement. Without it enforcement is inert (roles
+      # stay Frappe-local) or every user is denied+disabled once claims stamp.
+      # entrypoint.sh writes this into site_config.json.
+      EXE_ORG_ID: ${EXE_ORG_ID:-}
+      # SSO auto-provisioning allowlist (bug b6f1cd7d). CSV of email domains
+      # authorized to auto-provision on first SSO login, e.g. "acme.com,partner.org".
+      # Without this (or GOTRUE_ALLOW_ALL_DOMAINS) first login is fail-closed.
+      ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-}
+      # Single-tenant opt-in: trust every GoTrue user's domain (alternative to
+      # the allowlist above). Set to "true" only when every GoTrue user is trusted.
+      GOTRUE_ALLOW_ALL_DOMAINS: ${GOTRUE_ALLOW_ALL_DOMAINS:-}
+      # SSO callback CSRF (bug adf77179). Defaults TRUE in code (secure): the
+      # auth domain MUST echo the `state` nonce. Leave unset to keep the secure
+      # default; set to "false" ONLY as a mid-rollout escape hatch.
+      GOTRUE_REQUIRE_CALLBACK_STATE: ${GOTRUE_REQUIRE_CALLBACK_STATE:-}
     volumes:
       - erp-sites:/home/frappe/frappe-bench/sites
     networks:
@@ -71,7 +90,15 @@ services:
       EXE_ERP_ADMIN_TOKEN: ${EXE_ERP_ADMIN_TOKEN:-}
       EXE_ADMIN_TOKEN: ${EXE_ADMIN_TOKEN:-}
       GOTRUE_URL: ${GOTRUE_URL:-}
+      # Public auth URL for browser SSO redirects (https://auth.<domain>).
+      # Read at request time by login.py:get_exe_auth_url() as a fallback to
+      # site_config; distinct from GOTRUE_URL (internal service address).
+      GOTRUE_EXTERNAL_URL: ${GOTRUE_EXTERNAL_URL:-}
       GOTRUE_ADMIN_TOKEN: ${GOTRUE_ADMIN_TOKEN:-}
+      # Unified permissions (bug 842ede7c): env fallback for api.py:_configured_org_id
+      # (site_config `exe_org_id` is authoritative; this covers the runtime read
+      # on the request-serving process if the site_config write is ever missing).
+      EXE_ORG_ID: ${EXE_ORG_ID:-}
       # Raw-events landing pad (bug 12f4c334). When unset the exe_bridge fails
       # closed and visibly disables raw.raw_events emission instead of silently
       # guessing credentials. Set to the exedb bridge DSN to enable forwarding.
