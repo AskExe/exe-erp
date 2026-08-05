@@ -1,0 +1,134 @@
+# Classified auto-retry (broadened from bug e381fcb0).
+#
+# Automatically re-runs the failed jobs of a CI run ONLY when the failure is
+# classified as INFRASTRUCTURE (self-hosted runner disconnect, cancellation,
+# action-download/setup drop, disk full, etc.) — never for a real test/build/
+# lint failure. Runs on a GitHub-hosted runner so it works even when the
+# self-hosted fleet is the thing that dropped.
+#
+# Classification (must satisfy BOTH to retry):
+#   1. NO failed job has a genuinely failed STEP (a real code failure has a
+#      named failed step that is NOT a setup/checkout/cache/post step). If any
+#      such step exists -> REAL failure -> do nothing.
+#   2. At least one failed job's annotation matches an infra SIGNATURE below.
+#
+# Retry is capped at 1: only run_attempt < 2 is ever retried, so this can
+# never loop. Additive-only: does not touch the CI workflow itself.
+#
+# Triggered on "PR checks" (pr-checks.yml) — the top-level workflow that runs the self-hosted CI suite via the ci-checks.yml reusable workflow; reusable workflows do not emit their own workflow_run events.
+
+name: Auto retry classified
+
+on:
+  workflow_run:
+    workflows: ["PR checks"]
+    types: [completed]
+
+permissions: { actions: write, contents: read }
+
+jobs:
+  classified-auto-retry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retry failed CI only for infra-classified failures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          # Infra failure signatures (case-insensitive substring match against
+          # each failed job's annotation message / title / raw_details).
+          SIGNATURES: >-
+            ["lost communication with the server",
+             "the runner has received a shutdown signal",
+             "was cancelled",
+             "cancelled",
+             "failed to download action",
+             "failed to setup",
+             "setup-node",
+             "actions/checkout",
+             "the operation was canceled",
+             "no space left on device",
+             "runner lost"]
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "$RUN_CONCLUSION" != "failure" ]; then
+            echo "decision=skip reason=not-failure: run $RUN_ID concluded '$RUN_CONCLUSION'."
+            exit 0
+          fi
+
+          # Cap at 1 retry: only the first attempt is ever retried.
+          if [ "$RUN_ATTEMPT" -ge 2 ]; then
+            echo "decision=skip reason=cap-reached: run $RUN_ID is attempt $RUN_ATTEMPT (cap=1)."
+            exit 0
+          fi
+
+          jobs_json="$(gh api --paginate --slurp \
+            "/repos/$REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" \
+            --jq '{ jobs: [.[].jobs[]] }')"
+
+          failed_count="$(jq '[.jobs[] | select(.conclusion == "failure")] | length' <<<"$jobs_json")"
+          if [ "$failed_count" -eq 0 ]; then
+            echo "decision=skip reason=no-failed-jobs: run $RUN_ID failed but returned no failed jobs."
+            exit 0
+          fi
+          echo "info: run $RUN_ID attempt $RUN_ATTEMPT has $failed_count failed job(s)."
+
+          # --- Guard 1: a real failure has a failed STEP whose name is NOT a
+          # setup/checkout/cache/post step. Infra drops fail the job with no
+          # failed step, or with only a setup/checkout/cache/post step failed.
+          real_failed_steps="$(jq '
+            [ .jobs[]
+              | select(.conclusion == "failure")
+              | .name as $job
+              | .steps[]?
+              | select(.conclusion == "failure")
+              | { job: $job, name: (.name // ""), lname: ((.name // "") | ascii_downcase) }
+              | select((.lname
+                  | test("set up job|set up runner|setup|checkout|cache|post |post-|complete job|download action")) | not)
+            ]' <<<"$jobs_json")"
+
+          real_count="$(jq 'length' <<<"$real_failed_steps")"
+          if [ "$real_count" -gt 0 ]; then
+            echo "decision=skip reason=real-failure: $real_count non-infra failed step(s) found."
+            jq -r '.[] | "  real-failed-step: \(.job) :: \(.name)"' <<<"$real_failed_steps"
+            exit 0
+          fi
+
+          # --- Guard 2: require at least one infra signature in a failed job's
+          # annotations.
+          annotation_matches=0
+          while IFS= read -r check_run_url; do
+            if [ -z "$check_run_url" ] || [ "$check_run_url" = "null" ]; then
+              continue
+            fi
+            check_run_path="${check_run_url#https://api.github.com}"
+            annotations_json="$(gh api --paginate --slurp "$check_run_path/annotations?per_page=100")"
+            matched="$(jq --argjson sigs "$SIGNATURES" -r '
+              [ .[][] as $a
+                | $sigs[] as $s
+                | select(
+                    (($a.message     // "") | ascii_downcase | contains($s))
+                    or (($a.raw_details // "") | ascii_downcase | contains($s))
+                    or (($a.title      // "") | ascii_downcase | contains($s))
+                  )
+                | "  infra-annotation: \($a.title // "") :: \($a.message // "")"
+              ] | (length | tostring) + "\n" + (join("\n"))' <<<"$annotations_json")"
+            count="$(head -n1 <<<"$matched")"
+            body="$(tail -n +2 <<<"$matched")"
+            if [ "$count" -gt 0 ]; then
+              echo "$body"
+            fi
+            annotation_matches=$((annotation_matches + count))
+          done < <(jq -r '.jobs[] | select(.conclusion == "failure") | .check_run_url // empty' <<<"$jobs_json")
+
+          if [ "$annotation_matches" -eq 0 ]; then
+            echo "decision=skip reason=no-infra-signature: no failed job annotation matched an infra signature."
+            exit 0
+          fi
+
+          echo "decision=retry reason=infra-classified: run $RUN_ID attempt $RUN_ATTEMPT had 0 real failed steps and $annotation_matches infra annotation(s)."
+          gh run rerun "$RUN_ID" --repo "$REPOSITORY" --failed
