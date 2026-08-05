@@ -698,7 +698,7 @@ frappe.search.utils = {
 					value: __("Install {0} from Marketplace", [__(item.title)]),
 					index: search_result.score * 0.8,
 					route: [
-						`https://askexe.com/${item.route}?utm_source=awesomebar`,
+						`/${item.route}`,
 						item.name,
 					],
 				};

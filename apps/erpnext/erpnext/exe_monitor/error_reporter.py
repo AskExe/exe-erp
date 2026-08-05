@@ -6,7 +6,8 @@ to the central monitoring hub for alerting and dashboard visibility.
 
 Configuration (environment variables):
   MONITOR_ERROR_URL — Monitor hub endpoint (default: http://exe-monitor-hub:8090/api/exe-monitor/errors)
-  MONITOR_API_KEY — Authentication token for monitor hub
+  MONITOR_API_KEY — Authentication token for monitor hub. Sent as the X-Monitor-Key
+    header (matching exe-monitor's contract). EXE_MONITOR_KEY is accepted as a fallback.
   ERROR_REPORTING_ENABLED — Set to "false" to disable (default: true)
 
 Usage:
@@ -26,7 +27,7 @@ MONITOR_URL = os.environ.get(
 	"MONITOR_ERROR_URL",
 	"http://exe-monitor-hub:8090/api/exe-monitor/errors",
 )
-MONITOR_KEY = os.environ.get("MONITOR_API_KEY", "")
+MONITOR_KEY = os.environ.get("MONITOR_API_KEY") or os.environ.get("EXE_MONITOR_KEY", "")
 ENABLED = os.environ.get("ERROR_REPORTING_ENABLED", "true").lower() != "false"
 
 # Rate limiting: max N reports per minute to avoid flooding
@@ -91,7 +92,7 @@ def report_error(error, context=None, severity="error"):
 
 		headers = {"Content-Type": "application/json"}
 		if MONITOR_KEY:
-			headers["Authorization"] = f"Bearer {MONITOR_KEY}"
+			headers["X-Monitor-Key"] = MONITOR_KEY
 
 		requests.post(
 			MONITOR_URL,
