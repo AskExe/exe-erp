@@ -197,7 +197,7 @@ class TestComputeDecision(unittest.TestCase):
 		self.assertEqual(status, ep.ORG_UNMANAGED_ABSENT)
 
 	def testNoneAppMetadataUnmanaged(self):
-		d, status = ep.compute_decision(None, "acme")
+		d, _status = ep.compute_decision(None, "acme")
 		self.assertIsNone(d)
 
 	def testMultiOrgWithoutConfigDeniesFail(self):
@@ -218,14 +218,14 @@ class TestComputeDecision(unittest.TestCase):
 
 	def testRoleNoneIsManagedDeny(self):
 		meta = {"exe_perms": {"orgs": {"acme": {"role": "none", "caps": ["erp:admin"]}}}}
-		d, status = ep.compute_decision(meta, "acme")
+		d, _status = ep.compute_decision(meta, "acme")
 		# role "none" forces deny even if caps somehow present.
 		self.assertTrue(d["deny"])
 		self.assertEqual(d["level"], ep.LEVEL_NONE)
 
 	def testEmptyErpCapsIsManagedDeny(self):
 		meta = {"exe_perms": {"orgs": {"acme": {"role": "member", "caps": ["wiki:write"]}}}}
-		d, status = ep.compute_decision(meta, "acme")
+		d, _status = ep.compute_decision(meta, "acme")
 		self.assertTrue(d["deny"])
 
 
