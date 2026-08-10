@@ -31,7 +31,7 @@ shift || true
 if [ "$#" -gt 0 ]; then
 	PAGES=("$@")
 else
-	PAGES=("/login")
+	PAGES=("/login" "/app")
 fi
 
 failures=0
@@ -40,7 +40,7 @@ checked=0
 for page in "${PAGES[@]}"; do
 	echo "── Sweeping ${BASE_URL}${page}"
 
-	html=$(curl -fsS --max-time 20 "${BASE_URL}${page}" 2>/dev/null) || {
+	html=$(curl -fsSL --max-time 20 "${BASE_URL}${page}" 2>/dev/null) || {
 		echo "FAIL: could not fetch ${BASE_URL}${page}"
 		failures=$((failures + 1))
 		continue
