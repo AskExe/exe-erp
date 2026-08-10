@@ -24,6 +24,11 @@
         "type": "command",
         "command": "docker compose -f /opt/exe-erp/docker-compose.yml exec -T exe-erp-queue redis-cli -u redis://redis:6379/4 ping",
         "description": "RQ queue Redis connectivity"
+      },
+      {
+        "type": "command",
+        "command": "bash scripts/asset-resolution-smoke.sh http://localhost:8069 /login /app",
+        "description": "Asset resolution — every CSS/JS bundle the desk references must return 200 (bug 3938ac3d: ping was 200 and the container healthy while all 11 CSS bundles 404'd and the desk rendered unstyled)"
       }
     ],
     "migrations": {

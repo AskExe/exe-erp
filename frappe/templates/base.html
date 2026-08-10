@@ -53,11 +53,20 @@
 		window.socketio_port = {{ (frappe.socketio_port or 9000) }};
 		window.show_language_picker = {{ show_language_picker or 'false' }};
 	</script>
-	<!-- SSO redirect: unauthenticated users go to auth.<domain> -->
+	<!-- SSO redirect: unauthenticated users go to auth.<domain>
+	     CANONICAL SSO COOKIE CONTRACT: `exe_access_token`.
+	     Every product in the exe-os stack MUST gate on exactly this cookie name.
+	     It is what auth.<apex> sets on the registrable apex and what the
+	     exe-sso-edge nginx gate reads ($cookie_exe_access_token).
+	     Do NOT reintroduce `exe_sso_token` — that name is dead and gating on it
+	     produces an infinite login bounce (bug f1bb40d8 wiki, 9f60e8e6 crm,
+	     3938ac3d erp). See apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py. -->
 	{% if frappe.session.user == 'Guest' %}
 	<script>
 	(function(){
-		var token = document.cookie.match(/exe_sso_token=([^;]+)/);
+		// Boundary-anchored so a cookie merely *ending* in the canonical name
+		// (e.g. `other_exe_access_token`) cannot be mistaken for a session.
+		var token = document.cookie.match(/(?:^|;\s*)exe_access_token=([^;]+)/);
 		if (!token) {
 			var domain = window.location.hostname.split('.').slice(-2).join('.');
 			window.location.href = 'https://auth.' + domain + '?redirect=' + encodeURIComponent(window.location.href) + '&product=ERP';

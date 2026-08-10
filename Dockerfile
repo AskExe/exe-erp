@@ -224,6 +224,22 @@ COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/package.json /home/fr
 # crash-loops on MODULE_NOT_FOUND (bug 790794e8 / 35576eed).
 COPY --from=builder --chown=frappe:frappe /opt/exe-erp-src/node_modules /home/frappe/frappe-bench/apps/frappe/node_modules
 
+# Repoint the LAST dangling builder symlink (bug 3938ac3d).
+#
+# `frappe/public/node_modules -> /opt/exe-erp-src/node_modules` rides along
+# inside the `COPY .../opt/exe-erp-src/frappe` above, and /opt/exe-erp-src does
+# not exist in the production image. desk.bundle.scss imports through that path
+# (`@import "frappe/public/node_modules/highlight.js/styles/tomorrow.css"`), so
+# with it dangling `bench build` inside a running container dies with ENOENT —
+# i.e. the ONE command an operator needs to repair stale assets is impossible.
+# That is how the 2026-08-10 unstyled-desk outage became unfixable in place.
+# Point it at the real node_modules copied in just above, and fail the build if
+# the SCSS import target still doesn't resolve.
+RUN ln -sfn /home/frappe/frappe-bench/apps/frappe/node_modules \
+        /home/frappe/frappe-bench/apps/frappe/frappe/public/node_modules \
+    && test -f /home/frappe/frappe-bench/apps/frappe/frappe/public/node_modules/highlight.js/styles/tomorrow.css \
+    && echo "OK: frappe/public/node_modules resolves — bench build is repairable in-container"
+
 # Final regression guard: the realtime entrypoint + its runtime deps must be
 # present and resolvable in the production image, or the websocket service is
 # undeployable. Fail the build instead of shipping a broken image (bug 790794e8).
