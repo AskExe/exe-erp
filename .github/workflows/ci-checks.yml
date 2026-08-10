@@ -125,6 +125,15 @@ jobs:
             apps/erpnext/erpnext/exe_monitor \
             apps/erpnext/erpnext/exe_setup
 
+      - name: SSO cookie contract (bug 3938ac3d)
+        run: |
+          # The canonical SSO cookie is `exe_access_token`. This exact bug has
+          # shipped in three products (wiki f1bb40d8, crm 9f60e8e6, erp
+          # 3938ac3d) because the rename was documented but never machine-
+          # enforced. This gate stops a fourth. Frappe-free: runs under plain
+          # unittest with no bench and no live site.
+          python3 apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py -v
+
       - name: Migration / patches smoke
         run: python3 .github/scripts/ci_migration_smoke.py
 

@@ -93,25 +93,48 @@ wait_for_redis() {
 # sites/ and SHADOWS them on a fresh volume — the desk UI then 404s on CSS/JS
 # (bug 29a22993). The Dockerfile keeps a volume-safe backup at
 # /opt/exe-erp-assets; restore it into the volume when sites/assets is missing
-# or empty. Idempotent: a no-op once assets are present.
+# OR when the volume's manifest no longer matches the image's (stale after an
+# image upgrade — bug 3938ac3d). Idempotent: a no-op when they already match.
 ASSETS_BACKUP="/opt/exe-erp-assets"
+# Set to 1 by restore_prebuilt_assets when it actually rewrote the volume, so
+# main() knows the Redis asset map must be flushed (see bug 3938ac3d).
+ASSETS_REFRESHED=0
 restore_prebuilt_assets() {
     local assets_dir="${SITES_DIR}/assets"
-    # Already populated (manifest present) → nothing to do.
-    if [ -f "${assets_dir}/assets.json" ]; then
-        return 0
-    fi
+
     if [ ! -d "${ASSETS_BACKUP}" ] || [ ! -f "${ASSETS_BACKUP}/assets.json" ]; then
         echo "WARNING: no prebuilt asset backup at ${ASSETS_BACKUP}; skipping asset restore."
         return 0
     fi
-    echo "Prebuilt assets missing under volume — restoring from ${ASSETS_BACKUP}..."
+
+    # STALENESS CHECK (bug 3938ac3d), not just an existence check.
+    #
+    # The old guard was `[ -f assets.json ] && return 0`. That is only correct
+    # on a FRESH volume. On an image UPGRADE the persistent erp_assets volume
+    # keeps the PREVIOUS image's assets.json while `assets/<app>` resolves to
+    # the NEW image's dist/ — so the manifest advertises content-hashed
+    # filenames that no longer exist on disk. Observed live 2026-08-10:
+    # assets.json dated Jun 17, dist/ dated Jul 1, 11 of 46 entries missing,
+    # ALL of them CSS. The desk rendered completely unstyled.
+    #
+    # Comparing the volume's manifest against the image's baked manifest makes
+    # the restore idempotent on identical images and self-healing on upgrade.
+    if [ -f "${assets_dir}/assets.json" ]; then
+        if cmp -s "${assets_dir}/assets.json" "${ASSETS_BACKUP}/assets.json"; then
+            return 0
+        fi
+        echo "Asset manifest in volume differs from image (stale after upgrade) — refreshing..."
+    else
+        echo "Prebuilt assets missing under volume — restoring from ${ASSETS_BACKUP}..."
+    fi
+
     mkdir -p "${assets_dir}"
     cp -a "${ASSETS_BACKUP}/." "${assets_dir}/"
     # Re-establish the frappe asset symlink → live app public dir (the baked
     # symlink target is outside the volume and resolves at runtime).
     rm -f "${assets_dir}/frappe"
     ln -sf "${FRAPPE_BENCH}/apps/frappe/frappe/public" "${assets_dir}/frappe"
+    ASSETS_REFRESHED=1
     echo "Prebuilt assets restored into ${assets_dir}."
 }
 
@@ -295,6 +318,17 @@ main() {
 
     # Write currentsite.txt so Frappe knows the default site
     echo "${SITE_NAME}" > "${SITES_DIR}/currentsite.txt"
+
+    # Flush the Redis asset map whenever assets were rewritten (bug 3938ac3d).
+    # Frappe caches the resolved bundle filenames in Redis. Without this flush
+    # the served HTML keeps advertising a THIRD generation of content hashes —
+    # neither the volume's nor the image's — and every reference 404s. Observed
+    # live 2026-08-10: 11 CSS bundles unreachable, desk rendered unstyled.
+    if [ "${ASSETS_REFRESHED}" = "1" ]; then
+        echo "Assets were refreshed — clearing cached asset map..."
+        bench --site "${SITE_NAME}" clear-cache || \
+            echo "WARNING: bench clear-cache failed; served asset hashes may be stale."
+    fi
 
     # ── Configure GoTrue SSO (if GOTRUE_URL or GOTRUE_EXTERNAL_URL set) ──
     # Enables single sign-on across exe-crm, exe-wiki, and exe-erp.
