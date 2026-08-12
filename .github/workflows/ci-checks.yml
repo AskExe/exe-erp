@@ -50,22 +50,14 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Set up Python (with pip cache)
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: pyproject.toml
-
       - name: Validate docker-compose.yml
         run: |
           # docker-compose interpolates required vars (SITE_NAME, etc.) and
           # fails config validation if they are unset. Seed throwaway values
-          # from .env.example so the check validates compose interpolation +
-          # syntax deterministically, independent of runner state.
-          cp -n .env.example .env 2>/dev/null || true
-          docker compose --env-file .env -f docker-compose.yml config --quiet
-          rm -f .env
+          # from .env.example directly so the check validates compose
+          # interpolation + syntax deterministically without writing .env
+          # into a persistent self-hosted runner checkout.
+          docker compose --env-file .env.example -f docker-compose.yml config --quiet
 
       - name: Validate Dockerfile is parseable
         run: docker build --check . || test -f Dockerfile
@@ -91,11 +83,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m venv .venv-ci
-          . .venv-ci/bin/activate
+          # actions/setup-python cannot manage Python or pip cache on the
+          # self-hosted mac-fast runner; use runner-provided python3 instead.
+          PYTHON3="$(command -v python3)"
+          if [ "${RUNNER_OS:-}" = "macOS" ] && [ -x /opt/homebrew/bin/python3 ]; then
+            PYTHON3=/opt/homebrew/bin/python3
+          elif [ "${RUNNER_OS:-}" = "macOS" ] && [ -x /usr/local/bin/python3 ]; then
+            PYTHON3=/usr/local/bin/python3
+          fi
+          VENV_DIR="${RUNNER_TEMP:-/tmp}/exe-erp-validate-venv"
+          "$PYTHON3" -m venv "$VENV_DIR"
+          . "$VENV_DIR/bin/activate"
           python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7"
-          echo "$PWD/.venv-ci/bin" >> "$GITHUB_PATH"
+          python -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7" "tomli>=1.1; python_version < '3.11'"
+          echo "$VENV_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Install Python audit build prerequisites
         shell: bash
@@ -147,7 +148,10 @@ jobs:
           # any fixable vulnerability in a directly-declared dependency.
           python3 - <<'PY' > /tmp/pip_reqs.txt
           import re
-          import tomllib
+          try:
+              import tomllib
+          except ModuleNotFoundError:
+              import tomli as tomllib
           data = tomllib.load(open('pyproject.toml', 'rb'))
           deps = data.get('project', {}).get('dependencies', [])
           # pip-audit resolves this file via a `pip install --dry-run`
@@ -220,7 +224,10 @@ jobs:
           # lockfile and errors out, which previously broke this gate. Pin
           # Yarn Classic via npx so the audit is deterministic regardless
           # of the runner's default yarn, and needs no prior `yarn install`
-          # (classic audit resolves from yarn.lock alone).
+          # (classic audit resolves from yarn.lock alone). Run from an
+          # isolated copy of the root package.json + yarn.lock: on this macOS
+          # runner Yarn Classic rewrites classic lockfile `resolved` URLs even
+          # during audit, and persistent self-hosted checkouts must stay clean.
           #
           # Robustness (advisories are a moving target — new ones publish
           # daily against transitive, non-our-code packages):
@@ -244,10 +251,19 @@ jobs:
           # Fail closed: the audit MUST emit its summary line; if it doesn't
           # (wrong yarn, network error, empty output) the step fails rather
           # than silently passing.
-          npx --yes yarn@1.22.22 audit --level high --json \
-            > /tmp/yarn_audit.jsonl 2>/dev/null || true
-          python3 <<'PY'
+          workspace="${GITHUB_WORKSPACE:-$PWD}"
+          test -f "$workspace/package.json"
+          test -f "$workspace/yarn.lock"
+          audit_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/exe-erp-yarn-audit.XXXXXX")"
+          cp "$workspace/package.json" "$workspace/yarn.lock" "$audit_dir"/
+          (
+            cd "$audit_dir"
+            npx --yes yarn@1.22.22 audit --level high --json
+          ) > /tmp/yarn_audit.jsonl 2> /tmp/yarn_audit.stderr || true
+          YARN_AUDIT_STDERR=/tmp/yarn_audit.stderr python3 <<'PY'
           import json
+          import os
+          import pathlib
           import sys
 
           ALLOWED_ADVISORY_IDS = {"1094088", "1096543"}
@@ -290,6 +306,12 @@ jobs:
                   blocking.append(advisory)
 
           if not saw_summary:
+              stderr_path = pathlib.Path(os.environ["YARN_AUDIT_STDERR"])
+              stderr = stderr_path.read_text(encoding="utf-8", errors="replace")
+              if stderr.strip():
+                  print("::group::yarn audit stderr")
+                  print(stderr[-4000:])
+                  print("::endgroup::")
               print(
                   "::error::yarn audit did not complete (no summary line) — "
                   "failing closed"
@@ -336,10 +358,15 @@ jobs:
               exit 1
               ;;
           esac
+          GL_DIR="${RUNNER_TEMP:-/tmp}/exe-erp-gitleaks"
+          mkdir -p "$GL_DIR"
+          cd "$GL_DIR"
           TARBALL="gitleaks_${GL_VERSION}_${ASSET_OS_ARCH}.tar.gz"
           BASE="https://github.com/gitleaks/gitleaks/releases/download/v${GL_VERSION}"
-          curl -fsSL -o "$TARBALL" "$BASE/$TARBALL"
-          curl -fsSL -o gitleaks_checksums.txt "$BASE/gitleaks_${GL_VERSION}_checksums.txt"
+          curl --retry 3 --retry-all-errors --connect-timeout 20 --max-time 120 \
+            -fsSL -o "$TARBALL" "$BASE/$TARBALL"
+          curl --retry 3 --retry-all-errors --connect-timeout 20 --max-time 120 \
+            -fsSL -o gitleaks_checksums.txt "$BASE/gitleaks_${GL_VERSION}_checksums.txt"
           python3 - "$TARBALL" gitleaks_checksums.txt <<'PY'
           import hashlib
           import pathlib
@@ -363,15 +390,17 @@ jobs:
           PY
           tar -xzf "$TARBALL" gitleaks
           chmod +x gitleaks
-          ./gitleaks version
+          echo "$GL_DIR" >> "$GITHUB_PATH"
+          PATH="$GL_DIR:$PATH"
+          gitleaks version
 
       - name: Run gitleaks (fail on any finding)
         shell: bash
         run: |
           # Scan the full working tree AND git history. Any committed secret
           # fails the build closed.
-          ./gitleaks dir . --config .gitleaks.toml --no-banner --redact --exit-code 1
-          ./gitleaks git . --config .gitleaks.toml --no-banner --redact --exit-code 1
+          gitleaks dir . --config .gitleaks.toml --no-banner --redact --exit-code 1
+          gitleaks git . --config .gitleaks.toml --no-banner --redact --exit-code 1
 
   trivy-scan:
     name: Container/deps scan (trivy)
