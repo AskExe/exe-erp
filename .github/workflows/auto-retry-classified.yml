@@ -24,7 +24,12 @@ on:
     workflows: ["PR checks"]
     types: [completed]
 
-permissions: { actions: write, contents: read }
+# `checks: read` is required for the check-run annotations read in guard 2. An
+# explicit `permissions:` block sets every unlisted scope to `none`, so
+# actions+contents alone makes `/check-runs/{id}/annotations` return
+# "Resource not accessible by integration (HTTP 403)" (observed in exe-build,
+# whose copy of this workflow gets past the `--slurp` bug fixed below).
+permissions: { actions: write, checks: read, contents: read }
 
 jobs:
   classified-auto-retry:
@@ -66,9 +71,14 @@ jobs:
             exit 0
           fi
 
-          jobs_json="$(gh api --paginate --slurp \
+          # gh refuses `--slurp` together with `--jq` ("the `--slurp` option is
+          # not supported with `--jq` or `--template`"), which failed this step
+          # before any guard ran — observed on run 31569260852. `--paginate`
+          # with `--jq` applies the filter to EVERY page and concatenates the
+          # results, so stream `.jobs[]` and slurp locally instead.
+          jobs_json="$(gh api --paginate \
             "/repos/$REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" \
-            --jq '{ jobs: [.[].jobs[]] }')"
+            --jq '.jobs[]' | jq -s '{ jobs: . }')"
 
           failed_count="$(jq '[.jobs[] | select(.conclusion == "failure")] | length' <<<"$jobs_json")"
           if [ "$failed_count" -eq 0 ]; then
