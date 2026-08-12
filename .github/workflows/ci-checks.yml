@@ -175,10 +175,39 @@ jobs:
                   continue
               print(d)
           PY
-          set +e
-          python -m pip_audit --requirement /tmp/pip_reqs.txt --strict --format json --output /tmp/pip-audit.json
-          audit_status=$?
-          set -e
+          audit_backoffs=(5 10 20)
+          audit_status=0
+          for attempt in 1 2 3 4; do
+            rm -f /tmp/pip-audit.json /tmp/pip-audit.stderr
+            set +e
+            python -m pip_audit --requirement /tmp/pip_reqs.txt --strict --format json --output /tmp/pip-audit.json 2> /tmp/pip-audit.stderr
+            audit_status=$?
+            set -e
+            if python3 - <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = pathlib.Path('/tmp/pip-audit.json')
+          if not report.exists() or not report.read_text().strip():
+              sys.exit(1)
+          try:
+              json.loads(report.read_text())
+          except json.JSONDecodeError:
+              sys.exit(1)
+          sys.exit(0)
+          PY
+            then
+              echo "pip-audit produced a report on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              break
+            fi
+            backoff="${audit_backoffs[$((attempt - 1))]}"
+            echo "::warning::pip-audit did not produce a parseable report on attempt $attempt; retrying in ${backoff}s"
+            sleep "$backoff"
+          done
           AUDIT_STATUS=$audit_status python3 - <<'PY'
           import json, os, pathlib, sys
           audit_status = int(os.environ.get('AUDIT_STATUS', '0'))
@@ -249,17 +278,48 @@ jobs:
           #       1096543  json5 prototype pollution        (GHSA-9c47-m6qq-7p4h)
           #
           # Fail closed: the audit MUST emit its summary line; if it doesn't
-          # (wrong yarn, network error, empty output) the step fails rather
-          # than silently passing.
+          # (wrong yarn, network error, empty output) the step retries a
+          # bounded number of times, then fails rather than silently passing.
           workspace="${GITHUB_WORKSPACE:-$PWD}"
           test -f "$workspace/package.json"
           test -f "$workspace/yarn.lock"
           audit_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/exe-erp-yarn-audit.XXXXXX")"
           cp "$workspace/package.json" "$workspace/yarn.lock" "$audit_dir"/
-          (
-            cd "$audit_dir"
-            npx --yes yarn@1.22.22 audit --level high --json
-          ) > /tmp/yarn_audit.jsonl 2> /tmp/yarn_audit.stderr || true
+          audit_backoffs=(5 10 20)
+          for attempt in 1 2 3 4; do
+            rm -f /tmp/yarn_audit.jsonl /tmp/yarn_audit.stderr
+            (
+              cd "$audit_dir"
+              npx --yes yarn@1.22.22 audit --level high --json
+            ) > /tmp/yarn_audit.jsonl 2> /tmp/yarn_audit.stderr || true
+            if python3 - <<'PY'
+          import json
+          import sys
+
+          with open("/tmp/yarn_audit.jsonl") as f:
+              for line in f:
+                  line = line.strip()
+                  if not line:
+                      continue
+                  try:
+                      obj = json.loads(line)
+                  except json.JSONDecodeError:
+                      continue
+                  if obj.get("type") == "auditSummary":
+                      sys.exit(0)
+          sys.exit(1)
+          PY
+            then
+              echo "yarn audit produced a summary on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              break
+            fi
+            backoff="${audit_backoffs[$((attempt - 1))]}"
+            echo "::warning::yarn audit produced no summary on attempt $attempt; retrying in ${backoff}s"
+            sleep "$backoff"
+          done
           YARN_AUDIT_STDERR=/tmp/yarn_audit.stderr python3 <<'PY'
           import json
           import os
