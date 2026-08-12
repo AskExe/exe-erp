@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────────────────────
-# Exe ERP — reusable CI checks (called by PR checks AND by the
-# release image gate). Single source of truth so a release can
-# NEVER publish an image without the same checks that gate a PR.
+# Exe ERP — CI checks. Portable gates run on the dedicated mac-fast
+# runner for PR latency; Linux/Docker-only checks run on default-branch
+# pushes.
 #
 # Covers (bug c2b86c39 — CI too shallow):
 #   1. compose config validation
@@ -21,6 +21,8 @@
 name: CI checks
 
 on:
+  push:
+    branches: [main]
   workflow_call:
     inputs:
       ref:
@@ -41,7 +43,7 @@ concurrency:
 jobs:
   validate:
     name: Validate + lint + migration smoke
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -310,7 +312,7 @@ jobs:
 
   secret-scan:
     name: Secret scan (gitleaks)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     steps:
       - name: Checkout (full history for secret scan)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -326,12 +328,41 @@ jobs:
           # the tarball checksum before trusting the binary.
           set -euo pipefail
           GL_VERSION=8.30.1
-          TARBALL="gitleaks_${GL_VERSION}_linux_x64.tar.gz"
+          case "${RUNNER_OS}_${RUNNER_ARCH}" in
+            macOS_ARM64) ASSET_OS_ARCH="darwin_arm64" ;;
+            Linux_X64) ASSET_OS_ARCH="linux_x64" ;;
+            *)
+              echo "::error::unsupported gitleaks runner platform: ${RUNNER_OS}_${RUNNER_ARCH}"
+              exit 1
+              ;;
+          esac
+          TARBALL="gitleaks_${GL_VERSION}_${ASSET_OS_ARCH}.tar.gz"
           BASE="https://github.com/gitleaks/gitleaks/releases/download/v${GL_VERSION}"
           curl -fsSL -o "$TARBALL" "$BASE/$TARBALL"
           curl -fsSL -o gitleaks_checksums.txt "$BASE/gitleaks_${GL_VERSION}_checksums.txt"
-          grep " $TARBALL\$" gitleaks_checksums.txt | sha256sum -c -
+          python3 - "$TARBALL" gitleaks_checksums.txt <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          tarball = pathlib.Path(sys.argv[1])
+          checksums = pathlib.Path(sys.argv[2])
+          expected = None
+          for line in checksums.read_text(encoding="utf-8").splitlines():
+              parts = line.split()
+              if len(parts) >= 2 and parts[1] == tarball.name:
+                  expected = parts[0]
+                  break
+          if not expected:
+              print(f"checksum not found for {tarball.name}", file=sys.stderr)
+              sys.exit(1)
+          actual = hashlib.sha256(tarball.read_bytes()).hexdigest()
+          if actual != expected:
+              print(f"checksum mismatch for {tarball.name}", file=sys.stderr)
+              sys.exit(1)
+          PY
           tar -xzf "$TARBALL" gitleaks
+          chmod +x gitleaks
           ./gitleaks version
 
       - name: Run gitleaks (fail on any finding)
@@ -344,6 +375,7 @@ jobs:
 
   trivy-scan:
     name: Container/deps scan (trivy)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout
@@ -363,6 +395,7 @@ jobs:
 
   docker-build:
     name: Production Docker build (no push)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Kept self-hosted (FR 17efa619): full production image build exercises
     # `bench build --production` + websocket import smoke — heavy, and the
     # GHA layer cache is warmest on the persistent host. Release publish

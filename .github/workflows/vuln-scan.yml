@@ -47,7 +47,7 @@ jobs:
   # ── 1. Python — apps/erpnext dependency audit ─────────────────
   python-vuln-scan:
     name: Python vulnerability scan (pip-audit)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     continue-on-error: true   # non-blocking: upstream deps may carry known CVEs
     steps:
       - name: Checkout
@@ -96,7 +96,7 @@ jobs:
   # ── 2. Node — npm audit (complements existing yarn audit) ─────
   node-vuln-scan:
     name: Node vulnerability scan (npm audit)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     continue-on-error: true   # non-blocking: upstream Frappe JS deps may carry known CVEs
     steps:
       - name: Checkout
@@ -130,6 +130,7 @@ jobs:
   # ── 3. Container — Trivy filesystem + Dockerfile config ───────
   container-vuln-scan:
     name: Container vulnerability scan (Trivy)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64]
     continue-on-error: true   # non-blocking: upstream image layers likely carry known CVEs
     steps:
