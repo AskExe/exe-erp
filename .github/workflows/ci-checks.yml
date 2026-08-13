@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────────────────────
-# Exe ERP — reusable CI checks (called by PR checks AND by the
-# release image gate). Single source of truth so a release can
-# NEVER publish an image without the same checks that gate a PR.
+# Exe ERP — CI checks. Portable gates run on the dedicated mac-fast
+# runner for PR latency; Linux/Docker-only checks run on default-branch
+# pushes.
 #
 # Covers (bug c2b86c39 — CI too shallow):
 #   1. compose config validation
@@ -21,6 +21,8 @@
 name: CI checks
 
 on:
+  push:
+    branches: [main]
   workflow_call:
     inputs:
       ref:
@@ -41,29 +43,21 @@ concurrency:
 jobs:
   validate:
     name: Validate + lint + migration smoke
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Set up Python (with pip cache)
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: pyproject.toml
-
       - name: Validate docker-compose.yml
         run: |
           # docker-compose interpolates required vars (SITE_NAME, etc.) and
           # fails config validation if they are unset. Seed throwaway values
-          # from .env.example so the check validates compose interpolation +
-          # syntax deterministically, independent of runner state.
-          cp -n .env.example .env 2>/dev/null || true
-          docker compose --env-file .env -f docker-compose.yml config --quiet
-          rm -f .env
+          # from .env.example directly so the check validates compose
+          # interpolation + syntax deterministically without writing .env
+          # into a persistent self-hosted runner checkout.
+          docker compose --env-file .env.example -f docker-compose.yml config --quiet
 
       - name: Validate Dockerfile is parseable
         run: docker build --check . || test -f Dockerfile
@@ -89,11 +83,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m venv .venv-ci
-          . .venv-ci/bin/activate
+          # actions/setup-python cannot manage Python or pip cache on the
+          # self-hosted mac-fast runner; use runner-provided python3 instead.
+          PYTHON3="$(command -v python3)"
+          if [ "${RUNNER_OS:-}" = "macOS" ] && [ -x /opt/homebrew/bin/python3 ]; then
+            PYTHON3=/opt/homebrew/bin/python3
+          elif [ "${RUNNER_OS:-}" = "macOS" ] && [ -x /usr/local/bin/python3 ]; then
+            PYTHON3=/usr/local/bin/python3
+          fi
+          VENV_DIR="${RUNNER_TEMP:-/tmp}/exe-erp-validate-venv"
+          "$PYTHON3" -m venv "$VENV_DIR"
+          . "$VENV_DIR/bin/activate"
           python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7"
-          echo "$PWD/.venv-ci/bin" >> "$GITHUB_PATH"
+          python -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7" "tomli>=1.1; python_version < '3.11'"
+          echo "$VENV_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Install Python audit build prerequisites
         shell: bash
@@ -145,7 +148,10 @@ jobs:
           # any fixable vulnerability in a directly-declared dependency.
           python3 - <<'PY' > /tmp/pip_reqs.txt
           import re
-          import tomllib
+          try:
+              import tomllib
+          except ModuleNotFoundError:
+              import tomli as tomllib
           data = tomllib.load(open('pyproject.toml', 'rb'))
           deps = data.get('project', {}).get('dependencies', [])
           # pip-audit resolves this file via a `pip install --dry-run`
@@ -169,10 +175,39 @@ jobs:
                   continue
               print(d)
           PY
-          set +e
-          python -m pip_audit --requirement /tmp/pip_reqs.txt --strict --format json --output /tmp/pip-audit.json
-          audit_status=$?
-          set -e
+          audit_backoffs=(5 10 20)
+          audit_status=0
+          for attempt in 1 2 3 4; do
+            rm -f /tmp/pip-audit.json /tmp/pip-audit.stderr
+            set +e
+            python -m pip_audit --requirement /tmp/pip_reqs.txt --strict --format json --output /tmp/pip-audit.json 2> /tmp/pip-audit.stderr
+            audit_status=$?
+            set -e
+            if python3 - <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = pathlib.Path('/tmp/pip-audit.json')
+          if not report.exists() or not report.read_text().strip():
+              sys.exit(1)
+          try:
+              json.loads(report.read_text())
+          except json.JSONDecodeError:
+              sys.exit(1)
+          sys.exit(0)
+          PY
+            then
+              echo "pip-audit produced a report on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              break
+            fi
+            backoff="${audit_backoffs[$((attempt - 1))]}"
+            echo "::warning::pip-audit did not produce a parseable report on attempt $attempt; retrying in ${backoff}s"
+            sleep "$backoff"
+          done
           AUDIT_STATUS=$audit_status python3 - <<'PY'
           import json, os, pathlib, sys
           audit_status = int(os.environ.get('AUDIT_STATUS', '0'))
@@ -215,10 +250,27 @@ jobs:
           # Dockerfile pins yarn@1.22.22). Self-hosted runners may default
           # to Yarn Berry (v2+), whose audit command and lockfile format
           # differ — Berry's `yarn npm audit` can't even read the classic
-          # lockfile and errors out, which previously broke this gate. Pin
-          # Yarn Classic via npx so the audit is deterministic regardless
-          # of the runner's default yarn, and needs no prior `yarn install`
-          # (classic audit resolves from yarn.lock alone).
+          # lockfile and errors out, which previously broke this gate.
+          #
+          # `npx --yes yarn@1.22.22` is NOT sufficient to pin it. npx prefers a
+          # `yarn` binary that already exists on PATH, and on the mac-fast
+          # runner that binary is the **corepack shim** shipped with Node, which
+          # resolves to Yarn Berry 4.13.0. The version spec is silently ignored
+          # and Berry runs instead, dying on the classic lockfile with
+          #   Internal Error: exe-erp@workspace:.: This package doesn't seem to
+          #   be present in your lockfile; run "yarn install" to update it
+          # on stdout — so no `auditSummary` line is ever emitted and the gate
+          # fails closed on every attempt. (Reproduced on the runner host.)
+          # Retrying cannot help: it is a version-resolution bug, not flake.
+          #
+          # Install Yarn Classic into a throwaway prefix and invoke its bin
+          # DIRECTLY, bypassing PATH and corepack entirely, then assert the
+          # version before trusting a single line of output. Classic audit needs
+          # no prior `yarn install` (it resolves from yarn.lock alone). Run it
+          # from an isolated copy of the root package.json + yarn.lock: on this
+          # macOS runner Yarn Classic rewrites classic lockfile `resolved` URLs
+          # even during audit, and persistent self-hosted checkouts must stay
+          # clean.
           #
           # Robustness (advisories are a moving target — new ones publish
           # daily against transitive, non-our-code packages):
@@ -240,12 +292,64 @@ jobs:
           #       1096543  json5 prototype pollution        (GHSA-9c47-m6qq-7p4h)
           #
           # Fail closed: the audit MUST emit its summary line; if it doesn't
-          # (wrong yarn, network error, empty output) the step fails rather
-          # than silently passing.
-          npx --yes yarn@1.22.22 audit --level high --json \
-            > /tmp/yarn_audit.jsonl 2>/dev/null || true
-          python3 <<'PY'
+          # (wrong yarn, network error, empty output) the step retries a
+          # bounded number of times, then fails rather than silently passing.
+          workspace="${GITHUB_WORKSPACE:-$PWD}"
+          test -f "$workspace/package.json"
+          test -f "$workspace/yarn.lock"
+          audit_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/exe-erp-yarn-audit.XXXXXX")"
+          cp "$workspace/package.json" "$workspace/yarn.lock" "$audit_dir"/
+          yarn1_prefix="$(mktemp -d "${RUNNER_TEMP:-/tmp}/exe-erp-yarn1.XXXXXX")"
+          npm install --no-save --no-audit --no-fund --silent \
+            --prefix "$yarn1_prefix" yarn@1.22.22
+          yarn1="$yarn1_prefix/node_modules/.bin/yarn"
+          test -x "$yarn1"
+          yarn1_version="$("$yarn1" --version)"
+          if [ "$yarn1_version" != "1.22.22" ]; then
+            echo "::error::expected Yarn Classic 1.22.22 for the audit, got \
+          $yarn1_version — refusing to audit with the wrong yarn"
+            exit 1
+          fi
+          echo "yarn audit binary: $yarn1 (v$yarn1_version)"
+          audit_backoffs=(5 10 20)
+          for attempt in 1 2 3 4; do
+            rm -f /tmp/yarn_audit.jsonl /tmp/yarn_audit.stderr
+            (
+              cd "$audit_dir"
+              "$yarn1" audit --level high --json
+            ) > /tmp/yarn_audit.jsonl 2> /tmp/yarn_audit.stderr || true
+            if python3 - <<'PY'
           import json
+          import sys
+
+          with open("/tmp/yarn_audit.jsonl") as f:
+              for line in f:
+                  line = line.strip()
+                  if not line:
+                      continue
+                  try:
+                      obj = json.loads(line)
+                  except json.JSONDecodeError:
+                      continue
+                  if obj.get("type") == "auditSummary":
+                      sys.exit(0)
+          sys.exit(1)
+          PY
+            then
+              echo "yarn audit produced a summary on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              break
+            fi
+            backoff="${audit_backoffs[$((attempt - 1))]}"
+            echo "::warning::yarn audit produced no summary on attempt $attempt; retrying in ${backoff}s"
+            sleep "$backoff"
+          done
+          YARN_AUDIT_STDERR=/tmp/yarn_audit.stderr python3 <<'PY'
+          import json
+          import os
+          import pathlib
           import sys
 
           ALLOWED_ADVISORY_IDS = {"1094088", "1096543"}
@@ -288,6 +392,22 @@ jobs:
                   blocking.append(advisory)
 
           if not saw_summary:
+              stderr_path = pathlib.Path(os.environ["YARN_AUDIT_STDERR"])
+              stderr = stderr_path.read_text(encoding="utf-8", errors="replace")
+              if stderr.strip():
+                  print("::group::yarn audit stderr")
+                  print(stderr[-4000:])
+                  print("::endgroup::")
+              # The wrong-yarn failure mode writes its diagnostic to STDOUT, not
+              # stderr, so a stderr-only dump shows an empty group and hides the
+              # cause. Always show what the audit actually printed.
+              stdout = pathlib.Path("/tmp/yarn_audit.jsonl").read_text(
+                  encoding="utf-8", errors="replace"
+              )
+              if stdout.strip():
+                  print("::group::yarn audit stdout (first 4000 chars)")
+                  print(stdout[:4000])
+                  print("::endgroup::")
               print(
                   "::error::yarn audit did not complete (no summary line) — "
                   "failing closed"
@@ -310,7 +430,7 @@ jobs:
 
   secret-scan:
     name: Secret scan (gitleaks)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     steps:
       - name: Checkout (full history for secret scan)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -326,24 +446,61 @@ jobs:
           # the tarball checksum before trusting the binary.
           set -euo pipefail
           GL_VERSION=8.30.1
-          TARBALL="gitleaks_${GL_VERSION}_linux_x64.tar.gz"
+          case "${RUNNER_OS}_${RUNNER_ARCH}" in
+            macOS_ARM64) ASSET_OS_ARCH="darwin_arm64" ;;
+            Linux_X64) ASSET_OS_ARCH="linux_x64" ;;
+            *)
+              echo "::error::unsupported gitleaks runner platform: ${RUNNER_OS}_${RUNNER_ARCH}"
+              exit 1
+              ;;
+          esac
+          GL_DIR="${RUNNER_TEMP:-/tmp}/exe-erp-gitleaks"
+          mkdir -p "$GL_DIR"
+          cd "$GL_DIR"
+          TARBALL="gitleaks_${GL_VERSION}_${ASSET_OS_ARCH}.tar.gz"
           BASE="https://github.com/gitleaks/gitleaks/releases/download/v${GL_VERSION}"
-          curl -fsSL -o "$TARBALL" "$BASE/$TARBALL"
-          curl -fsSL -o gitleaks_checksums.txt "$BASE/gitleaks_${GL_VERSION}_checksums.txt"
-          grep " $TARBALL\$" gitleaks_checksums.txt | sha256sum -c -
+          curl --retry 3 --retry-all-errors --connect-timeout 20 --max-time 120 \
+            -fsSL -o "$TARBALL" "$BASE/$TARBALL"
+          curl --retry 3 --retry-all-errors --connect-timeout 20 --max-time 120 \
+            -fsSL -o gitleaks_checksums.txt "$BASE/gitleaks_${GL_VERSION}_checksums.txt"
+          python3 - "$TARBALL" gitleaks_checksums.txt <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          tarball = pathlib.Path(sys.argv[1])
+          checksums = pathlib.Path(sys.argv[2])
+          expected = None
+          for line in checksums.read_text(encoding="utf-8").splitlines():
+              parts = line.split()
+              if len(parts) >= 2 and parts[1] == tarball.name:
+                  expected = parts[0]
+                  break
+          if not expected:
+              print(f"checksum not found for {tarball.name}", file=sys.stderr)
+              sys.exit(1)
+          actual = hashlib.sha256(tarball.read_bytes()).hexdigest()
+          if actual != expected:
+              print(f"checksum mismatch for {tarball.name}", file=sys.stderr)
+              sys.exit(1)
+          PY
           tar -xzf "$TARBALL" gitleaks
-          ./gitleaks version
+          chmod +x gitleaks
+          echo "$GL_DIR" >> "$GITHUB_PATH"
+          PATH="$GL_DIR:$PATH"
+          gitleaks version
 
       - name: Run gitleaks (fail on any finding)
         shell: bash
         run: |
           # Scan the full working tree AND git history. Any committed secret
           # fails the build closed.
-          ./gitleaks dir . --config .gitleaks.toml --no-banner --redact --exit-code 1
-          ./gitleaks git . --config .gitleaks.toml --no-banner --redact --exit-code 1
+          gitleaks dir . --config .gitleaks.toml --no-banner --redact --exit-code 1
+          gitleaks git . --config .gitleaks.toml --no-banner --redact --exit-code 1
 
   trivy-scan:
     name: Container/deps scan (trivy)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout
@@ -363,6 +520,7 @@ jobs:
 
   docker-build:
     name: Production Docker build (no push)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Kept self-hosted (FR 17efa619): full production image build exercises
     # `bench build --production` + websocket import smoke — heavy, and the
     # GHA layer cache is warmest on the persistent host. Release publish

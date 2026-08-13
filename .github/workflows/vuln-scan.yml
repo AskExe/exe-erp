@@ -47,27 +47,29 @@ jobs:
   # ── 1. Python — apps/erpnext dependency audit ─────────────────
   python-vuln-scan:
     name: Python vulnerability scan (pip-audit)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     continue-on-error: true   # non-blocking: upstream deps may carry known CVEs
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up Python (with pip cache)
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: apps/erpnext/pyproject.toml
-
       - name: Install pip-audit
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m venv .venv-ci
-          . .venv-ci/bin/activate
-          python -m pip install --quiet --upgrade pip "pip-audit~=2.7"
-          echo "$PWD/.venv-ci/bin" >> "$GITHUB_PATH"
+          # actions/setup-python cannot manage Python or pip cache on the
+          # self-hosted mac-fast runner; use runner-provided python3 instead.
+          PYTHON3="$(command -v python3)"
+          if [ "${RUNNER_OS:-}" = "macOS" ] && [ -x /opt/homebrew/bin/python3 ]; then
+            PYTHON3=/opt/homebrew/bin/python3
+          elif [ "${RUNNER_OS:-}" = "macOS" ] && [ -x /usr/local/bin/python3 ]; then
+            PYTHON3=/usr/local/bin/python3
+          fi
+          VENV_DIR="${RUNNER_TEMP:-/tmp}/exe-erp-vuln-python-venv"
+          "$PYTHON3" -m venv "$VENV_DIR"
+          . "$VENV_DIR/bin/activate"
+          python -m pip install --quiet --upgrade pip "pip-audit~=2.7" "tomli>=1.1; python_version < '3.11'"
+          echo "$VENV_DIR/bin" >> "$GITHUB_PATH"
 
       - name: pip-audit — apps/erpnext/pyproject.toml
         shell: bash
@@ -76,7 +78,12 @@ jobs:
           # The root pyproject.toml is already audited in ci-checks.yml (blocking);
           # this scan covers the upstream ERPNext app dependency tree.
           python3 - <<'PY' > /tmp/erpnext_reqs.txt
-          import tomllib, pathlib, sys
+          import pathlib
+          import sys
+          try:
+              import tomllib
+          except ModuleNotFoundError:
+              import tomli as tomllib
           p = pathlib.Path('apps/erpnext/pyproject.toml')
           if not p.exists():
               sys.exit(0)
@@ -96,7 +103,7 @@ jobs:
   # ── 2. Node — npm audit (complements existing yarn audit) ─────
   node-vuln-scan:
     name: Node vulnerability scan (npm audit)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     continue-on-error: true   # non-blocking: upstream Frappe JS deps may carry known CVEs
     steps:
       - name: Checkout
@@ -106,30 +113,50 @@ jobs:
         shell: bash
         run: |
           # npm audit requires package-lock.json; generate a lock-only manifest
-          # without installing packages (--ignore-scripts = no postinstall hooks).
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only --ignore-scripts --legacy-peer-deps 2>/dev/null || true
+          # in an isolated temp copy so the persistent mac runner checkout
+          # does not accumulate untracked package-lock.json files.
+          workspace="${GITHUB_WORKSPACE:-$PWD}"
+          audit_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/exe-erp-npm-root.XXXXXX")"
+          cp "$workspace/package.json" "$audit_dir"/
+          if [ -f "$workspace/package-lock.json" ]; then
+            cp "$workspace/package-lock.json" "$audit_dir"/
           fi
-          npm audit --audit-level=high \
+          (
+            cd "$audit_dir"
+            if [ ! -f package-lock.json ]; then
+              npm install --package-lock-only --ignore-scripts --legacy-peer-deps 2>/dev/null || true
+            fi
+            npm audit --audit-level=high
+          ) \
             || echo "::warning::npm audit (root) found high/critical vulnerabilities — see job output"
 
       - name: npm audit — apps/erpnext/package.json
         shell: bash
         run: |
-          cd apps/erpnext
-          if [ ! -f package.json ]; then
+          workspace="${GITHUB_WORKSPACE:-$PWD}"
+          app_dir="$workspace/apps/erpnext"
+          if [ ! -f "$app_dir/package.json" ]; then
             echo "No package.json in apps/erpnext — skipping"
             exit 0
           fi
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only --ignore-scripts --legacy-peer-deps 2>/dev/null || true
+          audit_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/exe-erp-npm-erpnext.XXXXXX")"
+          cp "$app_dir/package.json" "$audit_dir"/
+          if [ -f "$app_dir/package-lock.json" ]; then
+            cp "$app_dir/package-lock.json" "$audit_dir"/
           fi
-          npm audit --audit-level=high \
+          (
+            cd "$audit_dir"
+            if [ ! -f package-lock.json ]; then
+              npm install --package-lock-only --ignore-scripts --legacy-peer-deps 2>/dev/null || true
+            fi
+            npm audit --audit-level=high
+          ) \
             || echo "::warning::npm audit (apps/erpnext) found high/critical vulnerabilities — see job output"
 
   # ── 3. Container — Trivy filesystem + Dockerfile config ───────
   container-vuln-scan:
     name: Container vulnerability scan (Trivy)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64]
     continue-on-error: true   # non-blocking: upstream image layers likely carry known CVEs
     steps:
