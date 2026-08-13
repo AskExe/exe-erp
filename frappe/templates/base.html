@@ -68,8 +68,16 @@
 		// (e.g. `other_exe_access_token`) cannot be mistaken for a session.
 		var token = document.cookie.match(/(?:^|;\s*)exe_access_token=([^;]+)/);
 		if (!token) {
-			var domain = window.location.hostname.split('.').slice(-2).join('.');
-			window.location.href = 'https://auth.' + domain + '?redirect=' + encodeURIComponent(window.location.href) + '&product=ERP';
+			// Route the unauthenticated bounce through the server-side
+			// gotrue_login_start entry point — the SAME path the login page's
+			// SSO link uses (www/login.html). It sets the exe_sso_state CSRF
+			// cookie, derives THIS customer's auth domain, and redirects to it
+			// carrying a matching `state` plus a `redirect=` that returns to
+			// gotrue_login_callback — the sole ?access_token consumer that
+			// calls login_as() and mints the Frappe `sid` the edge gate needs.
+			// Bouncing straight to auth.<domain>?redirect=<generic page> left
+			// the returning token on a page with no consumer → redirect loop.
+			window.location.href = '/api/method/erpnext.exe_auth.api.gotrue_login_start';
 		}
 	})();
 	</script>
