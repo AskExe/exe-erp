@@ -266,11 +266,11 @@ jobs:
           # Install Yarn Classic into a throwaway prefix and invoke its bin
           # DIRECTLY, bypassing PATH and corepack entirely, then assert the
           # version before trusting a single line of output. Classic audit needs
-          # no prior `yarn install` (it resolves from yarn.lock alone). Run from
-          # an
-          # isolated copy of the root package.json + yarn.lock: on this macOS
-          # runner Yarn Classic rewrites classic lockfile `resolved` URLs even
-          # during audit, and persistent self-hosted checkouts must stay clean.
+          # no prior `yarn install` (it resolves from yarn.lock alone). Run it
+          # from an isolated copy of the root package.json + yarn.lock: on this
+          # macOS runner Yarn Classic rewrites classic lockfile `resolved` URLs
+          # even during audit, and persistent self-hosted checkouts must stay
+          # clean.
           #
           # Robustness (advisories are a moving target — new ones publish
           # daily against transitive, non-our-code packages):
