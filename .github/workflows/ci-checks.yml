@@ -250,10 +250,24 @@ jobs:
           # Dockerfile pins yarn@1.22.22). Self-hosted runners may default
           # to Yarn Berry (v2+), whose audit command and lockfile format
           # differ — Berry's `yarn npm audit` can't even read the classic
-          # lockfile and errors out, which previously broke this gate. Pin
-          # Yarn Classic via npx so the audit is deterministic regardless
-          # of the runner's default yarn, and needs no prior `yarn install`
-          # (classic audit resolves from yarn.lock alone). Run from an
+          # lockfile and errors out, which previously broke this gate.
+          #
+          # `npx --yes yarn@1.22.22` is NOT sufficient to pin it. npx prefers a
+          # `yarn` binary that already exists on PATH, and on the mac-fast
+          # runner that binary is the **corepack shim** shipped with Node, which
+          # resolves to Yarn Berry 4.13.0. The version spec is silently ignored
+          # and Berry runs instead, dying on the classic lockfile with
+          #   Internal Error: exe-erp@workspace:.: This package doesn't seem to
+          #   be present in your lockfile; run "yarn install" to update it
+          # on stdout — so no `auditSummary` line is ever emitted and the gate
+          # fails closed on every attempt. (Reproduced on the runner host.)
+          # Retrying cannot help: it is a version-resolution bug, not flake.
+          #
+          # Install Yarn Classic into a throwaway prefix and invoke its bin
+          # DIRECTLY, bypassing PATH and corepack entirely, then assert the
+          # version before trusting a single line of output. Classic audit needs
+          # no prior `yarn install` (it resolves from yarn.lock alone). Run from
+          # an
           # isolated copy of the root package.json + yarn.lock: on this macOS
           # runner Yarn Classic rewrites classic lockfile `resolved` URLs even
           # during audit, and persistent self-hosted checkouts must stay clean.
@@ -285,12 +299,24 @@ jobs:
           test -f "$workspace/yarn.lock"
           audit_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/exe-erp-yarn-audit.XXXXXX")"
           cp "$workspace/package.json" "$workspace/yarn.lock" "$audit_dir"/
+          yarn1_prefix="$(mktemp -d "${RUNNER_TEMP:-/tmp}/exe-erp-yarn1.XXXXXX")"
+          npm install --no-save --no-audit --no-fund --silent \
+            --prefix "$yarn1_prefix" yarn@1.22.22
+          yarn1="$yarn1_prefix/node_modules/.bin/yarn"
+          test -x "$yarn1"
+          yarn1_version="$("$yarn1" --version)"
+          if [ "$yarn1_version" != "1.22.22" ]; then
+            echo "::error::expected Yarn Classic 1.22.22 for the audit, got \
+          $yarn1_version — refusing to audit with the wrong yarn"
+            exit 1
+          fi
+          echo "yarn audit binary: $yarn1 (v$yarn1_version)"
           audit_backoffs=(5 10 20)
           for attempt in 1 2 3 4; do
             rm -f /tmp/yarn_audit.jsonl /tmp/yarn_audit.stderr
             (
               cd "$audit_dir"
-              npx --yes yarn@1.22.22 audit --level high --json
+              "$yarn1" audit --level high --json
             ) > /tmp/yarn_audit.jsonl 2> /tmp/yarn_audit.stderr || true
             if python3 - <<'PY'
           import json
@@ -371,6 +397,16 @@ jobs:
               if stderr.strip():
                   print("::group::yarn audit stderr")
                   print(stderr[-4000:])
+                  print("::endgroup::")
+              # The wrong-yarn failure mode writes its diagnostic to STDOUT, not
+              # stderr, so a stderr-only dump shows an empty group and hides the
+              # cause. Always show what the audit actually printed.
+              stdout = pathlib.Path("/tmp/yarn_audit.jsonl").read_text(
+                  encoding="utf-8", errors="replace"
+              )
+              if stdout.strip():
+                  print("::group::yarn audit stdout (first 4000 chars)")
+                  print(stdout[:4000])
                   print("::endgroup::")
               print(
                   "::error::yarn audit did not complete (no summary line) — "
