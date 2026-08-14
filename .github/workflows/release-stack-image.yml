@@ -70,6 +70,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ env.GHCR_TOKEN }}
 
+      # ── Tag immutability guard (bug 2fe79166) ───────────────────
+      # ghcr.io/askexe/exe-erp:v0.2.0-final8 was pushed over at least
+      # three times, so the tag pointed at three different builds over
+      # its lifetime — anything pinning it is not reproducible. The
+      # workflow used to push the version tag unconditionally; this
+      # guard fails the release BEFORE anything is pushed if the tag
+      # already exists in the registry. It fails closed: only an
+      # authoritative 404 counts as "tag absent".
+      # Break-glass: set repo variable EXE_ALLOW_TAG_OVERWRITE=1 for a
+      # deliberate re-push (rare); state why in the release PR.
+      - name: Assert release tag is unpublished (fail closed)
+        env:
+          # GHCR_TOKEN comes from the job-level env above; re-declaring the
+          # secret expression here would just be a second place to drift.
+          EXE_ALLOW_TAG_OVERWRITE: ${{ vars.EXE_ALLOW_TAG_OVERWRITE }}
+        run: |
+          python3 scripts/assert-release-tag-unpublished.py --repository askexe/exe-erp --tag "v${{ steps.release.outputs.stack_version }}"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
         with:
@@ -89,10 +107,18 @@ jobs:
           tags: |
             ${{ steps.release.outputs.image }}
             ghcr.io/askexe/exe-erp:sha-${{ github.sha }}
+          # org.exe.* provenance labels let a running container be traced back to
+          # a commit even when a tag was reused (bug 2fe79166). They must stay
+          # OUTSIDE the block scalar below -- every line inside `labels: |` is a
+          # literal label, so a `#` there becomes a garbage label, not a comment.
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.release.outputs.stack_version }}
+            org.exe.git_sha=${{ github.sha }}
+            org.exe.repo=${{ github.repository }}
+            org.exe.git_ref=${{ github.ref }}
+            org.exe.tree_clean=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
