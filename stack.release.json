@@ -4,12 +4,12 @@
   "repo": "AskExe/exe-erp",
   "service": "exe-erp",
   "packageName": "@askexenow/exe-erp",
-  "version": "0.2.0-final8",
+  "version": "0.3.0",
   "components": {
-    "erp": "ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e",
-    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e",
-    "erp-queue": "ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e",
-    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.2.0-final8@sha256:2d55a7c30bc6c5240b516de00e75e7384d0e6ec2580691e31cf3cb32ec012b4e"
+    "erp": "ghcr.io/askexe/exe-erp:v0.3.0",
+    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.3.0",
+    "erp-queue": "ghcr.io/askexe/exe-erp:v0.3.0",
+    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.3.0"
   },
   "stackParticipation": {
     "required": false,
