@@ -88,6 +88,17 @@ jobs:
           print('stack release contract OK:', rel['version'])
           PY
 
+      # Catch a malformed/stale manifest on the PR, not at tag-cut time. Runs the
+      # gate's own negative-case suite first so a gate that has stopped refusing
+      # is itself caught. Only the PRE phase is meaningful here — the digest is an
+      # OUTPUT of the release build (bug cc8feeee) and cannot exist yet.
+      - name: Stack pin gate (self-tests + pre phase)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/verify-stack-pins.py --self-test
+          python3 .github/scripts/verify-stack-pins.py --phase pre
+
       - name: Set up Python tooling
         shell: bash
         run: |
