@@ -33,11 +33,20 @@ on:
 permissions:
   contents: read
 
-# Cancel superseded runs (bug 03faf797). Reusable workflow: the group is
-# evaluated per caller (github.workflow differs for PR checks vs release),
-# so a new push cancels the in-flight PR-gate run but never a release run.
+# Cancel superseded runs (bug 03faf797).
+#
+# THE PREFIX IS LOAD-BEARING (bug b7496cb1). In a reusable workflow the `github`
+# context is the CALLER's, so `github.workflow` here resolves to the calling
+# workflow's name — not "CI checks". Without the prefix this group is
+# byte-identical to the caller's own group, and `cancel-in-progress` makes the
+# callee cancel its own caller the moment the `gate` job starts. That is what
+# killed every workflow_dispatch of "Release stack image" (run 31088517462
+# failed 3s after creation with `release-image` skipped).
+#
+# pr-checks.yml avoids the collision the same way, with a `pr-checks-` prefix.
+# Any new caller must likewise carry a distinct prefix.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-checks-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -136,6 +145,12 @@ jobs:
           # enforced. This gate stops a fourth. Frappe-free: runs under plain
           # unittest with no bench and no live site.
           python3 apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py -v
+
+      - name: Entrypoint admin-password regression (bug 593fe59f)
+        run: bash scripts/entrypoint-admin-password.test.sh
+
+      - name: Workflow gate integrity (bugs b7496cb1, 98fbb1a0)
+        run: python3 scripts/workflow-gate-integrity.test.py
 
       - name: Migration / patches smoke
         run: python3 .github/scripts/ci_migration_smoke.py
@@ -498,9 +513,21 @@ jobs:
           gitleaks dir . --config .gitleaks.toml --no-banner --redact --exit-code 1
           gitleaks git . --config .gitleaks.toml --no-banner --redact --exit-code 1
 
+  # NO `if:` GUARD ON THIS JOB OR docker-build BELOW (bug 98fbb1a0).
+  #
+  # Both used to carry `if: github.event_name == 'push' && github.ref ==
+  # 'refs/heads/main'`. In a reusable workflow the `github` context belongs to
+  # the CALLER, so that condition was false on every call site except a direct
+  # push to main:
+  #   - pull_request via pr-checks.yml  -> SKIPPED (GitHub counts a skipped
+  #     required context as SATISFIED, so these read green without evaluating)
+  #   - release tag / workflow_dispatch via release-stack-image.yml's `gate`
+  #     -> SKIPPED, even though that job's whole purpose is to run "the FULL
+  #     deep CI suite ... real production Docker build" against the release
+  #     SHA. The release gate was not building the production image at all.
+  # A gate that cannot fail is not a gate. Keep these unconditional.
   trivy-scan:
     name: Container/deps scan (trivy)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout
@@ -520,7 +547,6 @@ jobs:
 
   docker-build:
     name: Production Docker build (no push)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Kept self-hosted (FR 17efa619): full production image build exercises
     # `bench build --production` + websocket import smoke — heavy, and the
     # GHA layer cache is warmest on the persistent host. Release publish

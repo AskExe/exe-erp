@@ -6,7 +6,10 @@ set -eo pipefail
 # Handles first-boot site creation + subsequent-boot migrations
 # ──────────────────────────────────────────────────────────────
 
-FRAPPE_BENCH="/home/frappe/frappe-bench"
+# Overridable ONLY so the entrypoint can be exercised by tests against a
+# throwaway bench root. Production containers never set it, so the default
+# below is what actually ships.
+FRAPPE_BENCH="${FRAPPE_BENCH:-/home/frappe/frappe-bench}"
 SITES_DIR="${FRAPPE_BENCH}/sites"
 # SITE_NAME must be set per-deployment (e.g. erp.acme.com). Production stacks
 # enforce this via docker-compose (${SITE_NAME:?...}) and stack.release.json
@@ -23,29 +26,49 @@ SITE_DIR="${SITES_DIR}/${SITE_NAME}"
 cd "${FRAPPE_BENCH}"
 
 # ── Validate admin password ─────────────────────────────────
-validate_admin_password() {
+# check_admin_password is the pure predicate: it NEVER exits. It prints the
+# reason on stdout and returns 1 when the configured password fails a rule.
+# Callers decide whether that is fatal. Splitting the decision out of the rule
+# is the whole fix for bug 593fe59f — see admin_password_preflight below.
+check_admin_password() {
     local pw="${ADMIN_PASSWORD:-}"
     if [ -z "${pw}" ]; then
-        echo "ERROR: ADMIN_PASSWORD (ERP_ADMIN_PASSWORD) is required but not set."
-        echo "Set ERP_ADMIN_PASSWORD in your .env or docker-compose override."
-        exit 1
+        echo "ADMIN_PASSWORD (ERP_ADMIN_PASSWORD) is required but not set."
+        return 1
     fi
     local len=${#pw}
     if [ "${len}" -lt 12 ]; then
-        echo "ERROR: ADMIN_PASSWORD must be at least 12 characters (got ${len})."
-        exit 1
+        echo "ADMIN_PASSWORD must be at least 12 characters (got ${len})."
+        return 1
     fi
     # Check against common weak defaults
     local weak
     for weak in admin password changeme admin123 password123 administrator; do
         if [ "${pw}" = "${weak}" ]; then
-            echo "ERROR: ADMIN_PASSWORD cannot be a common default ('${weak}')."
-            exit 1
+            echo "ADMIN_PASSWORD cannot be a common default ('${weak}')."
+            return 1
         fi
     done
-    # Require at least one special character
-    if ! echo "${pw}" | grep -qP '[^a-zA-Z0-9]'; then
-        echo "ERROR: ADMIN_PASSWORD must contain at least one special character."
+    # Require at least one special character. Uses a shell glob rather than
+    # `grep -P`, which is a GNU extension unavailable on BSD/macOS grep — there
+    # it errors out and makes EVERY password look non-compliant.
+    case "${pw}" in
+        *[!a-zA-Z0-9]*) ;;
+        *)
+            echo "ADMIN_PASSWORD must contain at least one special character."
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+# Fatal wrapper. Use only where an invalid password must stop the boot —
+# i.e. site bootstrap, where this value BECOMES the Administrator credential.
+validate_admin_password() {
+    local reason
+    if ! reason="$(check_admin_password)"; then
+        echo "ERROR: ${reason}"
+        echo "Set ERP_ADMIN_PASSWORD in your .env or docker-compose override."
         exit 1
     fi
 }
@@ -252,16 +275,93 @@ admin_password_hash() {
     printf '%s' "${1}:${SITE_NAME}" | sha256sum | cut -d' ' -f1
 }
 
-rotate_admin_password_if_changed() {
-    local current_hash stored_hash=""
-    current_hash="$(admin_password_hash "${ADMIN_PASSWORD}")"
-
+read_admin_pw_marker() {
     if [ -f "${ADMIN_PW_MARKER}" ]; then
-        stored_hash="$(cat "${ADMIN_PW_MARKER}" 2>/dev/null || true)"
+        cat "${ADMIN_PW_MARKER}" 2>/dev/null || true
+    fi
+}
+
+# ── Admin-password preflight (bug 593fe59f) ──────────────────
+# AVAILABILITY MUST NOT HINGE ON A PASSWORD LINT.
+#
+# Production incident 2026-08-07 (exe-db-jkt, 0.9.33 flip): an install that
+# predates the special-character rule was upgraded into an image carrying it.
+# It had no marker, so the rotation path ran validate_admin_password, which
+# exited 1 under `set -e` — AFTER a full `bench migrate`. The container died,
+# restarted, re-ran multi-minute migrations, and died again: erp.askexe.com
+# 502 for ~25 minutes. No credential was ever wrong; only the lint was.
+#
+# This runs BEFORE any migration so a genuinely fatal verdict costs seconds
+# rather than a migration cycle, and it decides ONCE what the later rotation
+# step is allowed to do:
+#   none         — configured password already matches the marker; nothing to do
+#   rotate       — changed (or never recorded) and valid; apply it
+#   skip-invalid — NO MARKER and invalid: a pre-existing install whose
+#                  long-standing, working password predates a newer rule.
+#                  Warn loudly, change nothing, stay up.
+# A marker that EXISTS and disagrees means an operator deliberately set a new
+# password. An invalid new password there is a real operator error and is still
+# fatal — but now it is fatal before migrations, not after them.
+ADMIN_PW_ACTION="none"
+admin_password_preflight() {
+    local erpnext_installed="${1}"
+
+    # Migrate-only services (gunicorn/worker/scheduler) never receive
+    # ADMIN_PASSWORD, so there is nothing to validate or rotate.
+    if [ -z "${ADMIN_PASSWORD:-}" ]; then
+        ADMIN_PW_ACTION="none"
+        return 0
     fi
 
+    # Site bootstrap has its own fatal gate (this value becomes the credential),
+    # and it runs before create_site, so no migrations are at stake there.
+    if [ "${erpnext_installed}" != "1" ]; then
+        ADMIN_PW_ACTION="rotate"
+        return 0
+    fi
+
+    local current_hash stored_hash reason
+    current_hash="$(admin_password_hash "${ADMIN_PASSWORD}")"
+    stored_hash="$(read_admin_pw_marker)"
+
     if [ "${current_hash}" = "${stored_hash}" ]; then
-        # Unchanged — do not reset every boot.
+        ADMIN_PW_ACTION="none"
+        return 0
+    fi
+
+    if reason="$(check_admin_password)"; then
+        ADMIN_PW_ACTION="rotate"
+        return 0
+    fi
+
+    if [ -n "${stored_hash}" ]; then
+        echo "ERROR: ${reason}"
+        echo "ERP_ADMIN_PASSWORD was changed to a value that fails validation."
+        echo "Set a compliant ERP_ADMIN_PASSWORD; refusing to rotate."
+        exit 1
+    fi
+
+    ADMIN_PW_ACTION="skip-invalid"
+    echo "WARNING: ${reason}"
+    echo "WARNING: no admin-password marker on an existing install — SKIPPING"
+    echo "         Administrator password rotation to keep the service available"
+    echo "         (bug 593fe59f). NOTHING IS CHANGED: the site keeps the"
+    echo "         Administrator password it already has, which is very likely"
+    echo "         the working one. Set a compliant ERP_ADMIN_PASSWORD to rotate."
+    return 0
+}
+
+rotate_admin_password_if_changed() {
+    # The verdict was reached in admin_password_preflight, before migrations.
+    [ "${ADMIN_PW_ACTION}" = "rotate" ] || return 0
+
+    local current_hash stored_hash
+    current_hash="$(admin_password_hash "${ADMIN_PASSWORD}")"
+    stored_hash="$(read_admin_pw_marker)"
+
+    # create_site seeds the marker on the bootstrap path, so by the time we get
+    # here on a fresh install the password is already applied.
+    if [ "${current_hash}" = "${stored_hash}" ]; then
         return 0
     fi
 
@@ -271,8 +371,6 @@ rotate_admin_password_if_changed() {
         echo "No admin-password marker found — applying ERP_ADMIN_PASSWORD to Administrator..."
     fi
 
-    # Validate the new password before applying (same rules as first boot).
-    validate_admin_password
     bench --site "${SITE_NAME}" set-admin-password "${ADMIN_PASSWORD}"
     # Refresh the marker only after a successful reset (set -e aborts on failure).
     printf '%s' "${current_hash}" > "${ADMIN_PW_MARKER}"
@@ -297,7 +395,17 @@ main() {
     # whose `install-app erpnext` then failed — that site must be repaired, not
     # migrated (migrating a half-installed site leaves desk/data broken while
     # ping still passes).
-    if ! is_erpnext_installed; then
+    local erpnext_installed=0
+    if is_erpnext_installed; then
+        erpnext_installed=1
+    fi
+
+    # Decide the admin-password verdict BEFORE any migration runs (bug 593fe59f):
+    # a lint failure must cost seconds, never a re-run of multi-minute migrations
+    # on every restart cycle.
+    admin_password_preflight "${erpnext_installed}"
+
+    if [ "${erpnext_installed}" != "1" ]; then
         if [ -d "${SITE_DIR}" ]; then
             echo "Site dir exists but erpnext is NOT installed — running create/repair."
         fi
@@ -426,4 +534,8 @@ except Exception as e:
     exec "$@"
 }
 
-main "$@"
+# Sourcing this file with EXE_ERP_ENTRYPOINT_NO_MAIN=1 loads the functions
+# without booting, so they can be exercised directly by tests.
+if [ -z "${EXE_ERP_ENTRYPOINT_NO_MAIN:-}" ]; then
+    main "$@"
+fi
