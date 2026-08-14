@@ -196,10 +196,32 @@ services:
     # The RQ worker has no listening port; liveness = the worker process
     # is still running. Without this the container can wedge silently and
     # background jobs stop processing with no signal (bug 81a9b8ad).
-    # Uses Python (guaranteed in the image) to inspect PID 1 — no extra apt
-    # deps (procps/pgrep are not installed in the slim base).
+    #
+    # THREE GENERATIONS OF THIS PROBE WERE BROKEN. Read before touching it:
+    #   gen 1: pgrep -f 'bench worker' — pgrep is NOT in the slim Frappe base
+    #          (exit 127) => permanent false-unhealthy.
+    #   gen 2: ps -ef | grep -q '[r]q worker' — shipped as the FIX for gen 1
+    #          (bug c8fb434f) while asserting "ps + grep are present"; ps is
+    #          ALSO absent. This aborted >=2 production stack deploys (0.9.33,
+    #          0.9.34) on exe-erp-queue after 180s each, auto-rolling back.
+    #          exe-erp itself was healthy every time — the image was never at fault.
+    #   gen 3: a python /proc/1/cmdline probe matching b'bench worker'
+    #          (bug ed19883e, exe-os PR #580) — "verified" only against a
+    #          SYNTHETIC PID1 argv, never a real container. `bench` execs away at
+    #          startup, so real PID 1 is
+    #            .../env/bin/python -m frappe.utils.bench_helper frappe worker --queue=...
+    #          and the literal "bench worker" never appears => exit 1 (measured
+    #          against genuinely-healthy production containers, 2026-08-14).
+    #   gen 4 (this): match what PID 1 actually is — 'frappe worker'. Verified
+    #          exit 0 against those same live containers.
+    # The `tr` is load-bearing: /proc/1/cmdline is NUL-separated, so a bare
+    # `grep -q 'frappe worker' /proc/1/cmdline` returns 1 (measured).
+    #
+    # RULE: a healthcheck must not name a binary the image does not ship, and
+    # must not match a literal PID 1 never contains. Only sh, tr and grep are
+    # used here; pidof is the only process tool this image ships.
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import sys; cmd=open('/proc/1/cmdline','rb').read().replace(b'\\0', b' '); sys.exit(0 if b'bench worker' in cmd else 1)\""]
+      test: ["CMD-SHELL", "tr '\\0' ' ' < /proc/1/cmdline | grep -q 'frappe worker'"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -244,10 +266,28 @@ services:
     # The scheduler has no listening port; liveness = the schedule process
     # is still running. Without this a stalled scheduler stops dispatching
     # cron jobs (enqueued_calls, daily/weekly tasks) silently (bug 81a9b8ad).
-    # Uses Python (guaranteed in the image) to inspect PID 1 — no extra apt
-    # deps (procps/pgrep are not installed in the slim base).
+    #
+    # Same three broken generations as exe-erp-queue above — see that block for
+    # the full history. In short:
+    #   gen 1: pgrep -f 'bench schedule' — pgrep is NOT in the slim Frappe base
+    #          (exit 127) => permanent false-unhealthy.
+    #   gen 2: ps -ef | grep — ps is ALSO absent (bug c8fb434f); this aborted
+    #          >=2 production stack deploys (0.9.33, 0.9.34) with auto-rollback.
+    #   gen 3: python /proc/1/cmdline matching b'bench schedule' (bug ed19883e,
+    #          exe-os PR #580) — `bench` execs away, so real PID 1 is
+    #            .../env/bin/python -m frappe.utils.bench_helper frappe schedule
+    #          and "bench schedule" never appears => exit 1 (measured on live,
+    #          genuinely-healthy production containers, 2026-08-14).
+    #   gen 4 (this): match 'frappe schedule', what PID 1 actually is. Verified
+    #          exit 0 against those same live containers.
+    # The `tr` is load-bearing: /proc/1/cmdline is NUL-separated, so a bare
+    # `grep -q 'frappe schedule' /proc/1/cmdline` returns 1 (measured).
+    #
+    # RULE: a healthcheck must not name a binary the image does not ship, and
+    # must not match a literal PID 1 never contains. Only sh, tr and grep are
+    # used here; pidof is the only process tool this image ships.
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import sys; cmd=open('/proc/1/cmdline','rb').read().replace(b'\\0', b' '); sys.exit(0 if b'bench schedule' in cmd else 1)\""]
+      test: ["CMD-SHELL", "tr '\\0' ' ' < /proc/1/cmdline | grep -q 'frappe schedule'"]
       interval: 60s
       timeout: 10s
       retries: 3
