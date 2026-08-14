@@ -43,24 +43,39 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
+      # Prove the pin gate still REFUSES before trusting it to approve anything.
+      # A guard nobody has watched refuse is not a guard — these 17 cases assert
+      # the specific failures (tag-only, wrong digest, foreign registry, one
+      # tag-only component among four, ...) rather than assuming them.
+      - name: Stack pin gate self-tests (negative cases)
+        shell: bash
+        run: python3 .github/scripts/verify-stack-pins.py --self-test
+
       - name: Validate stack release contract
         id: release
         shell: bash
         run: |
+          set -euo pipefail
           python3 -m json.tool stack.release.json >/dev/null
+
+          # PRE phase: what a human may legally commit. All four components must
+          # name this repo at :v<version>; a digest may already be present (a
+          # re-pin, or the pin a previous run wrote back) but is NOT required —
+          # a new build's digest cannot exist before the build (bug cc8feeee).
+          python3 .github/scripts/verify-stack-pins.py --phase pre
+
           python3 - <<'PY2' >> "$GITHUB_OUTPUT"
           import json
           rel = json.load(open('stack.release.json'))
-          assert rel.get('version'), 'version required'
-          # exe-erp uses components map, not top-level image
-          components = rel.get('components', {})
-          assert 'erp' in components, 'erp component required in components map'
-          erp_image = components['erp']
-          assert ':v' + rel['version'] in erp_image, f'erp image must use stack release tag: {erp_image}'
           health = rel.get('stackParticipation', {}).get('health', [])
           assert len(health) > 0, 'health checks required'
-          print('stack_version=' + rel['version'])
-          print('image=' + erp_image)
+          version = rel['version']
+          # The push tag is DERIVED from version, never read verbatim out of
+          # components. components.erp may carry an @sha256 pin, and `tag@digest`
+          # is not a pushable reference — feeding it to build-push-action as a tag
+          # is what made a digest-pinned manifest unbuildable before this change.
+          print('stack_version=' + version)
+          print('image=ghcr.io/askexe/exe-erp:v' + version)
           PY2
 
       - name: Login to GHCR
@@ -126,3 +141,85 @@ jobs:
         run: |
           docker manifest inspect "${{ steps.release.outputs.image }}" >/dev/null
           echo "Published and verified ${{ steps.release.outputs.image }}"
+
+      # ── Digest capture (the step whose absence caused this bug) ─────────────
+      # v0.3.0 shipped with all four components on the MUTABLE tag :v0.3.0
+      # because this workflow published tags and never recorded the immutable
+      # @sha256 digest. A mutable tag is what poisoned exe-erp's own
+      # v0.2.0-final8 (pinned 2d55a7c3…, later resolving to 15bb6020…) and
+      # exe-gateway's v0.9.28. Capture the digest build-push-action emitted and
+      # write it into every component so the manifest describes exact bytes.
+      #
+      # Fail closed if no digest was produced — never record an unpinned value.
+      - name: Capture image digest into stack manifest (fail closed)
+        id: pin
+        shell: bash
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [ -z "${IMAGE_DIGEST:-}" ]; then
+            echo "::error::build-push-action produced no digest. Refusing to record an unpinned image."
+            exit 1
+          fi
+          case "$IMAGE_DIGEST" in
+            sha256:*) : ;;
+            *) echo "::error::Unexpected digest format '$IMAGE_DIGEST' (expected sha256:<64 hex>)."; exit 1 ;;
+          esac
+          python3 - <<'PY'
+          import json, os, re, collections
+          digest = os.environ['IMAGE_DIGEST']
+          if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):
+              raise SystemExit(f'Refusing to record malformed digest: {digest}')
+          path = 'stack.release.json'
+          rel = json.loads(open(path, encoding='utf-8').read(),
+                           object_pairs_hook=collections.OrderedDict)
+          # All four roles (erp, websocket, queue, scheduler) run ONE image, so
+          # one digest pins all four. Strip any pre-existing digest first so a
+          # re-pinned manifest converges instead of accumulating.
+          for name, ref in rel['components'].items():
+              rel['components'][name] = f"{ref.split('@')[0]}@{digest}"
+          open(path, 'w', encoding='utf-8').write(
+              json.dumps(rel, indent=2, ensure_ascii=False) + '\n')
+          for name, ref in rel['components'].items():
+              print(f'  {name}: {ref}')
+          PY
+
+      # POST phase, fail-closed: EVERY component must now carry @sha256:<64 hex>
+      # and every one must equal the digest this run actually built and pushed.
+      # This is what refuses a tag-only manifest — and it is also what catches
+      # the capture step above silently no-opping or being deleted later.
+      - name: Enforce digest pins (fail closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/verify-stack-pins.py \
+            --phase post \
+            --built-digest "${{ steps.build.outputs.digest }}"
+
+      # The digest-pinned manifest is the release's authoritative output. It is
+      # what the exe-os stack manifest pins from — the digest is an OUTPUT of a
+      # release, never an input to it (bug cc8feeee).
+      - name: Upload digest-pinned stack manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: stack-release-pinned
+          path: stack.release.json
+          if-no-files-found: error
+
+      - name: Report pinned digest
+        shell: bash
+        run: |
+          {
+            echo "## Stack image published"
+            echo ""
+            echo "| field | value |"
+            echo "|-------|-------|"
+            echo "| release tag | \`${{ steps.release.outputs.image }}\` |"
+            echo "| digest | \`${{ steps.build.outputs.digest }}\` |"
+            echo "| pinned ref | \`ghcr.io/askexe/exe-erp@${{ steps.build.outputs.digest }}\` |"
+            echo "| commit | \`${{ github.sha }}\` |"
+            echo ""
+            echo "All four components (erp, erp-websocket, erp-queue, erp-scheduler)"
+            echo "are pinned to this digest in the \`stack-release-pinned\` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
