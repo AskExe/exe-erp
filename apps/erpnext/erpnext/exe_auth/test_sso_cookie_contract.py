@@ -24,8 +24,26 @@ product in the stack gates on the canonical name) lives in exe-os:
 `scripts/sso-cookie-contract-check.mjs`. Both halves are needed: this one stops
 a fourth product from ever merging the bug, that one stops a stale image from
 serving it.
+
+THE THIRD HALF (bug 96e6b8b6) — added after the source fix above shipped and
+production STILL served the dead cookie for weeks.
+
+The template fix landed on main (5aebfb9, PR #43) and was baked into the v0.3.0
+image. The v0.3.0 release commit (5659b47) is even titled "retire the
+orphaned/poisoned v0.2.0-final8 pin". But it retired that pin in
+`stack.release.json` ONLY. `docker-compose.yml` — the file that actually runs on
+the host — kept all six of its services pinned to
+`v0.2.0-final8@sha256:2d55a7c3…`, an image built BEFORE 5aebfb9. So every test
+in this file passed, the cross-product check in exe-os failed against live, and
+erp.askexe.com/login bounced forever on `exe_sso_token`.
+
+A fix that is merged but not deployable is not a fix. The classes below make the
+deploy manifest part of the machine contract: docker-compose.yml must pin the
+exact image `stack.release.json` publishes, and must never pin an image known to
+predate the SSO cookie fix.
 """
 
+import json
 import os
 import re
 import unittest
@@ -132,6 +150,99 @@ class TestDeadCookieNamesAbsentFail(unittest.TestCase):
 			[],
 			"these files read a DEAD SSO cookie name; the canonical cookie is "
 			f"`{CANONICAL_COOKIE}`: {offenders}",
+		)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deploy-manifest half of the contract (bug 96e6b8b6)
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEPLOY_MANIFEST = "docker-compose.yml"
+RELEASE_MANIFEST = "stack.release.json"
+
+# Images built BEFORE the SSO cookie fix (5aebfb9). Pinning any of these in the
+# deploy manifest ships the infinite login bounce no matter how correct the
+# source tree is. Never remove an entry here to make a pin pass — cut a new
+# release instead.
+PRE_SSO_FIX_IMAGE_TAGS = (
+	"v0.2.0-final8",
+	"v0.2.0-final7",
+	"v0.2.0-final3",
+	"v0.2.0",
+)
+
+# `image: ghcr.io/askexe/exe-erp:<tag>@sha256:<digest>` in docker-compose.yml.
+_COMPOSE_IMAGE_RE = re.compile(
+	r"^\s*image:\s*(?P<ref>ghcr\.io/askexe/exe-erp[^\s]*)\s*$", re.MULTILINE
+)
+
+
+def _compose_erp_image_refs():
+	"""Every exe-erp image reference the deploy manifest pins."""
+	return _COMPOSE_IMAGE_RE.findall(_read(DEPLOY_MANIFEST))
+
+
+def _released_erp_image_ref():
+	"""The image reference the published release manifest names."""
+	manifest = json.loads(_read(RELEASE_MANIFEST))
+	return manifest["components"]["erp"]
+
+
+class TestDeployManifestShipsTheSsoFix(unittest.TestCase):
+	"""docker-compose.yml must deploy an image that contains the cookie fix."""
+
+	def testComposePinsExist(self):
+		"""Guard the guard: a regex that matches nothing would pass vacuously."""
+		refs = _compose_erp_image_refs()
+		self.assertNotEqual(
+			refs,
+			[],
+			f"{DEPLOY_MANIFEST} names no ghcr.io/askexe/exe-erp image — either "
+			"the deploy manifest moved or this test's parser is broken. Either "
+			"way the deploy half of the SSO contract is unenforced.",
+		)
+
+	def testComposeMatchesPublishedReleaseFail(self):
+		"""Every service must pin exactly the image stack.release.json publishes."""
+		released = _released_erp_image_ref()
+		mismatched = sorted({r for r in _compose_erp_image_refs() if r != released})
+		self.assertEqual(
+			mismatched,
+			[],
+			f"{DEPLOY_MANIFEST} pins image(s) that are not the published release "
+			f"{released!r}: {mismatched}. exe-erp runs all its roles off ONE "
+			"image; a compose pin that lags stack.release.json means the host "
+			"keeps serving old code after the fix merges — exactly how bug "
+			"96e6b8b6 kept the dead `exe_sso_token` gate live in production "
+			"after 5aebfb9 fixed the template.",
+		)
+
+	def testComposeHasNoPreSsoFixImageFail(self):
+		"""No service may pin an image built before the SSO cookie fix."""
+		offenders = []
+		for ref in _compose_erp_image_refs():
+			for tag in PRE_SSO_FIX_IMAGE_TAGS:
+				if re.search(r":" + re.escape(tag) + r"(?:@|$)", ref):
+					offenders.append((tag, ref))
+		self.assertEqual(
+			offenders,
+			[],
+			f"{DEPLOY_MANIFEST} pins image(s) built BEFORE the SSO cookie fix "
+			f"(5aebfb9): {offenders}. Those images gate on the DEAD cookie "
+			f"`{DEAD_COOKIE_NAMES[0]}` and bounce every login forever. The "
+			f"canonical cookie is `{CANONICAL_COOKIE}`.",
+		)
+
+	def testReleaseManifestComponentsAreIdenticalFail(self):
+		"""All four roles run off one image; divergence means a partial rollout."""
+		components = json.loads(_read(RELEASE_MANIFEST))["components"]
+		distinct = sorted(set(components.values()))
+		self.assertEqual(
+			len(distinct),
+			1,
+			f"{RELEASE_MANIFEST} components must all name ONE image (exe-erp "
+			f"runs erp/websocket/queue/scheduler off the same build); found "
+			f"{distinct}. A split here rolls the SSO fix out to some roles only.",
 		)
 
 
