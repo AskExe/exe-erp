@@ -8,12 +8,26 @@
 #   2. stack release contract validation
 #   3. Python lint (ruff) of Exe-owned fork code
 #   4. Python syntax compile of all Exe-owned modules
-#   5. migration / patches.txt smoke (broken patch refs fail closed)
-#   6. dependency security audit (pip-audit + yarn audit, fork deps)
-#   7. real production Docker build (no push) — exercises
+#   5. Exe-owned Python UNIT TESTS actually execute (bug 483cc712 —
+#      compileall only byte-compiles; it never runs a test, so every
+#      test in this fork, including the PR #54 SSO/deploy-manifest
+#      contract guards, was permanently and silently green)
+#   6. migration / patches.txt smoke (broken patch refs fail closed)
+#   7. dependency security audit (pip-audit + yarn audit, fork deps)
+#   8. real production Docker build (no push) — exercises
 #      `bench build --production` + the websocket import smoke check
-#   8. secret scan (gitleaks CLI — working tree + git history)
-#   9. container/deps + IaC scan (trivy fs — vuln/misconfig/secret)
+#   9. secret scan (gitleaks CLI — working tree + git history)
+#  10. container/deps + IaC scan (trivy fs — vuln/misconfig/secret)
+#
+# CI SCOPE — what is NOT covered here, stated plainly:
+# The inherited upstream suites (erpnext/, hrms/, frappe/) subclass
+# `frappe.tests.utils.FrappeTestCase` and require a bootstrapped bench
+# site with live MariaDB + Redis. This job has none of those, so it does
+# NOT run them; doing so needs a `bench init` + `bench new-site` service
+# stack on every PR, which is separate, larger work. Step 5 runs the
+# Exe-owned, deliberately frappe-free tests, and fails closed if it
+# collects zero tests or if a named contract class stops being collected
+# — a vacuous "0 tests, exit 0" pass is treated as a failure.
 #
 # Least-privilege: read-only, no packages/contents write. All
 # third-party actions pinned to a full commit SHA.
@@ -148,20 +162,28 @@ jobs:
             apps/erpnext/erpnext/exe_monitor \
             apps/erpnext/erpnext/exe_setup
 
-      - name: SSO cookie contract (bug 3938ac3d)
-        run: |
-          # The canonical SSO cookie is `exe_access_token`. This exact bug has
-          # shipped in three products (wiki f1bb40d8, crm 9f60e8e6, erp
-          # 3938ac3d) because the rename was documented but never machine-
-          # enforced. This gate stops a fourth. Frappe-free: runs under plain
-          # unittest with no bench and no live site.
-          python3 apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py -v
 
       - name: Entrypoint admin-password regression (bug 593fe59f)
         run: bash scripts/entrypoint-admin-password.test.sh
 
       - name: Workflow gate integrity (bugs b7496cb1, 98fbb1a0)
         run: python3 scripts/workflow-gate-integrity.test.py
+
+      # Runs EVERY Exe-owned, frappe-free unit test (bug 483cc712).
+      #
+      # This replaces the previous hand-maintained allowlist of one-file
+      # `python3 <path>` steps. That pattern ran the SSO cookie contract
+      # (bug 3938ac3d) but silently omitted two other Exe-owned test
+      # modules -- `exe_auth/test_exe_perms.py` (56 tests) and
+      # `exe_monitor/test_error_reporter.py` (3 tests) -- which had never
+      # executed in CI at all. `ruff` and `compileall` above do not help:
+      # compileall byte-compiles a file, it never runs a test.
+      #
+      # The runner is manifest-driven and fails closed: zero collected
+      # tests, a missing test module, or a missing named contract class
+      # is an ERROR, not a vacuous pass.
+      - name: Python unit tests (Exe-owned, frappe-free)
+        run: python3 .github/scripts/ci_python_tests.py
 
       - name: Migration / patches smoke
         run: python3 .github/scripts/ci_migration_smoke.py
