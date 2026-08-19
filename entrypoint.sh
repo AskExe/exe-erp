@@ -161,6 +161,64 @@ restore_prebuilt_assets() {
     echo "Prebuilt assets restored into ${assets_dir}."
 }
 
+# ── Flush Frappe's cache through its own cache client ────────
+# `bench clear-cache` CANNOT clear the asset map (bug f6552d32) — it exits 0
+# having changed nothing, which is why stale bundles kept serving after an
+# upgrade. Two reasons, both visible in this repo:
+#
+#   1. Its "clear everything" branch (frappe/cache_manager.py:clear_cache)
+#      deletes only `frappe.cache.get_keys("")`, and get_keys() prefixes every
+#      key with the site's db_name (frappe/utils/redis_wrapper.py:make_key).
+#      The resolved bundle manifest is cached as `assets_json` with
+#      shared=True (frappe/utils/__init__.py:get_assets_json), i.e. WITHOUT
+#      that prefix — so it is never in the delete set. (clear_global_cache has
+#      to delete bench_cache_keys with shared=True explicitly for this reason;
+#      the clear-cache path does not go through it.)
+#   2. Even if the Redis key went away, every gunicorn worker holds its own
+#      in-process ClientCache copy. Those are dropped only on a Redis
+#      client-side-cache invalidation message.
+#
+# FLUSHDB on the cache client fixes both: it removes shared keys the
+# site-prefixed sweep misses, and it fires an invalidation with a null key
+# list, which each worker's ClientCache turns into a full local clear
+# (redis_wrapper.py:_handle_invalidation). This is exactly what Frappe itself
+# does after rebuilding bundles — frappe/build.py calls frappe.cache.flushdb()
+# at the end of bundle(). flushdb (not flushall) keeps the blast radius to the
+# cache DB and leaves the queue/socketio DBs on the same Redis untouched.
+#
+# frappe.init() alone wires up frappe.cache (see frappe/__init__.py:init →
+# setup_redis_cache_connection), so no DB connection is needed here.
+flush_frappe_cache() {
+    local py="${FRAPPE_BENCH}/env/bin/python"
+    [ -x "${py}" ] || py="python3"
+
+    if FLUSH_SITE_NAME="${SITE_NAME}" FLUSH_SITES_DIR="${SITES_DIR}" "${py}" - <<'PYFLUSH'
+import os
+import sys
+
+import frappe
+
+try:
+    frappe.init(site=os.environ["FLUSH_SITE_NAME"], sites_path=os.environ["FLUSH_SITES_DIR"])
+    frappe.cache.flushdb()
+    print("Frappe cache DB flushed (asset map + rendered page cache).")
+except Exception as exc:  # noqa: BLE001 - reported to the caller via exit code
+    print(f"cache flush failed: {exc}", file=sys.stderr)
+    sys.exit(1)
+finally:
+    try:
+        frappe.destroy()
+    except Exception:  # noqa: BLE001
+        pass
+PYFLUSH
+    then
+        return 0
+    fi
+
+    echo "WARNING: Frappe cache flush failed; served asset hashes may be stale."
+    return 0
+}
+
 # ── Configure common_site_config.json ────────────────────────
 configure_site_config() {
     echo "Writing common_site_config.json..."
@@ -433,9 +491,8 @@ main() {
     # neither the volume's nor the image's — and every reference 404s. Observed
     # live 2026-08-10: 11 CSS bundles unreachable, desk rendered unstyled.
     if [ "${ASSETS_REFRESHED}" = "1" ]; then
-        echo "Assets were refreshed — clearing cached asset map..."
-        bench --site "${SITE_NAME}" clear-cache || \
-            echo "WARNING: bench clear-cache failed; served asset hashes may be stale."
+        echo "Assets were refreshed — flushing Frappe's cache DB..."
+        flush_frappe_cache
     fi
 
     # ── Configure GoTrue SSO (if GOTRUE_URL or GOTRUE_EXTERNAL_URL set) ──
