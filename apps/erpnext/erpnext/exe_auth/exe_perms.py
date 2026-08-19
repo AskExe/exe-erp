@@ -210,6 +210,32 @@ def oauth_state_matches(received_state, expected_state):
     return hmac.compare_digest(str(received_state), str(expected_state))
 
 
+def oauth_state_decision(received_state, cookie_state, require_state):
+    """Decide whether an SSO callback passes the login-CSRF state check.
+
+    Returns "ok" to proceed with login, or "reject" to fail closed. This is the
+    pure policy behind gotrue_login_callback, split out so it is testable without
+    a live site (bug adf77179 — robust to auth domains that don't echo `state`).
+
+    Policy:
+      * If the auth domain echoed a `state`, it MUST match the nonce cookie set
+        by gotrue_login_start (strong double-submit check). Enforced whenever a
+        state is present, regardless of `require_state` — a present state is
+        never trusted blindly.
+      * If NO state was echoed (some auth domains legitimately don't), fall back
+        to the presence of the state COOKIE, which still proves THIS browser
+        initiated the flow; a blind forged callback (no prior login_start, hence
+        no cookie) is still rejected. Enforced only when `require_state` is on.
+      * `require_state=False` is the operator rollout opt-out: when no state is
+        echoed, skip the cookie fallback too.
+    """
+    if received_state:
+        return "ok" if oauth_state_matches(received_state, cookie_state) else "reject"
+    if not require_state:
+        return "ok"
+    return "ok" if cookie_state else "reject"
+
+
 def subject_binding_ok(gotrue_email, submitted_email):
     """True iff the authoritative /user email is PRESENT and MATCHES.
 

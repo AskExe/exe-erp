@@ -368,6 +368,41 @@ class TestOAuthStateMatches(unittest.TestCase):
 		self.assertFalse(ep.oauth_state_matches(None, None))
 
 
+class TestOauthStateDecision(unittest.TestCase):
+	"""P1 login-CSRF policy for the SSO callback (bug adf77179).
+
+	Robust to auth domains that don't echo `state`, without weakening CSRF when
+	a state IS present.
+	"""
+
+	def testEchoedMatchingStateOk(self):
+		self.assertEqual(ep.oauth_state_decision("nonce", "nonce", True), "ok")
+
+	def testSsoCompletesWithoutStateEcho(self):
+		# REGRESSION (adf77179): auth domain omits state, but this browser began
+		# the flow (state cookie present) -> login must proceed, not fail closed.
+		self.assertEqual(ep.oauth_state_decision(None, "nonce", True), "ok")
+
+	def testEchoedMismatchedStateRejectedFail(self):
+		# CSRF preserved: a present-but-wrong state is always rejected.
+		self.assertEqual(ep.oauth_state_decision("attacker", "victim", True), "reject")
+
+	def testNoEchoNoCookieRejectedFail(self):
+		# Blind forged callback: no echo and no initiating cookie -> reject.
+		self.assertEqual(ep.oauth_state_decision(None, None, True), "reject")
+
+	def testOptOutSkipsWhenNoEcho(self):
+		self.assertEqual(ep.oauth_state_decision(None, None, False), "ok")
+
+	def testOptOutStillEnforcesPresentStateFail(self):
+		# Even under the opt-out, a present state that mismatches is rejected.
+		self.assertEqual(ep.oauth_state_decision("attacker", "victim", False), "reject")
+
+	def testEmptyStringEchoTreatedAsNoEcho(self):
+		# An empty state param is not an echo; fall back to the cookie.
+		self.assertEqual(ep.oauth_state_decision("", "nonce", True), "ok")
+
+
 if __name__ == "__main__":
 	unittest.main()
 
