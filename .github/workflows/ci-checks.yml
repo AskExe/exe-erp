@@ -113,6 +113,17 @@ jobs:
           python3 .github/scripts/verify-stack-pins.py --self-test
           python3 .github/scripts/verify-stack-pins.py --phase pre
 
+      # Reconcile the DEPLOY manifest (docker-compose.yml) against the RELEASE
+      # manifest (stack.release.json). Without this the two files can pin
+      # different images and stay silently green — the exact failure that kept
+      # erp.askexe.com/login serving the pre-fix image while source, test and
+      # manifest were all correct (bugs 129a0495 / 96e6b8b6). Required check.
+      - name: Stack pin gate (compose <-> stack.release.json reconciliation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/verify-stack-pins.py --phase compose
+
       - name: Set up Python tooling
         shell: bash
         run: |
