@@ -51,6 +51,17 @@ jobs:
         shell: bash
         run: python3 .github/scripts/verify-stack-pins.py --self-test
 
+      # Reconcile docker-compose.yml against stack.release.json on the committed
+      # tree BEFORE building. If the deploy manifest lags the release manifest,
+      # the host would serve old code after the fix merges (bugs 129a0495 /
+      # 96e6b8b6). Run pre-build only: the post-build step re-pins the release
+      # manifest to the freshly built digest in place, and docker-compose.yml is
+      # not committed back in the same run, so a post-build reconciliation would
+      # compare against an ephemeral, uncommitted digest.
+      - name: Stack pin gate (compose <-> stack.release.json reconciliation)
+        shell: bash
+        run: python3 .github/scripts/verify-stack-pins.py --phase compose
+
       - name: Validate stack release contract
         id: release
         shell: bash

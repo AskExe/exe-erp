@@ -39,6 +39,17 @@ produced:
                  built and pushed by this run. This is the phase that refuses a
                  tag-only manifest.
 
+  --phase compose  reconcile docker-compose.yml against stack.release.json.
+                 EVERY `ghcr.io/askexe/exe-erp` image the deploy manifest pins
+                 must be BYTE-IDENTICAL to the release manifest's `erp` ref.
+                 This closes the gap behind the ERP login outage (bugs
+                 129a0495 / 96e6b8b6): the release manifest was re-pinned to the
+                 fixed image while docker-compose.yml — the file that runs on the
+                 host — kept the pre-fix pin, and NOTHING reconciled the two, so
+                 source/test/manifest were all green while production served the
+                 pre-fix bytes. Fails closed: a compose file that names no ERP
+                 image (moved file or broken extractor) is REFUSED, not passed.
+
 Negative cases are exercised by `--self-test` (run in CI), so the gate is proven
 to refuse rather than assumed to. A guard nobody has watched refuse is not a
 guard.
@@ -139,6 +150,127 @@ def check_post(components, version, built_digest, repo=REPO):
     return failures
 
 
+# ---------------------------------------------------------------------------
+# docker-compose.yml <-> stack.release.json reconciliation
+#
+# THE GAP THIS CLOSES (bugs 129a0495 / 96e6b8b6): the release manifest and the
+# deploy manifest independently declare which image ships, and were allowed to
+# disagree silently. On the v0.3.0 cut, stack.release.json was re-pinned to the
+# fixed image while docker-compose.yml — the file that actually runs on the host
+# — was left pinning v0.2.0-final8, an image built BEFORE the SSO cookie fix. The
+# source, its regression test, and the manifest were all green; production served
+# the pre-fix bytes for the entire window. Every gate we had inspected the half
+# that was correct. Nothing reconciled compose against the manifest, so this
+# script — the dedicated pin gate — was blind to the exact file that shipped the
+# outage. This phase makes the pin gate read docker-compose.yml too and fail
+# closed on any drift, so the one guarding unittest is no longer the only thing
+# standing between a compose-pin regression and production.
+#
+# This mirrors, byte for byte, the invariant asserted by the unittest in
+# apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py — same regex, same
+# "compose ref must equal the released ref" rule — but runs it as a required
+# stdlib gate step in CI and at release, independent of the Frappe test runner.
+# ---------------------------------------------------------------------------
+
+# Every `image:` mapping value in the compose file. Group `val` is the raw
+# value, which may be quoted or carry a trailing `# comment`; those forms are
+# normalized in _clean_image_value below. Matching ALL image lines (not only
+# ones that already look like the ERP repo) is deliberate: a drifted service
+# whose ref is quoted or commented must still be SEEN, or the gate would pass
+# over the exact regression it exists to catch.
+COMPOSE_ANY_IMAGE_RE = re.compile(r"^[ \t]*image:[ \t]*(?P<val>\S.*?)[ \t]*$", re.MULTILINE)
+
+# The exact ERP repo, boundary-anchored: `exe-erp` must be followed by `:tag`,
+# `@digest`, or end-of-ref. This deliberately does NOT match a hypothetical
+# sidecar repo like `ghcr.io/askexe/exe-erp-init` (which would be a different
+# image, not a drifted pin) — anchoring here avoids a false-fail on such a ref.
+_ERP_REPO_RE = re.compile(r"^ghcr\.io/askexe/exe-erp(?=[:@]|$)")
+
+
+def _clean_image_value(raw):
+    """Normalize a raw compose `image:` value to the bare image reference.
+
+    Strips YAML quoting and any trailing inline `# comment`. Image references
+    never contain whitespace or `#`, so the ref is the first quoted span or the
+    first whitespace-delimited token.
+    """
+    v = raw.strip()
+    if v[:1] in ("\"", "'"):
+        q = v[0]
+        end = v.find(q, 1)
+        return v[1:end] if end != -1 else v[1:].strip()
+    return v.split()[0] if v.split() else ""
+
+
+def extract_compose_refs(compose_text):
+    """Every exe-erp image ref the deploy manifest pins.
+
+    Sees quoted and inline-commented forms, not just bare unquoted refs, so a
+    drifted service cannot hide behind formatting. Duplicates are KEPT: the
+    deploy manifest declares six services (configurator, erp, websocket, queue,
+    scheduler, nginx) off ONE image; the caller compares the DISTINCT set, and a
+    single drifted service yields a distinct ref that survives that set.
+    """
+    refs = []
+    for m in COMPOSE_ANY_IMAGE_RE.finditer(compose_text):
+        val = _clean_image_value(m.group("val"))
+        if _ERP_REPO_RE.match(val):
+            refs.append(val)
+    return refs
+
+
+def check_compose(components, version, compose_text, repo=REPO):
+    """Reconcile docker-compose.yml against the released manifest refs.
+
+    Returns [(name, reason)] failures; empty == pass. Fails CLOSED: a malformed
+    manifest, a missing 'erp' component, or an extractor that finds nothing can
+    never produce a vacuous pass.
+    """
+    failures = []
+
+    # 1. The manifest must itself be well-formed before it can be a reconcile
+    #    target — otherwise we would "agree" with garbage. Surface every
+    #    pre-phase manifest failure, prefixed so its source is unambiguous.
+    for name, reason in check_pre(components, version, repo=repo):
+        failures.append((f"manifest:{name}", reason))
+
+    # 2. The 'erp' component is the canonical released ref (check_pre already
+    #    requires all four components identical). Without it there is nothing
+    #    sound to reconcile against — refuse.
+    canonical = components.get("erp")
+    if canonical is None:
+        failures.append(("manifest", "no 'erp' component in stack.release.json to "
+                                     "reconcile docker-compose.yml against"))
+        return failures
+
+    # 3. GUARD-THE-GUARD: an extractor that matches nothing must FAIL, never
+    #    pass vacuously. Zero refs means either docker-compose.yml moved / was
+    #    renamed, or the regex no longer matches how images are pinned — the
+    #    precise way a silent gate stops guarding.
+    compose_refs = extract_compose_refs(compose_text)
+    if not compose_refs:
+        failures.append(("docker-compose.yml",
+                         "no ghcr.io/askexe/exe-erp image found — the deploy manifest "
+                         "moved or this extractor is broken; refusing to pass vacuously"))
+        return failures
+
+    # 4. Every distinct compose ref must equal the canonical released ref as a
+    #    plain string (byte identity — a tag can be re-pointed, a digest cannot,
+    #    so `repo:tag` and `repo:tag@digest` are DIFFERENT pins). Any mismatch
+    #    means the compose pin lags stack.release.json and the host serves old
+    #    code after the fix merges (bugs 129a0495 / 96e6b8b6).
+    for ref in sorted(set(compose_refs)):
+        if ref != canonical:
+            failures.append(("docker-compose.yml",
+                             f"pins {ref!r}, which is NOT the released image "
+                             f"{canonical!r} from stack.release.json. exe-erp runs every "
+                             "role off ONE image; a compose pin that lags the manifest "
+                             "keeps the host serving old code after the fix merges — the "
+                             "exact shape of bugs 129a0495 / 96e6b8b6. Re-pin "
+                             "docker-compose.yml to the released ref."))
+    return failures
+
+
 def load_manifest(path):
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
@@ -220,7 +352,59 @@ def self_test():
     case("pre: stale pin from the PREVIOUS release is refused after a bump",
          check_pre(_components(f"{REPO}:v0.2.0@{GOOD_DIGEST}"), v), True)
 
+    # --- compose reconciliation must REFUSE (bugs 129a0495 / 96e6b8b6) ---
+    def _compose(*refs):
+        # Six services, mirroring docker-compose.yml (configurator, erp,
+        # websocket, queue, scheduler, nginx), so a single drifted service is
+        # exercised rather than deduped away.
+        body = "\n".join(f"  svc{i}:\n    image: {r}" for i, r in enumerate(refs))
+        return f"services:\n{body}\n"
+
+    good_ref = f"{REPO}:v{v}@{GOOD_DIGEST}"
+    case("compose: different digest than manifest is refused",
+         check_compose(pinned, v, _compose(*[f"{REPO}:v{v}@{OTHER_DIGEST}"] * 6)), True)
+    case("compose: pre-fix tag v0.2.0-final8 is refused (the literal outage)",
+         check_compose(pinned, v, _compose(*[f"{REPO}:v0.2.0-final8@{OTHER_DIGEST}"] * 6)), True)
+    case("compose: tag-only while manifest is digest-pinned is refused",
+         check_compose(pinned, v, _compose(*[f"{REPO}:v{v}"] * 6)), True)
+    case("compose: ONE drifted service among six identical is refused",
+         check_compose(pinned, v, _compose(good_ref, good_ref, good_ref,
+                                           f"{REPO}:v0.2.0-final8@{OTHER_DIGEST}",
+                                           good_ref, good_ref)), True)
+    case("compose: foreign registry -> extractor finds nothing -> refused",
+         check_compose(pinned, v, _compose(*[f"ghcr.io/evil/exe-erp:v{v}@{GOOD_DIGEST}"] * 6)), True)
+    case("compose: empty file is refused (guard-the-guard)",
+         check_compose(pinned, v, ""), True)
+    case("compose: no image: lines is refused (guard-the-guard)",
+         check_compose(pinned, v, "services:\n  erp:\n    build: .\n"), True)
+    case("compose: reconciling against a malformed manifest is refused",
+         check_compose(_components(f"{REPO}:v0.2.0"), v, _compose(*[good_ref] * 6)), True)
+    # A drifted service must not hide behind YAML formatting: the extractor sees
+    # quoted values and values with a trailing inline comment.
+    case("compose: a drifted QUOTED ref among clean ones is refused",
+         check_compose(pinned, v, _compose(good_ref, good_ref, good_ref,
+                                           f'"{REPO}:v0.2.0-final8@{OTHER_DIGEST}"',
+                                           good_ref, good_ref)), True)
+    case("compose: a drifted ref hidden behind an inline comment is refused",
+         check_compose(pinned, v, _compose(good_ref, good_ref, good_ref,
+                                           f"{REPO}:v0.2.0-final8@{OTHER_DIGEST}  # rollback",
+                                           good_ref, good_ref)), True)
+
     # --- must PASS (proves the gate is not simply always-red) ---
+    case("compose: pins byte-identical to digest-pinned manifest PASSES",
+         check_compose(pinned, v, _compose(*[good_ref] * 6)), False)
+    case("compose: tag-only compose equal to tag-only manifest PASSES pre-build",
+         check_compose(tag_only, v, _compose(*[f"{REPO}:v{v}"] * 6)), False)
+    # Quoted refs and trailing comments are normalized before comparison, so a
+    # correctly-pinned-but-quoted/commented compose still PASSES (no false-fail).
+    case("compose: correct QUOTED + inline-commented pins PASS (normalized)",
+         check_compose(pinned, v, _compose(f'"{good_ref}"', f"{good_ref}  # erp",
+                                           good_ref, good_ref, good_ref, good_ref)), False)
+    # A different repo that merely starts with 'exe-erp' is NOT the ERP image and
+    # must be ignored, not reconciled — proves the boundary anchor (no false-fail).
+    case("compose: unrelated exe-erp-init sidecar image is ignored (PASSES)",
+         check_compose(pinned, v, _compose(*[good_ref] * 6)
+                       + f"  sidecar:\n    image: ghcr.io/askexe/exe-erp-init:v1\n"), False)
     case("post: correctly pinned manifest PASSES",
          check_post(pinned, v, GOOD_DIGEST), False)
     case("pre: tag-only manifest PASSES pre-build (digest not knowable yet)",
@@ -252,9 +436,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--manifest", default="stack.release.json")
-    ap.add_argument("--phase", choices=("pre", "post"))
+    ap.add_argument("--phase", choices=("pre", "post", "compose"))
     ap.add_argument("--built-digest", default="",
                     help="sha256:<64 hex> produced by docker/build-push-action (post phase)")
+    ap.add_argument("--compose", default="docker-compose.yml",
+                    help="deploy manifest reconciled against the release manifest (compose phase)")
     ap.add_argument("--self-test", action="store_true",
                     help="run negative-case self-tests and exit")
     args = ap.parse_args()
@@ -274,14 +460,30 @@ def main():
 
     if args.phase == "pre":
         failures = check_pre(components, version)
-    else:
+    elif args.phase == "post":
         failures = check_post(components, version, args.built_digest)
+    else:  # compose: reconcile docker-compose.yml against the release manifest
+        try:
+            with open(args.compose, encoding="utf-8") as fh:
+                compose_text = fh.read()
+        except OSError as exc:
+            # A missing/unreadable deploy manifest is a fail-closed condition:
+            # the reconciliation cannot be performed, so the gate must be RED.
+            print(f"::error::stack pin gate FAILED (compose) — cannot read "
+                  f"{args.compose!r}: {exc}", file=sys.stderr)
+            return 1
+        failures = check_compose(components, version, compose_text)
 
     rc = report(failures, args.phase, args.manifest)
     if rc == 0:
-        print(f"stack pin gate OK ({args.phase}) — {args.manifest} @ v{version}")
-        for name in sorted(components):
-            print(f"  {name}: {components[name]}")
+        if args.phase == "compose":
+            print(f"stack pin gate OK (compose) — {args.compose} agrees with "
+                  f"{args.manifest} @ v{version}")
+            print(f"  released ref: {components.get('erp')}")
+        else:
+            print(f"stack pin gate OK ({args.phase}) — {args.manifest} @ v{version}")
+            for name in sorted(components):
+                print(f"  {name}: {components[name]}")
     return rc
 
 
