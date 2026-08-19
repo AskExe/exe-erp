@@ -567,10 +567,10 @@ def gotrue_login_callback():
 	# One-time use: always drop the state cookie once we have read it.
 	if cookie_state and getattr(frappe.local, "cookie_manager", None):
 		frappe.local.cookie_manager.delete_cookie(_OAUTH_STATE_COOKIE)
-	if require_state and not _exe_perms.oauth_state_matches(received_state, cookie_state):
+	if _exe_perms.oauth_state_decision(received_state, cookie_state, require_state) == "reject":
 		frappe.log_error(
-			title="GoTrue SSO callback: CSRF state mismatch",
-			message="missing or non-matching state on SSO callback",
+			title="GoTrue SSO callback: CSRF state rejected",
+			message="missing/non-matching state and no initiating state cookie on SSO callback",
 		)
 		frappe.throw("Invalid or missing login state", frappe.AuthenticationError)
 
