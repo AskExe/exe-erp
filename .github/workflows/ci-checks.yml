@@ -177,6 +177,12 @@ jobs:
       - name: Entrypoint admin-password regression (bug 593fe59f)
         run: bash scripts/entrypoint-admin-password.test.sh
 
+      - name: Asset volume refresh regression (bug f6552d32 / 3938ac3d)
+        run: bash scripts/asset-volume-refresh.test.sh
+
+      - name: Asset healthcheck script lints (bug f6552d32)
+        run: sh -n scripts/asset-healthcheck.sh
+
       - name: Workflow gate integrity (bugs b7496cb1, 98fbb1a0)
         run: python3 scripts/workflow-gate-integrity.test.py
 
