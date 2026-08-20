@@ -4,12 +4,12 @@
   "repo": "AskExe/exe-erp",
   "service": "exe-erp",
   "packageName": "@askexenow/exe-erp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "components": {
-    "erp": "ghcr.io/askexe/exe-erp:v0.3.0@sha256:de7a6fb952b64f1e25737b2771c5fed9a9b6102c63a73624391fd6a5f880993e",
-    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.3.0@sha256:de7a6fb952b64f1e25737b2771c5fed9a9b6102c63a73624391fd6a5f880993e",
-    "erp-queue": "ghcr.io/askexe/exe-erp:v0.3.0@sha256:de7a6fb952b64f1e25737b2771c5fed9a9b6102c63a73624391fd6a5f880993e",
-    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.3.0@sha256:de7a6fb952b64f1e25737b2771c5fed9a9b6102c63a73624391fd6a5f880993e"
+    "erp": "ghcr.io/askexe/exe-erp:v0.3.1",
+    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.3.1",
+    "erp-queue": "ghcr.io/askexe/exe-erp:v0.3.1",
+    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.3.1"
   },
   "stackParticipation": {
     "required": false,
@@ -28,7 +28,7 @@
       {
         "type": "command",
         "command": "bash scripts/asset-resolution-smoke.sh http://localhost:8069 /login /app",
-        "description": "Asset resolution — every CSS/JS bundle the desk references must return 200 (bug 3938ac3d: ping was 200 and the container healthy while all 11 CSS bundles 404'd and the desk rendered unstyled)"
+        "description": "Asset resolution \u2014 every CSS/JS bundle the desk references must return 200 (bug 3938ac3d: ping was 200 and the container healthy while all 11 CSS bundles 404'd and the desk rendered unstyled)"
       }
     ],
     "migrations": {
