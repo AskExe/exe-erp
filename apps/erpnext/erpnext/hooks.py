@@ -87,6 +87,11 @@ additional_print_settings = "erpnext.controllers.print_settings.get_print_settin
 
 on_session_creation = "erpnext.portal.utils.create_customer_or_supplier"
 
+# bug 20f25abe: "one login, one logout" — revoke the shared exe-auth/GoTrue
+# session on Frappe logout. Merges with frappe/hooks.py's own on_logout entry
+# (Frappe aggregates same-named hooks across all installed apps into a list).
+on_logout = "erpnext.exe_auth.api.revoke_central_gotrue_session"
+
 treeviews = [
 	"Account",
 	"Cost Center",
