@@ -58,6 +58,37 @@ DEFAULT_WRITE_ROLES = ("Sales User", "Purchase User", "Stock User", "Accounts Us
 SYSTEM_USER_TYPE = "System User"
 WEBSITE_USER_TYPE = "Website User"
 
+# --- Logout-side SSO revocation (bug 20f25abe) -------------------------------
+# The apex-scoped HttpOnly cookie exe-auth sets at login and reads to identify
+# the shared session for revocation. See erpnext.exe_auth.api.revoke_central_gotrue_session.
+EXE_SESS_COOKIE = "exe_sess"
+
+
+def build_logout_revocation_request(exe_sess_cookie, auth_base_url):
+	"""Build the request needed to revoke the shared exe-auth/GoTrue session on
+	Frappe logout (bug 20f25abe — founder directive "one login, one logout").
+
+	Pure/frappe-free so it is testable without a live Frappe site (matches this
+	module's existing pattern for exe_perms decision logic). Returns None when
+	there is nothing to revoke: no exe_sess cookie present (this Frappe session
+	was never bridged to the shared SSO session — e.g. a local/admin-token login)
+	or no auth_base_url resolvable. Otherwise returns the requests.post() kwargs
+	the caller should use, unevaluated (the actual HTTP call is not pure and
+	belongs in api.py).
+
+	exe-auth's POST /auth/logout (auth.njs.js) reads ONLY the `exe_sess` cookie
+	to identify the session, needs no other auth, and ALWAYS returns 204
+	regardless of outcome (it clears its own cookies even when GoTrue revocation
+	fails or is unreachable) — so this is fire-and-forget from the caller's side.
+	"""
+	if not exe_sess_cookie or not auth_base_url:
+		return None
+	return {
+		"url": f"{auth_base_url.rstrip('/')}/auth/logout",
+		"cookies": {EXE_SESS_COOKIE: exe_sess_cookie},
+		"timeout": 5,
+	}
+
 # Access levels (monotonic: admin > write > read > none)
 LEVEL_ADMIN = "admin"
 LEVEL_WRITE = "write"

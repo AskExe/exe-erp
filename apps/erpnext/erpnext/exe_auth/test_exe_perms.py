@@ -403,6 +403,50 @@ class TestOauthStateDecision(unittest.TestCase):
 		self.assertEqual(ep.oauth_state_decision("", "nonce", True), "ok")
 
 
+class TestBuildLogoutRevocationRequest(unittest.TestCase):
+	"""Logout-side SSO revocation (bug 20f25abe — "one login, one logout").
+
+	Pure request-shape logic for erpnext.exe_auth.api.revoke_central_gotrue_session.
+	"""
+
+	def testNoCookieReturnsNone(self):
+		# No exe_sess cookie -> this Frappe session was never bridged to the
+		# shared SSO session (e.g. local/admin-token login); nothing to revoke.
+		self.assertIsNone(
+			ep.build_logout_revocation_request(None, "https://auth.acme.com")
+		)
+
+	def testEmptyCookieReturnsNoneFail(self):
+		self.assertIsNone(
+			ep.build_logout_revocation_request("", "https://auth.acme.com")
+		)
+
+	def testNoAuthBaseUrlReturnsNoneFail(self):
+		self.assertIsNone(ep.build_logout_revocation_request("jwt-cookie-value", None))
+
+	def testEmptyAuthBaseUrlReturnsNoneFail(self):
+		self.assertIsNone(ep.build_logout_revocation_request("jwt-cookie-value", ""))
+
+	def testBothMissingReturnsNoneFail(self):
+		self.assertIsNone(ep.build_logout_revocation_request(None, None))
+
+	def testValidInputsBuildRequest(self):
+		req = ep.build_logout_revocation_request(
+			"jwt-cookie-value", "https://auth.acme.com"
+		)
+		self.assertEqual(req["url"], "https://auth.acme.com/auth/logout")
+		self.assertEqual(req["cookies"], {"exe_sess": "jwt-cookie-value"})
+		self.assertEqual(req["timeout"], 5)
+
+	def testTrailingSlashOnAuthBaseUrlNoDoubleSlash(self):
+		# REGRESSION: a trailing slash on the resolved auth base URL must not
+		# produce "https://auth.acme.com//auth/logout".
+		req = ep.build_logout_revocation_request(
+			"jwt-cookie-value", "https://auth.acme.com/"
+		)
+		self.assertEqual(req["url"], "https://auth.acme.com/auth/logout")
+
+
 if __name__ == "__main__":
 	unittest.main()
 

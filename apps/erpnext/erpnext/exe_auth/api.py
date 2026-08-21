@@ -678,3 +678,40 @@ def admin_token(token: str | None = None):
 		"home_page": get_home_page() or "/desk",
 		"isAdminToken": True,
 	}
+
+
+def revoke_central_gotrue_session(login_manager=None, **kwargs):
+	"""Frappe `on_logout` hook (bug 20f25abe): revoke the shared exe-auth/GoTrue
+	session when a user logs out of ERP, so "one login, one logout" holds for ERP
+	the same way it already does for exe-crm (PR AskExe/exe-crm, bug cdb4a918,
+	commit 8fdef78307's revokeCentralGoTrueSession).
+
+	Runs BEFORE frappe.auth.LoginManager.logout() clears cookies/deletes the
+	session (see LoginManager.run_trigger, called at the top of .logout()), so
+	frappe.request.cookies still carries the apex-scoped `exe_sess` HttpOnly
+	cookie exe-auth's own login page set. Sessions that never went through the
+	SSO bridge (local/admin-token logins) carry no exe_sess cookie, so this is a
+	no-op for them.
+
+	Fails open by design: ANY exception here is swallowed and logged, never
+	re-raised. frappe.auth.LoginManager.run_trigger() calls on_logout hooks
+	un-guarded — an exception here would propagate up through logout() and abort
+	session deletion / cookie clearing, i.e. break local Frappe logout because of
+	a network hiccup talking to exe-auth. exe-auth's own /auth/logout is
+	similarly fail-safe (always returns 204 and clears its cookies even when
+	GoTrue is unreachable) — this mirrors that design on the caller's side.
+	"""
+	try:
+		if not frappe.request:
+			return
+		exe_sess = frappe.request.cookies.get(_exe_perms.EXE_SESS_COOKIE)
+		if not exe_sess:
+			return
+		from frappe.www.login import get_exe_auth_url
+
+		req = _exe_perms.build_logout_revocation_request(exe_sess, get_exe_auth_url())
+		if req is None:
+			return
+		requests.post(req["url"], cookies=req["cookies"], timeout=req["timeout"])
+	except Exception as e:
+		frappe.logger().warning(f"exe-auth logout revocation failed: {e}")
