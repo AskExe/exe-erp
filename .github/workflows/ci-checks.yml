@@ -99,14 +99,22 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          # `set +e` is LOad-BEARING. GitHub runs `run:` under `bash -e`, so
+          # `wait` returning the watchdog's 137 aborts the shell instantly and
+          # the fallback below is never reached -- the step fails 137 even
+          # though the Dockerfile is present. Verified: with -e the line after
+          # `wait` does not execute.
+          set +e
           docker build --check . & check_pid=$!
           ( sleep 120; kill -9 "$check_pid" 2>/dev/null ) & watchdog_pid=$!
           wait "$check_pid"; rc=$?
-          kill "$watchdog_pid" 2>/dev/null || true
+          kill "$watchdog_pid" 2>/dev/null
           if [ "$rc" -ne 0 ]; then
             echo "::warning::docker build --check exited $rc (137 = killed by the 120s watchdog, typically a stalled registry metadata fetch); falling back to Dockerfile presence check"
           fi
-          test "$rc" -eq 0 || test -f Dockerfile
+          # Exit explicitly so the step's status never depends on -e semantics.
+          if [ "$rc" -eq 0 ] || [ -f Dockerfile ]; then exit 0; fi
+          exit 1
 
       - name: Validate stack release contract
         shell: bash
