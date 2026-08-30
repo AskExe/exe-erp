@@ -518,8 +518,19 @@ def gotrue_login_start():
 		# Derive the customer auth domain + attach product tag and our callback.
 		from frappe.www.login import get_exe_auth_url
 
-		callback_url = frappe.utils.get_url(
-			"/api/method/erpnext.exe_auth.api.gotrue_login_callback"
+		# SCHEME (bug 42470087): frappe.utils.get_url() derives the scheme from
+		# the request as the CONTAINER sees it. Behind exe-erp-nginx /
+		# cloudflared that request is plain HTTP, so this produced
+		# `redirect=http://erp.<apex>/...` on a deployment served exclusively
+		# over https — a downgrade that GoTrue's URI allow-list may reject
+		# outright, and that otherwise bounces the browser through a plaintext
+		# URL carrying the token and state. Refuse to emit a downgraded callback
+		# no matter what the proxy reports; loopback/dev hosts keep http.
+		callback_url = _exe_perms.force_https_callback_url(
+			frappe.utils.get_url(
+				"/api/method/erpnext.exe_auth.api.gotrue_login_callback"
+			),
+			allow_insecure=bool(frappe.conf.get("gotrue_allow_insecure_callback")),
 		)
 		target = (
 			f"{get_exe_auth_url().rstrip('/')}/login"

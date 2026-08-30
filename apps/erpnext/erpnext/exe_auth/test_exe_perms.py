@@ -511,3 +511,69 @@ if __name__ == "__main__":
 #      gotrue_require_callback_state is on). gotrue_login_start sets the cookie
 #      + redirects with matching state; happy path logs in. NOTE: token-in-URL
 #      transport + session-outlives-JWT still need auth-flow coordination.
+
+
+class TestForceHttpsCallbackUrl(unittest.TestCase):
+	"""SSO callback URLs must never be emitted with a downgraded scheme.
+
+	Bug 42470087: gotrue_login_start built its `redirect=` callback with
+	frappe.utils.get_url(), which reads the scheme off the request as the
+	CONTAINER sees it. Behind exe-erp-nginx / cloudflared that request is plain
+	HTTP, so a deployment served exclusively over https emitted
+
+	    redirect=http%3A%2F%2Ferp.askexe.com%2Fapi%2Fmethod%2F...callback
+
+	GoTrue's URI allow-list is registered with the https form (so the callback
+	can be rejected outright), and if it is allowed the browser is bounced
+	through a plaintext URL carrying the token and state.
+	"""
+
+	def testPublicHttpIsUpgraded(self):
+		self.assertEqual(
+			ep.force_https_callback_url(
+				"http://erp.askexe.com/api/method/erpnext.exe_auth.api.gotrue_login_callback"
+			),
+			"https://erp.askexe.com/api/method/erpnext.exe_auth.api.gotrue_login_callback",
+		)
+
+	def testHttpsIsLeftAlone(self):
+		url = "https://erp.askexe.com/api/method/x"
+		self.assertEqual(ep.force_https_callback_url(url), url)
+
+	def testPortIsPreservedOnUpgrade(self):
+		self.assertEqual(
+			ep.force_https_callback_url("http://erp.example.co.uk:8443/a?b=c"),
+			"https://erp.example.co.uk:8443/a?b=c",
+		)
+
+	def testLocalDevHostsKeepHttp(self):
+		for url in (
+			"http://localhost:8000/a",
+			"http://127.0.0.1:8000/a",
+			"http://0.0.0.0:8000/a",
+			"http://[::1]:8000/a",
+			"http://site.localhost/a",
+			"http://bench.local/a",
+			"http://erp.test/a",
+		):
+			with self.subTest(url=url):
+				self.assertEqual(ep.force_https_callback_url(url), url)
+
+	def testOperatorOptOutIsHonoured(self):
+		"""site_config `gotrue_allow_insecure_callback` for odd TLS topologies."""
+		url = "http://erp.askexe.com/a"
+		self.assertEqual(ep.force_https_callback_url(url, allow_insecure=True), url)
+
+	def testNonHttpInputIsUntouched(self):
+		for value in (None, "", "ftp://x/y", 42):
+			with self.subTest(value=value):
+				self.assertEqual(ep.force_https_callback_url(value), value)
+
+	def testLookalikeHostIsNotTreatedAsLocalFail(self):
+		"""`evil-localhost.com` must NOT match the loopback allowance."""
+		for host in ("evil-localhost.com", "notlocalhost", "localhost.attacker.com"):
+			with self.subTest(host=host):
+				self.assertEqual(
+					ep.force_https_callback_url(f"http://{host}/a"),
+					f"https://{host}/a",
+				)

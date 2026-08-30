@@ -427,3 +427,69 @@ def compute_decision(app_metadata, configured_org_id, admin_role=None, write_rol
     decision["org_id"] = org_id
     decision["role_preset"] = role
     return decision, ORG_RESOLVED
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SSO callback scheme (bug 42470087)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Hosts for which plain http:// is legitimate: local development benches, where
+# there is no TLS terminator and no credential crossing a network. Everything
+# else is a public deployment and must be https.
+_LOCAL_HOST_EXACT = frozenset(("localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"))
+_LOCAL_HOST_SUFFIXES = (".localhost", ".local", ".test", ".internal")
+
+
+def is_local_http_host(host):
+    """True when plain http:// is legitimate for this host (a dev bench)."""
+    if not isinstance(host, str):
+        return False
+    host = host.strip().lower()
+    if not host:
+        return False
+    # Strip a port; keep bracketed IPv6 literals intact.
+    if host.startswith("["):
+        host = host.split("]", 1)[0] + "]"
+    elif host.count(":") == 1:
+        host = host.split(":", 1)[0]
+    if host in _LOCAL_HOST_EXACT:
+        return True
+    return any(host.endswith(suffix) for suffix in _LOCAL_HOST_SUFFIXES)
+
+
+def force_https_callback_url(url, allow_insecure=False):
+    """Upgrade an http:// SSO callback URL to https:// (bug 42470087).
+
+    WHY: gotrue_login_start builds its `redirect=` callback with
+    frappe.utils.get_url(), which derives the scheme from the INBOUND REQUEST as
+    the container sees it. In the deployed stack that request reaches Frappe
+    over plain HTTP from exe-erp-nginx / cloudflared, so get_url() returns
+    `http://erp.<apex>/...` even though the browser spoke https end to end. The
+    live redirect observed on erp.askexe.com was:
+
+        https://auth.askexe.com/login?product=ERP
+            &redirect=http%3A%2F%2Ferp.askexe.com%2Fapi%2Fmethod%2F...callback
+
+    Two real costs: GoTrue's GOTRUE_URI_ALLOW_LIST is registered with the https
+    form, so the callback can be rejected outright; and if it IS allowed, the
+    browser is bounced through a plaintext URL that carries the access token and
+    state before any HSTS upgrade — a credential-exposure window on a login flow.
+
+    Fixing this at the proxy (forwarding and honouring X-Forwarded-Proto) is the
+    other half and is an infrastructure change. This function makes the
+    application refuse to EMIT a downgraded callback regardless of what the
+    proxy tells it, so a proxy misconfiguration can no longer silently become a
+    plaintext credential hop.
+
+    Local development is unaffected: loopback / .localhost / .local / .test
+    hosts keep http. An operator who genuinely terminates TLS elsewhere can opt
+    out with site_config `gotrue_allow_insecure_callback`.
+    """
+    if allow_insecure:
+        return url
+    if not isinstance(url, str) or not url.startswith("http://"):
+        return url
+    host = url[len("http://") :].split("/", 1)[0]
+    if is_local_http_host(host):
+        return url
+    return "https://" + url[len("http://") :]
