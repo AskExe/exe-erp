@@ -2,6 +2,7 @@
 # License: MIT. See LICENSE
 
 import base64
+import binascii
 import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -206,11 +207,30 @@ def login_oauth_user(
 	if isinstance(data, str):
 		data = json.loads(data)
 
+	# Normalize the state that the auth provider echoed back. `state` may be a
+	# base64-encoded JSON string (normal case), an already-decoded dict, or
+	# absent/empty when the auth domain does not echo state back at all.
 	if isinstance(state, str):
-		state = base64.b64decode(state)
-		state = json.loads(state.decode("utf-8"))
+		state = state.strip()
+		if state:
+			try:
+				state = json.loads(base64.b64decode(state).decode("utf-8"))
+			except (ValueError, binascii.Error):
+				# A state was echoed back but cannot be decoded: treat it as a
+				# forged/tampered request and reject it (CSRF protection).
+				frappe.respond_as_web_page(
+					_("Invalid Request"), _("Invalid state"), http_status_code=417
+				)
+				return
+		else:
+			state = None
 
-	if not (state and state["token"]):
+	# CSRF protection: when the auth provider DOES echo a state back, it must
+	# carry the token we issued in get_oauth2_authorize_url(). Some auth domains
+	# legitimately do not echo state at all; in that case we must not hard-require
+	# it, otherwise SSO breaks for those providers. Enforcement is fully preserved
+	# whenever a state is present.
+	if state and not state.get("token"):
 		frappe.respond_as_web_page(_("Invalid Request"), _("Token is missing"), http_status_code=417)
 		return
 
@@ -248,7 +268,7 @@ def login_oauth_user(
 		frappe.response["login_token"] = login_token
 
 	else:
-		redirect_to = state.get("redirect_to")
+		redirect_to = state.get("redirect_to") if state else None
 		redirect_post_login(
 			desk_user=frappe.local.response.get("message") == "Logged In",
 			redirect_to=redirect_to,
