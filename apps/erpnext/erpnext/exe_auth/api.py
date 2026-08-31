@@ -555,14 +555,15 @@ def gotrue_login_callback():
 	validate the JWT against GoTrue's /user endpoint, auto-provision a Frappe
 	User if needed, log them in, and redirect to /desk.
 
-	SECURITY — CSRF state is enforced here (see below). TWO transport issues
-	remain and need broader auth-flow coordination (NOT fixed here, flagged):
-	  (1) the access token still arrives in the URL QUERY on a GET, so it can
-	      land in nginx/Frappe access logs and Referer headers (replay risk);
-	      moving it to a URL fragment or a POST one-time-code exchange changes
-	      the shared GoTrue redirect contract.
+	SECURITY — CSRF state is enforced here (see below).
+	  (1) RESOLVED for current deployments: the token no longer needs to travel in
+	      the URL query. exe-auth sets it as the apex-scoped HttpOnly `exe_sess`
+	      cookie (bug 83ba9546) and we read it from there. The `?access_token=`
+	      query path is retained only for backward compatibility with deployments
+	      still on the legacy redirect contract, and carries the original log /
+	      Referer exposure while it is used.
 	  (2) the issued Frappe session outlives the ~1h JWT TTL; binding session
-	      expiry to the JWT `exp` is a follow-up.
+	      expiry to the JWT `exp` is a follow-up (NOT fixed here, flagged).
 	"""
 	# CSRF STATE (P1 login-CSRF): require a `state` nonce that matches the signed
 	# cookie set by gotrue_login_start. Without it, a GET callback carrying an
@@ -585,7 +586,17 @@ def gotrue_login_callback():
 		)
 		frappe.throw("Invalid or missing login state", frappe.AuthenticationError)
 
-	access_token = frappe.form_dict.get("access_token")
+	# TOKEN SOURCE (SSO login blocker): prefer the legacy `?access_token=` query
+	# param when present, else fall back to the apex-scoped HttpOnly `exe_sess`
+	# cookie the browser attaches to this request. exe-auth stopped putting tokens
+	# in redirect URLs (bug 83ba9546); reading only the query made every SSO login
+	# fail with "No access token provided" on a callback carrying no query at all.
+	# Policy is pure/testable in exe_perms; the validation below is unchanged and
+	# runs identically whichever source supplied the token.
+	access_token = _exe_perms.resolve_sso_access_token(
+		frappe.form_dict.get("access_token"),
+		frappe.request.cookies if frappe.request else None,
+	)
 	if not access_token:
 		frappe.throw("No access token provided", frappe.AuthenticationError)
 

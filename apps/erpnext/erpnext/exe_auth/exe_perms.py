@@ -89,6 +89,54 @@ def build_logout_revocation_request(exe_sess_cookie, auth_base_url):
 		"timeout": 5,
 	}
 
+
+def resolve_sso_access_token(query_token, cookies):
+	"""Resolve the GoTrue access token for the SSO login callback.
+
+	Pure/frappe-free so it is testable without a live Frappe site (same pattern as
+	`build_logout_revocation_request` and `oauth_state_decision` above).
+
+	WHY THIS EXISTS (SSO login blocker)
+	-----------------------------------
+	`gotrue_login_callback` used to read the token ONLY from the URL query
+	(`?access_token=`). exe-auth stopped emitting that parameter site-wide (bug
+	83ba9546 — tokens in redirect URLs leak via browser history, access logs and
+	Referer headers). It now authenticates server-side and sets the credential as
+	the HttpOnly, apex-scoped `exe_sess` cookie instead. Because that cookie's
+	Domain covers every sibling subdomain, the browser attaches it automatically
+	to the callback request on erp.<apex> — HttpOnly only blocks `document.cookie`
+	reads from page JS, it does not stop the cookie travelling on the wire.
+
+	So the callback came back with ZERO query parameters and threw
+	"No access token provided" on every single SSO login. exe-wiki
+	(`resolveSsoJwt`, bugs 7772300f / 6017dd9f) and exe-crm were both already
+	moved to the cookie; ERP was the integration that was missed. This is that
+	same contract, ported to Frappe.
+
+	NOTE ON COOKIE NAMES — there are two, and only one is a credential:
+	  * `exe_sess` (EXE_SESS_COOKIE): HttpOnly, apex-scoped, and its VALUE is the
+	    GoTrue JWT. This is the one to bearer-auth with, and the one
+	    `build_logout_revocation_request` already hands back to exe-auth.
+	  * `exe_access_token`: a JS-readable PRESENCE SENTINEL whose value is the
+	    literal "1" (see frappe/templates/base.html and
+	    test_sso_cookie_contract.py). It is NOT a bearer token and must never be
+	    sent to GoTrue.
+
+	The query parameter is still preferred when present, purely for backward
+	compatibility with any deployment still on the legacy redirect contract.
+	Returns None when neither source yields a token, so the caller keeps throwing
+	its existing "No access token provided" error.
+	"""
+	if isinstance(query_token, str) and query_token.strip():
+		return query_token
+	if cookies is None:
+		return None
+	cookie_token = cookies.get(EXE_SESS_COOKIE)
+	if isinstance(cookie_token, str) and cookie_token.strip():
+		return cookie_token
+	return None
+
+
 # Access levels (monotonic: admin > write > read > none)
 LEVEL_ADMIN = "admin"
 LEVEL_WRITE = "write"
