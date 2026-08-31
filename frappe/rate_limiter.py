@@ -25,8 +25,38 @@ def update():
 
 
 def respond():
-	if hasattr(frappe.local, "rate_limiter"):
-		return frappe.local.rate_limiter.respond()
+	"""Build the response for a 429.
+
+	MUST return a Response. `frappe.app.handle_exception` assigns the result
+	straight into the response it hands back to Werkzeug, and Werkzeug's
+	`Request.application` decorator *calls* that value as a WSGI callable
+	(`return resp(*args[-2:])`). Returning `None` there does not produce a 429 —
+	it produces `TypeError: 'NoneType' object is not callable` raised from inside
+	Werkzeug, i.e. an unhandled 500 with a traceback that never mentions rate
+	limiting at all.
+
+	This used to return `None` in two states, both of them normal:
+
+	  1. No site-level limiter. `frappe.local.rate_limiter` is only ever set by
+	     `apply()` above, and only when `site_config.rate_limit` is configured.
+	     No deployment here sets it. But a 429 does not only come from the
+	     site-level limiter — the `@rate_limit(...)` decorator raises
+	     `frappe.RateLimitExceededError` (http_status_code 429) entirely on its
+	     own, with no `frappe.local.rate_limiter` anywhere. Every such 429 that
+	     was not answered as JSON hit this `None`.
+	  2. A site-level limiter exists but `rejected` is False — again `None`.
+
+	Callers that want to know whether the *site-level* limiter rejected the
+	request should ask `frappe.local.rate_limiter` directly; this function's
+	only job is to produce the 429.
+	"""
+	limiter = getattr(frappe.local, "rate_limiter", None)
+	if limiter is not None:
+		response = limiter.respond()
+		if response is not None:
+			return response
+
+	return Response(_("Too Many Requests"), status=429)
 
 
 class RateLimiter:

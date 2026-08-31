@@ -85,6 +85,15 @@ class TracingMiddleware:
 
             return start_response(status, headers, exc_info)
 
+        # Whether control has already been handed to the wrapped application.
+        # Once it has, this middleware must NEVER call it a second time: the
+        # request has already run, `start_response` may already have been
+        # called, and every side effect (rate-limit counters, cookies, login
+        # attempts, DB writes) would be replayed. Before that point a tracing
+        # failure is genuinely recoverable and we fall through to an untraced
+        # call.
+        app_invoked = [False]
+
         try:
             with tracer.span("http.request", "request") as span:
                 span.set_attribute("http.method", method)
@@ -102,6 +111,7 @@ class TracingMiddleware:
                 except Exception:
                     pass
 
+                app_invoked[0] = True
                 result = self.app(environ, traced_start_response)
 
                 # Set response attributes
@@ -117,8 +127,19 @@ class TracingMiddleware:
                 return result
 
         except Exception as e:
+            if app_invoked[0]:
+                # The failure came from the application itself, not from
+                # tracing. Re-running it here REPLAYS the whole request — which
+                # is how a single failing SSO click produced the doubled
+                # "During handling of the above exception, another exception
+                # occurred" traceback in the container logs, burned two
+                # rate-limit tokens per click, and hid the real error behind a
+                # second identical one. Let it propagate to the WSGI server,
+                # which is what turns it into a 500.
+                logger.debug(f"TracingMiddleware: application raised: {e}")
+                raise
             logger.debug(f"TracingMiddleware error: {e}")
-            # Don't let tracing break the app
+            # Tracing setup failed before the app ran — safe to run it untraced.
             return self.app(environ, start_response)
 
         finally:

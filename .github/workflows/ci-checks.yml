@@ -171,7 +171,11 @@ jobs:
           "$PYTHON3" -m venv "$VENV_DIR"
           . "$VENV_DIR/bin/activate"
           python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7" "tomli>=1.1; python_version < '3.11'"
+          # Werkzeug is pinned to the SAME version as pyproject.toml on purpose:
+          # the SSO 429 regression test drives the real `Request.application`
+          # boundary, so testing it against a different Werkzeug than production
+          # runs would prove nothing about production.
+          python -m pip install --quiet "ruff==0.14.10" "pip-audit~=2.7" "Werkzeug==3.1.6" "tomli>=1.1; python_version < '3.11'"
           echo "$VENV_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Install Python audit build prerequisites

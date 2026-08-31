@@ -64,6 +64,14 @@ EXPECTED_MODULES = (
 	"apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py",
 	"apps/erpnext/erpnext/exe_auth/test_exe_perms.py",
 	"apps/erpnext/erpnext/exe_auth/test_login_page_contract.py",
+	# Bug adf77179 / 83ba9546 — SSO callback token source. This module existed
+	# but had never been listed here, so it had never run in CI: exactly the
+	# opt-in gap this runner was written to close.
+	"apps/erpnext/erpnext/exe_auth/test_sso_callback_token_source.py",
+	# The SSO 429 -> 500 crash. Needs Werkzeug (installed in the CI venv
+	# alongside ruff) because it drives the real `Request.application`
+	# boundary that raised the production TypeError.
+	"apps/erpnext/erpnext/exe_auth/test_sso_rate_limit_response.py",
 	"apps/erpnext/erpnext/exe_monitor/test_error_reporter.py",
 )
 
@@ -83,6 +91,13 @@ REQUIRED_TEST_CLASSES = (
 	"TestSsoControlHasServerRenderedHref",
 	# Bug 42470087 — no downgraded (http://) SSO callback URL may be emitted.
 	"TestForceHttpsCallbackUrl",
+	# The SSO 429 -> 500 crash: a rate-limited endpoint must answer 429, and no
+	# branch of handle_exception may hand None back to Werkzeug.
+	"TestRateLimiterRespondAlwaysBuildsAResponse",
+	"TestWerkzeugBoundaryGetsAWsgiCallable",
+	"TestHandleExceptionNeverReturnsNone",
+	"TestTracingMiddlewareDoesNotReplayTheRequest",
+	"TestCiWerkzeugPinMatchesProduction",
 )
 
 
