@@ -119,6 +119,33 @@ jobs:
         with:
           platforms: arm64
 
+      # Bug 5f2fb4fa: docker/setup-buildx-action creates a fresh named
+      # `buildx_buildkit_builder-<uuid>` container per run but does not clean
+      # up the previous run's builder container when that run is cancelled
+      # mid-setup. On 2026-08-31 this stalled three consecutive release
+      # builds on the self-hosted ERP release runner — each one hung for 2+ minutes inside "Set
+      # up Docker Buildx" itself, before any build layer ran, because two
+      # orphaned builder containers from earlier cancelled runs were still
+      # "Up" and not registered in `docker buildx ls`. Manual `docker rm` on
+      # both immediately unblocked the next run.
+      #
+      # This runner label maps to one job at a time per physical runner, so
+      # any buildx_buildkit_builder-* container still present HERE, before
+      # this run's own setup-buildx step has created one, can only be an
+      # orphan from an earlier, already-finished-or-cancelled run on this
+      # same host — never a container this run itself is using.
+      - name: Clean up orphaned buildx builder containers
+        run: |
+          set -uo pipefail
+          orphans="$(docker ps -aq --filter 'name=buildx_buildkit_builder-' 2>/dev/null || true)"
+          if [ -n "$orphans" ]; then
+            echo "Removing orphaned buildx builder container(s) from a prior cancelled run:"
+            docker ps -a --filter 'name=buildx_buildkit_builder-' --format '  {{.Names}} ({{.Status}})'
+            docker rm -f $orphans >/dev/null 2>&1 || true
+          else
+            echo "No orphaned buildx builder containers found."
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
