@@ -173,7 +173,7 @@ def _build_frappe_stub():
 		frappe.logged_errors.append((title, message))
 
 	def _get_doc(*args, **kwargs):	# pragma: no cover - not reached on these paths
-		raise AssertionError("unexpected frappe.get_doc%r" % (args,))
+		raise AssertionError(f"unexpected frappe.get_doc{args!r}")
 
 	def _logger(*args, **kwargs):
 		noop = lambda *a, **k: None	 # noqa: E731
