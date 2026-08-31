@@ -61,24 +61,56 @@
 	     Do NOT reintroduce `exe_sso_token` — that name is dead and gating on it
 	     produces an infinite login bounce (bug f1bb40d8 wiki, 9f60e8e6 crm,
 	     3938ac3d erp). See apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py. -->
-	{% if frappe.session.user == 'Guest' %}
+	{% if frappe.session.user == 'Guest' and path != 'login' %}
 	<script>
 	(function(){
-		// Boundary-anchored so a cookie merely *ending* in the canonical name
-		// (e.g. `other_exe_access_token`) cannot be mistaken for a session.
-		var token = document.cookie.match(/(?:^|;\s*)exe_access_token=([^;]+)/);
-		if (!token) {
-			// Route the unauthenticated bounce through the server-side
-			// gotrue_login_start entry point — the SAME path the login page's
-			// SSO link uses (www/login.html). It sets the exe_sso_state CSRF
-			// cookie, derives THIS customer's auth domain, and redirects to it
-			// carrying a matching `state` plus a `redirect=` that returns to
-			// gotrue_login_callback — the sole ?access_token consumer that
-			// calls login_as() and mints the Frappe `sid` the edge gate needs.
-			// Bouncing straight to auth.<domain>?redirect=<generic page> left
-			// the returning token on a page with no consumer → redirect loop.
-			window.location.href = '/api/method/erpnext.exe_auth.api.gotrue_login_start';
+		// ADOPT AN EXISTING APEX SESSION (bug 62c42448).
+		//
+		// This gate used to read as:
+		//
+		//     var token = <exe_access_token cookie>;
+		//     if (!token) { window.location.href = <gotrue_login_start>; }
+		//
+		// i.e. it started SSO only when there was NO apex session — exactly
+		// backwards. A user who had just signed in at auth.<apex> arrived here
+		// carrying `exe_access_token`, the branch was skipped, nothing consumed
+		// the apex session, and Frappe served the local login page with
+		// sid=Guest. Having a valid SSO session made ERP LESS likely to log you
+		// in than having none.
+		//
+		// `exe_access_token` is a JS-readable PRESENCE SENTINEL (literal value
+		// "1"), not a bearer token — it can never be exchanged for a session
+		// client-side. The only thing that mints a Frappe `sid` is
+		// gotrue_login_callback. So the correct move in BOTH cases is the same:
+		// enter the server-side gotrue_login_start flow. When an apex session
+		// already exists, auth.<apex> recognises it and returns immediately
+		// without re-prompting, and the callback exchanges it for a Frappe
+		// session — that IS the adoption. When it does not, the user gets the
+		// normal sign-in prompt. Hence: no cookie branch at all.
+		//
+		// Never link straight to the callback: gotrue_login_start is what sets
+		// the exe_sso_state CSRF cookie the callback verifies.
+		var START = '/api/method/erpnext.exe_auth.api.gotrue_login_start';
+
+		// ONE-SHOT LOOP GUARD. If the handoff comes back and we are STILL Guest,
+		// bouncing again would spin forever (the failure mode bugs f1bb40d8 /
+		// 9f60e8e6 / 3938ac3d were all made of). Attempt the handoff at most
+		// once per tab; on the second arrival, fall back to the local login page
+		// — which still offers password and Login Token sign-in — instead of
+		// looping. sessionStorage is per-tab and cleared with the tab, so a
+		// genuine later sign-in attempt is not blocked.
+		var KEY = 'exe_sso_handoff_attempted';
+		var attempted = false;
+		try { attempted = window.sessionStorage.getItem(KEY) === '1'; } catch (e) {}
+
+		if (attempted) {
+			try { window.sessionStorage.removeItem(KEY); } catch (e) {}
+			window.location.href = '/login';
+			return;
 		}
+
+		try { window.sessionStorage.setItem(KEY, '1'); } catch (e) {}
+		window.location.href = START;
 	})();
 	</script>
 	{% endif %}

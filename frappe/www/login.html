@@ -132,7 +132,17 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 				<span style="color:#A09CAF;font-size:12px;font-family:'Manrope',sans-serif">or</span>
 				<div style="flex:1;height:1px;background:rgba(240,237,232,0.1)"></div>
 			</div>
+			{# The href is set SERVER-SIDE, in the markup, on purpose (bug e1a9e4e9).
+			   It used to be assigned only by the inline <script> at the bottom of
+			   this file. When anything in that script fails to parse, the whole
+			   block never executes and this control silently becomes a dead <a>
+			   with no href — which is exactly the outage e1a9e4e9 describes. A
+			   static href makes "Sign in via Exe SSO" work even with the page's
+			   JavaScript entirely broken or disabled. Keep it in sync with the
+			   assignment in the script below; both point at gotrue_login_start,
+			   never at the callback (see the comment there for why). #}
 			<a id="exe-sso-link"
+				href="/api/method/erpnext.exe_auth.api.gotrue_login_start"
 				style="display:flex;align-items:center;justify-content:center;width:100%;max-width:340px;height:42px;margin-top:1rem;border:1px solid rgba(240,237,232,0.1);border-radius:8px;color:#F0EDE8;font-family:'Manrope',sans-serif;font-size:13px;font-weight:500;text-decoration:none;transition:background-color 0.15s,border-color 0.15s;cursor:pointer"
 				onmouseover="this.style.backgroundColor='rgba(37,35,64,0.6)';this.style.borderColor='rgba(245,215,110,0.3)'"
 				onmouseout="this.style.backgroundColor='transparent';this.style.borderColor='rgba(240,237,232,0.1)'"
@@ -257,7 +267,17 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 			callback: function(r) {
 				if (r && r.message && r.message.success) {
 					btn.textContent = 'Success';
-					document.body.innerHTML = '{% include "templates/includes/splash_screen.html" %}';
+					// TEMPLATE LITERAL, NOT a single-quoted string (bug e1a9e4e9).
+					// templates/includes/splash_screen.html is MULTI-LINE HTML and
+					// Jinja expands this include verbatim. A single-quoted JS string
+					// cannot contain a raw newline, so wrapping this include in
+					// SINGLE QUOTES emitted an UNTERMINATED STRING LITERAL at parse
+					// time -> this entire <script> block never ran -> the SSO link
+					// never got an href, the tab switcher never bound, and the login
+					// button stayed permanently disabled. Backticks span newlines, so
+					// the include is safe here. This matches how the same include is
+					// already consumed in templates/includes/login/login.js.
+					document.body.innerHTML = `{% include "templates/includes/splash_screen.html" %}`;
 					window.location.href = r.message.home_page || '/desk';
 				}
 			},

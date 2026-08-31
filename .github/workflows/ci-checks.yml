@@ -67,6 +67,7 @@ jobs:
   validate:
     name: Validate + lint + migration smoke
     runs-on: [self-hosted, macOS, ARM64, mac-fast]
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -83,7 +84,37 @@ jobs:
           docker compose --env-file .env.example -f docker-compose.yml config --quiet
 
       - name: Validate Dockerfile is parseable
-        run: docker build --check . || test -f Dockerfile
+        # BOUNDED ON PURPOSE (bug 3136f36b). `docker build --check` performs a
+        # REGISTRY metadata fetch -- observed stalling indefinitely at
+        # "#2 [internal] load metadata for docker.io/library/python:3.14-slim-bookworm".
+        # It has no built-in timeout, and this repo has exactly ONE mac-fast
+        # runner, so an unbounded stall holds the only slot and starves every
+        # queued job behind it: run 33319026352 sat in_progress for 2h19m while
+        # the gitleaks job never started, leaving PR #65 permanently "pending".
+        # The mac runner has neither `timeout` nor `gtimeout`, so bound by hand.
+        # Semantics are unchanged from `... || test -f Dockerfile`: this step was
+        # already advisory, so a timeout degrades to the presence check rather
+        # than failing the build.
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -uo pipefail
+          # `set +e` is LOad-BEARING. GitHub runs `run:` under `bash -e`, so
+          # `wait` returning the watchdog's 137 aborts the shell instantly and
+          # the fallback below is never reached -- the step fails 137 even
+          # though the Dockerfile is present. Verified: with -e the line after
+          # `wait` does not execute.
+          set +e
+          docker build --check . & check_pid=$!
+          ( sleep 120; kill -9 "$check_pid" 2>/dev/null ) & watchdog_pid=$!
+          wait "$check_pid"; rc=$?
+          kill "$watchdog_pid" 2>/dev/null
+          if [ "$rc" -ne 0 ]; then
+            echo "::warning::docker build --check exited $rc (137 = killed by the 120s watchdog, typically a stalled registry metadata fetch); falling back to Dockerfile presence check"
+          fi
+          # Exit explicitly so the step's status never depends on -e semantics.
+          if [ "$rc" -eq 0 ] || [ -f Dockerfile ]; then exit 0; fi
+          exit 1
 
       - name: Validate stack release contract
         shell: bash
@@ -496,6 +527,7 @@ jobs:
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: [self-hosted, macOS, ARM64, mac-fast]
+    timeout-minutes: 45
     steps:
       - name: Checkout (full history for secret scan)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -579,6 +611,7 @@ jobs:
   trivy-scan:
     name: Container/deps scan (trivy)
     runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -602,6 +635,7 @@ jobs:
     # GHA layer cache is warmest on the persistent host. Release publish
     # (release-stack-image.yml) also stays self-hosted for GHCR secrets.
     runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

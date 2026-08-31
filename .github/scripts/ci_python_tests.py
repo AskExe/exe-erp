@@ -63,6 +63,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 EXPECTED_MODULES = (
 	"apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py",
 	"apps/erpnext/erpnext/exe_auth/test_exe_perms.py",
+	"apps/erpnext/erpnext/exe_auth/test_login_page_contract.py",
 	"apps/erpnext/erpnext/exe_monitor/test_error_reporter.py",
 )
 
@@ -75,6 +76,13 @@ REQUIRED_TEST_CLASSES = (
 	"TestSsoGateUsesCanonicalCookie",
 	"TestDeadCookieNamesAbsentFail",
 	"TestDeployManifestShipsTheSsoFix",
+	# Bug e1a9e4e9 — the login page's inline script must PARSE, and the SSO
+	# control must carry a real href in the server-rendered markup. The outage
+	# was a single quote character; nothing but a machine check catches that.
+	"TestLoginPageScriptParses",
+	"TestSsoControlHasServerRenderedHref",
+	# Bug 42470087 — no downgraded (http://) SSO callback URL may be emitted.
+	"TestForceHttpsCallbackUrl",
 )
 
 

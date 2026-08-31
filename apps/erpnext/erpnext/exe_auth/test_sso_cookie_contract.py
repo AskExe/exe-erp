@@ -97,14 +97,54 @@ class TestSsoGateUsesCanonicalCookie(unittest.TestCase):
 			f"`{CANONICAL_COOKIE}`",
 		)
 
-	def testBaseTemplateReadsCookieInRedirectGuard(self):
-		"""The canonical name must appear in the cookie *match*, not just a comment."""
+	def testBaseTemplateGuardIsUnconditionalOnGuestFail(self):
+		"""The Guest guard must NOT branch on the presence of the apex cookie.
+
+		SUPERSEDES an earlier assertion here that REQUIRED a
+		`document.cookie.match(...exe_access_token...)` read inside this guard.
+		That assertion was written to stop the guard drifting back to the dead
+		`exe_sso_token` name, but it also froze in place the shape that caused
+		bug 62c42448: the guard read the cookie and then started SSO only when
+		the cookie was ABSENT.
+
+		`exe_access_token` is a presence SENTINEL (literal "1"), not a bearer
+		token, so its presence proves an apex session exists but can never be
+		exchanged for a Frappe session client-side. Skipping the handoff because
+		it is present therefore strands the user as Guest forever — a valid SSO
+		session made ERP *less* likely to log you in. The correct guard is
+		unconditional: always enter gotrue_login_start, and let the callback mint
+		the Frappe sid (which is the adoption).
+
+		The dead-name protection the old assertion was really for is NOT weakened
+		— it lives in TestDeadCookieNamesAbsentFail below, which sweeps this file
+		and the whole fork for any `document.cookie` read of a retired name.
+		"""
 		content = _read(os.path.join("frappe", "templates", "base.html"))
-		self.assertRegex(
+		guard = re.search(
+			r"\{% if frappe\.session\.user == 'Guest'.*?\{% endif %\}",
 			content,
-			r"document\.cookie\.match\([^\n]*" + re.escape(CANONICAL_COOKIE),
-			"the SSO redirect guard must match the canonical cookie name against "
-			"document.cookie",
+			re.DOTALL,
+		)
+		self.assertIsNotNone(guard, "base.html must still carry a Guest SSO guard")
+		# Strip `//` comments before asserting on control flow: this guard
+		# deliberately QUOTES the old broken branch in its explanation, and a
+		# check that a comment can trip is a check that teaches people to stop
+		# explaining themselves.
+		body = re.sub(r"//[^\n]*", "", guard.group(0))
+		self.assertIn(
+			"erpnext.exe_auth.api.gotrue_login_start",
+			body,
+			"the Guest guard must route through the server-side gotrue_login_start "
+			"entry point (never straight to the callback, which would bypass the "
+			"exe_sso_state CSRF cookie initializer)",
+		)
+		self.assertNotRegex(
+			body,
+			r"if\s*\(\s*!\s*token\s*\)",
+			"the Guest guard must not skip the SSO handoff when the apex "
+			f"`{CANONICAL_COOKIE}` sentinel is present (bug 62c42448) — that "
+			"cookie is a presence sentinel, not a session, so its presence is "
+			"a reason to ADOPT the apex session, never a reason to stay Guest",
 		)
 
 
