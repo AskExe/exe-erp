@@ -408,6 +408,26 @@ def handle_exception(e):
 			http_status_code=http_status_code, title=_("Server Error"), message=_("Uncaught Exception")
 		).render()
 
+	if response is None:
+		# BACKSTOP — never hand None back to Werkzeug.
+		#
+		# `application()` returns whatever this function produced, and Werkzeug's
+		# `Request.application` decorator calls it as a WSGI callable
+		# (`return resp(*args[-2:])` in werkzeug/wrappers/request.py). A None
+		# there surfaces as `TypeError: 'NoneType' object is not callable` raised
+		# from inside Werkzeug — a 500 whose traceback names neither the failing
+		# endpoint nor the branch that produced no response.
+		#
+		# The branch table above could reach here two ways:
+		#   - the 508 deadlock/timeout branch, which only rewrites
+		#     http_status_code and assigns no response at all;
+		#   - the 429 branch, when `frappe.rate_limiter.respond()` returned None
+		#     (fixed at source in frappe/rate_limiter.py).
+		# A deliberately dependency-free response: this path can be reached with
+		# a deadlocked or unavailable database, so it must not render a template
+		# or hit translations.
+		response = Response(f"{http_status_code} Error", status=http_status_code or 500)
+
 	if e.__class__ == frappe.AuthenticationError:
 		if hasattr(frappe.local, "login_manager"):
 			frappe.local.login_manager.clear_cookies()
