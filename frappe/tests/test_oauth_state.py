@@ -14,8 +14,8 @@ def _encode_state(payload: dict) -> str:
 
 
 class TestOAuthState(UnitTestCase):
-	def test_sso_completes_without_state_echo(self):
-		"""SSO must complete even when the auth domain does not echo state back."""
+	def test_missing_state_rejected_Fail(self):
+		"""A callback with no state echo at all must be rejected (login CSRF)."""
 		with (
 			patch("frappe.respond_as_web_page") as respond_as_web_page,
 			patch("frappe.utils.oauth.get_email", return_value="sso@example.com"),
@@ -27,12 +27,13 @@ class TestOAuthState(UnitTestCase):
 		):
 			login_oauth_user({"email": "sso@example.com"}, provider="frappe", state=None)
 
-			respond_as_web_page.assert_not_called()
-			local.login_manager.login_as.assert_called_once_with("sso@example.com")
-			redirect_post_login.assert_called_once()
+			respond_as_web_page.assert_called_once()
+			self.assertEqual(respond_as_web_page.call_args.kwargs.get("http_status_code"), 417)
+			local.login_manager.login_as.assert_not_called()
+			redirect_post_login.assert_not_called()
 
-	def test_sso_completes_with_empty_state(self):
-		"""An empty-string state is equivalent to no state echo: SSO must complete."""
+	def test_empty_state_rejected_Fail(self):
+		"""An empty-string state echo is the same hole: it must be rejected."""
 		with (
 			patch("frappe.respond_as_web_page") as respond_as_web_page,
 			patch("frappe.utils.oauth.get_email", return_value="sso@example.com"),
@@ -44,9 +45,10 @@ class TestOAuthState(UnitTestCase):
 		):
 			login_oauth_user({"email": "sso@example.com"}, provider="frappe", state="")
 
-			respond_as_web_page.assert_not_called()
-			local.login_manager.login_as.assert_called_once_with("sso@example.com")
-			redirect_post_login.assert_called_once()
+			respond_as_web_page.assert_called_once()
+			self.assertEqual(respond_as_web_page.call_args.kwargs.get("http_status_code"), 417)
+			local.login_manager.login_as.assert_not_called()
+			redirect_post_login.assert_not_called()
 
 	def test_csrf_enforced_when_state_present_without_token_Fail(self):
 		"""A echoed state without the CSRF token must be rejected with 417."""

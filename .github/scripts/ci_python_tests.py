@@ -77,6 +77,7 @@ EXPECTED_MODULES = (
 	# loop (bug 62c42448). Drives the real frappe/www/login.py get_context().
 	"apps/erpnext/erpnext/exe_auth/test_login_sso_autoredirect.py",
 	"apps/erpnext/erpnext/exe_monitor/test_error_reporter.py",
+	"apps/erpnext/erpnext/exe_auth/test_oauth_csrf_contract.py",
 )
 
 # Contract classes that MUST be collected and run. These are the SSO +
@@ -102,6 +103,11 @@ REQUIRED_TEST_CLASSES = (
 	"TestHandleExceptionNeverReturnsNone",
 	"TestTracingMiddlewareDoesNotReplayTheRequest",
 	"TestCiWerkzeugPinMatchesProduction",
+	# Bug 8eab0042 (repeat of fba616eb) — the SSO callback must keep requiring
+	# the token-bearing state echo. PR #59 relaxed it, was flagged and closed;
+	# the same stale branch returned as PR #66 and merged. This class is what
+	# makes a third return fail CI instead of sailing through green.
+	"TestOAuthStateCsrfContract",
 	# Bug 3cb4871c — the /login SSO handoff and its loop brake. ERP was the only
 	# product in the stack that stranded unauthenticated visitors on its local
 	# login form; these classes are what keep the handoff and the brake together.
