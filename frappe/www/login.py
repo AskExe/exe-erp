@@ -23,6 +23,42 @@ from frappe.website.utils import get_home_page
 no_cache = True
 
 
+
+# The SUPPORTED server-side SSO entry point. Never link or redirect straight to
+# gotrue_login_callback: only gotrue_login_start mints the `exe_sso_state` CSRF
+# cookie the callback verifies.
+EXE_SSO_START_PATH = "/api/method/erpnext.exe_auth.api.gotrue_login_start"
+
+
+def _exe_should_autoredirect_to_sso() -> bool:
+	"""Whether this GET /login should be handed off to SSO (bug 3cb4871c).
+
+	Thin, frappe-side adapter: it gathers live request state and defers the
+	whole policy to `erpnext.exe_auth.exe_perms.sso_autoredirect_decision`,
+	which is frappe-free and unit-tested without a bench.
+
+	Swallows every exception on purpose. This runs on the login page — the one
+	page that must render even when something else is broken. A deployment
+	without the erpnext app (ImportError) or without a request object simply
+	gets the local form.
+	"""
+	try:
+		from erpnext.exe_auth import exe_perms
+
+		request = getattr(frappe.local, "request", None)
+		if request is None:
+			return False
+
+		return exe_perms.sso_autoredirect_decision(
+			session_user=frappe.session.user,
+			cookies=getattr(request, "cookies", None),
+			query_args=getattr(request, "args", None),
+			gotrue_configured=bool(frappe.conf.get("gotrue_url")),
+		)
+	except Exception:
+		return False
+
+
 def get_context(context):
 	redirect_to = frappe.local.request.args.get("redirect-to")
 	redirect_to = sanitize_redirect(redirect_to)
@@ -37,6 +73,39 @@ def get_context(context):
 		if redirect_to != "login":
 			frappe.local.flags.redirect_location = redirect_to
 			raise frappe.Redirect
+
+	# ── Exe SSO: one-shot auto-redirect to auth.<apex> (bug 3cb4871c) ────────
+	#
+	# erp.<apex> was the only product in the stack that stranded an
+	# unauthenticated visitor on its own local login form; crm and wiki both
+	# hand off to the shared auth domain on first arrival.
+	#
+	# The handoff is decided HERE, server-side, and NOT in the base.html Guest
+	# guard, for three reasons:
+	#   1. `/login` is `no_cache` (top of this module), so a decision that
+	#      varies per visitor cannot be baked into the website page cache
+	#      (`frappe.website.utils.cache_html` keys on path + language ONLY — it
+	#      does not vary by user or cookie, so a cookie-dependent branch
+	#      rendered into a CACHEABLE guest page would be served to the wrong
+	#      visitor for up to 30 minutes).
+	#   2. `exe_sso_state` is HttpOnly, so the loop brake is only readable
+	#      server-side.
+	#   3. A 302 needs no HTML download, no JS parse, and survives JS being
+	#      broken — which this fork has already been burned by (bug e1a9e4e9,
+	#      where one unterminated string literal silently killed the entire
+	#      login <script> and with it the SSO control).
+	#
+	# base.html keeps its `path != 'login'` exemption precisely so the two
+	# mechanisms cannot fight: every non-login guest page is handled by the head
+	# script, `/login` is handled here, and neither ever re-decides the other's
+	# page.
+	#
+	# FAIL-SAFE: any error resolves to "render the local login form". Losing the
+	# auto-redirect costs one click on the page's own SSO control; wrongly
+	# redirecting costs a loop or a lockout.
+	if _exe_should_autoredirect_to_sso():
+		frappe.local.flags.redirect_location = EXE_SSO_START_PATH
+		raise frappe.Redirect
 
 	context.no_header = True
 	context.for_test = "login.html"

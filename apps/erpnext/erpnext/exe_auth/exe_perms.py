@@ -541,3 +541,88 @@ def force_https_callback_url(url, allow_insecure=False):
     if is_local_http_host(host):
         return url
     return "https://" + url[len("http://") :]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# One-shot SSO auto-redirect from the local login page (bug 3cb4871c)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# The CSRF nonce cookie gotrue_login_start sets (api.py `_OAUTH_STATE_COOKIE`)
+# immediately before it 302s the browser at the auth domain, and that
+# gotrue_login_callback deletes the moment it has read it. Its presence on an
+# inbound request is therefore a precise, server-observable "an SSO handoff is
+# ALREADY IN FLIGHT for this browser" signal — which is exactly the condition
+# under which auto-redirecting again would spin.
+SSO_STATE_COOKIE = "exe_sso_state"
+
+# Explicit "give me the local form, do not hand me off" escape hatch. The
+# base.html Guest guard uses it as its give-up destination, and an operator
+# locked out of SSO can always reach password / Login Token sign-in with it.
+SSO_OPT_OUT_PARAM = "sso"
+SSO_OPT_OUT_VALUES = frozenset(("0", "off", "false", "no", "local"))
+
+
+def sso_autoredirect_decision(session_user, cookies, query_args, gotrue_configured):
+    """Should GET /login hand a visitor straight to the SSO domain?
+
+    THE DEFECT (bug 3cb4871c)
+    ─────────────────────────
+    erp.<apex> was the only product in the stack that did not auto-redirect an
+    unauthenticated visitor to auth.<apex>; crm and wiki both do. ERP served its
+    own local Frappe login form instead.
+
+    The cause was the fix for bug 62c48242's sibling, 62c42448: the base.html
+    Guest guard was given a blanket `and path != 'login'` exemption to break an
+    infinite /login -> SSO -> /login bounce. It broke the loop, but it also
+    disabled the handoff on a Guest's FIRST arrival at /login — the one case
+    that was never a loop.
+
+    A blanket exemption cannot tell those two arrivals apart, because it looks
+    only at WHERE the browser is, never at WHETHER an attempt is already
+    running. This function looks at the latter, so the first visit redirects and
+    only a re-entry is suppressed.
+
+    Kept pure (no frappe import) so the policy is unit-testable without a bench;
+    `frappe/www/login.py` is the single caller and supplies live request state.
+
+    Returns True only when ALL of the following hold:
+
+      * the visitor is Guest — an authenticated session is handled earlier by
+        login.py's own redirect and must never be bounced at SSO;
+      * SSO is actually configured for this site (`gotrue_url`). Redirecting to
+        a handoff that cannot complete would strand every visitor of a
+        password-only deployment away from the only login form they have;
+      * no `exe_sso_state` cookie — i.e. no handoff is already in flight. This
+        is the loop brake, and it is self-clearing: the callback deletes the
+        cookie, and the browser drops it after its 600s max_age;
+      * the visitor did not explicitly ask for the local form (`?sso=0`).
+
+    FAIL-SAFE DIRECTION: every unknown or unreadable input resolves to False —
+    "show the local login form". The worst outcome of a false negative is one
+    extra click on the page's own "Sign in via Exe SSO" control; the worst
+    outcome of a false positive is a redirect loop or a lockout.
+    """
+    if session_user != "Guest":
+        return False
+    if not gotrue_configured:
+        return False
+
+    try:
+        opt_out = (query_args or {}).get(SSO_OPT_OUT_PARAM)
+    except Exception:
+        return False
+    if opt_out is not None and str(opt_out).strip().lower() in SSO_OPT_OUT_VALUES:
+        return False
+
+    try:
+        in_flight = (cookies or {}).get(SSO_STATE_COOKIE)
+    except Exception:
+        return False
+    # A cookie present but empty is not a handoff in flight (gotrue_login_start
+    # always writes a token_urlsafe(32) nonce), so it must not brake the
+    # redirect — otherwise anything that can plant a blank cookie can
+    # permanently disable SSO on this deployment.
+    if in_flight and str(in_flight).strip():
+        return False
+
+    return True
