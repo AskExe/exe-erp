@@ -36,6 +36,9 @@ jobs:
     name: Build + push stack image
     needs: gate
     runs-on: [self-hosted, linux, x64]
+    # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
+    # 49-60 min over the last 10 runs -> 90 min caps a wedged build/push at 1.5x worst.
+    timeout-minutes: 90
     env:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
     steps:

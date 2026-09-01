@@ -48,6 +48,9 @@ jobs:
   python-vuln-scan:
     name: Python vulnerability scan (pip-audit)
     runs-on: [self-hosted, macOS, ARM64, mac-fast]
+    # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
+    # 1.6-19.8 min over the last 15 runs -> 30 min caps a wedged scan at ~1.5x worst.
+    timeout-minutes: 30
     continue-on-error: true   # non-blocking: upstream deps may carry known CVEs
     steps:
       - name: Checkout
@@ -104,6 +107,9 @@ jobs:
   node-vuln-scan:
     name: Node vulnerability scan (npm audit)
     runs-on: [self-hosted, macOS, ARM64, mac-fast]
+    # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
+    # 1.6-19.8 min over the last 15 runs -> 30 min caps a wedged scan at ~1.5x worst.
+    timeout-minutes: 30
     continue-on-error: true   # non-blocking: upstream Frappe JS deps may carry known CVEs
     steps:
       - name: Checkout
@@ -158,6 +164,9 @@ jobs:
     name: Container vulnerability scan (Trivy)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64]
+    # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
+    # 1.6-19.8 min over the last 15 runs -> 30 min caps a wedged scan at ~1.5x worst.
+    timeout-minutes: 30
     continue-on-error: true   # non-blocking: upstream image layers likely carry known CVEs
     steps:
       - name: Checkout
