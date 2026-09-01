@@ -89,6 +89,73 @@ jobs:
           print('image=ghcr.io/askexe/exe-erp:v' + version)
           PY2
 
+      # ── Git-tag provenance gate (bug 2c9bf186) ──────────────────
+      # THE INCIDENT. ghcr.io/askexe/exe-erp:v0.3.2, :v0.3.3 and :v0.3.4 were
+      # published on 2026-08-31 and v0.3.4 was deployed to production — while
+      # `git tag -l "v0.3.*"` in this repo listed only v0.3.0 and v0.3.1. They
+      # were not hand-pushed: they came out of THIS workflow, via its
+      # `workflow_dispatch` trigger, run three times against `main`.
+      #
+      # WHY THAT PRODUCES AN UNTAGGED RELEASE. The pushed image tag is DERIVED
+      # from stack.release.json's `version` field (see the step above), not from
+      # the git ref. On a tag push those agree by construction. On a
+      # workflow_dispatch against a branch, `version` is whatever the last PR
+      # bumped it to and there is no tag anywhere — so the run publishes a
+      # release-named image for a commit nobody ever tagged. Every downstream
+      # guard was satisfied: the tag-immutability check passed (the tag was
+      # genuinely new), CI was green, the digest was captured, the labels were
+      # correct. The one thing nothing checked was whether the version being
+      # released existed in git. The result is bytes in production that cannot
+      # be traced back to a reviewed, tagged commit.
+      #
+      # THE FIX. Require the git tag to exist AND to point at the commit being
+      # built, for BOTH triggers. That makes workflow_dispatch behave exactly
+      # like a tag push instead of being a second, unguarded release path — the
+      # tag is created first, by a human, through review, and the build follows
+      # it. Deliberately NO break-glass variable: an override here is an
+      # override on "is this code released at all", which is the whole question.
+      - name: Assert this version exists as a git tag at this commit (fail closed)
+        env:
+          STACK_VERSION: ${{ steps.release.outputs.stack_version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v${STACK_VERSION}"
+
+          # The API is the authority, not the runner's local refs: actions/checkout
+          # fetches a single commit with no tags, so `git tag -l` here is empty for
+          # every release and would fail even a correct one.
+          # `gh --jq` uses gh's own built-in jq, so this needs no jq binary on
+          # the runner — the rest of this workflow reaches for python3 for the
+          # same reason, and the self-hosted release runner is not guaranteed
+          # to have jq installed.
+          if ! resp="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha, .object.type' 2>/dev/null)"; then
+            echo "::error::stack.release.json declares version ${STACK_VERSION}, but git tag ${tag} does not exist in ${GITHUB_REPOSITORY}."
+            echo "::error::Refusing to publish ghcr.io/askexe/exe-erp:${tag} — it would be a release-named image for a commit nobody tagged (bug 2c9bf186)."
+            echo "::error::Push the tag at the reviewed commit first: git tag ${tag} <sha> && git push origin ${tag}. That alone triggers this workflow."
+            exit 1
+          fi
+
+          sha="$(printf '%s\n' "$resp" | sed -n '1p')"
+          type="$(printf '%s\n' "$resp" | sed -n '2p')"
+          # Annotated tags point at a tag object; dereference to the commit.
+          if [ "$type" = "tag" ]; then
+            sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${sha}" --jq '.object.sha')"
+          fi
+
+          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
+            echo "::error::git tag ${tag} exists but could not be resolved to a commit. Unverifiable provenance fails closed."
+            exit 1
+          fi
+
+          if [ "$sha" != "${GITHUB_SHA}" ]; then
+            echo "::error::git tag ${tag} points at ${sha}, but this run is building ${GITHUB_SHA}."
+            echo "::error::Publishing would put bytes built from an untagged commit behind a released tag name (bug 2c9bf186). Refusing."
+            exit 1
+          fi
+
+          echo "✓ ${tag} exists in ${GITHUB_REPOSITORY} and points at ${GITHUB_SHA}."
+
       - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
