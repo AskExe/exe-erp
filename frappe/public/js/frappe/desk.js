@@ -401,7 +401,15 @@ frappe.Application = class Application {
 		)}`;
 	}
 	set_favicon() {
-		var link = $('link[type="image/x-icon"]').remove().attr("href");
+		// Fallback chain: when no link[type="image/x-icon"] exists (or has no
+		// href), the original code appended href="undefined", making the browser
+		// request /undefined on every desk load (404). Fall back to any existing
+		// icon link, then to the bundled Exe ERP favicon.
+		var link =
+			$('link[type="image/x-icon"]').remove().attr("href") ||
+			$('link[rel="shortcut icon"]').attr("href") ||
+			$('link[rel="icon"]').attr("href") ||
+			"/assets/frappe/images/exe-erp-favicon.svg";
 		$('<link rel="shortcut icon" href="' + link + '" type="image/x-icon">').appendTo("head");
 		$('<link rel="icon" href="' + link + '" type="image/x-icon">').appendTo("head");
 	}
