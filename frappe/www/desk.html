@@ -24,6 +24,9 @@
 		{% for include in app_include_css -%}
 		{{ include_style(include) }}
 		{%- endfor -%}
+		<!-- Exe Foundry Bold desk theme — loaded AFTER the app bundles so the
+		     token overrides in exe-desk-brand.css win the cascade. -->
+		<link rel="stylesheet" href="/assets/frappe/css/exe-desk-brand.css">
 
 		{% if lang == "eo" %}
 		<script type="text/javascript">

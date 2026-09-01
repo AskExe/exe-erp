@@ -1,0 +1,248 @@
+/*
+ * Exe Foundry Bold — ERP desk brand theme.
+ *
+ * Applies the Exe design tokens (exe-theme-tokens.json) to the Frappe desk by
+ * overriding the CSS custom properties defined in
+ * frappe/public/scss/common/css_variables.scss, plus a small set of structural
+ * rules for fonts and the gold-on-dark primary buttons.
+ *
+ * Loaded from frappe/www/desk.html AFTER the desk bundle so it wins the
+ * cascade without modifying the build pipeline.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700;900&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root,
+body {
+  /* Surfaces */
+  --bg-color: #0f0e1a;
+  --fg-color: #191823;
+  --card-bg: #191823;
+  --navbar-bg: #131222;
+  --modal-bg: #201f2a;
+  --popover-bg: #201f2a;
+  --toast-bg: #201f2a;
+  --control-bg: rgba(255, 255, 255, 0.05);
+  --control-bg-on-gray: rgba(255, 255, 255, 0.08);
+  --awesomebar-focus-bg: #201f2a;
+  --subtle-accent: rgba(255, 255, 255, 0.04);
+  --subtle-fg: rgba(255, 255, 255, 0.06);
+  --fg-hover-color: rgba(255, 255, 255, 0.08);
+  --code-block-bg: #0f0e1a;
+
+  /* Text */
+  --text-color: #f0ede8;
+  --text-muted-color: #a09caf;
+  --disabled-text-color: #5f5c70;
+  --placeholder-color: rgba(160, 156, 175, 0.4);
+
+  /* Primary + accents (gold) */
+  --primary-color: #f5d76e;
+  --btn-primary: #f5d76e;
+  --sidebar-select-color: rgba(245, 215, 110, 0.14);
+  --btn-default-bg: rgba(255, 255, 255, 0.06);
+  --btn-default-hover-bg: rgba(255, 255, 255, 0.1);
+  --btn-ghost-hover-bg: rgba(255, 255, 255, 0.08);
+
+  /* Borders + scrollbars */
+  --border-color: rgba(240, 237, 232, 0.12);
+  --dark-border-color: rgba(240, 237, 232, 0.2);
+  --table-border-color: rgba(240, 237, 232, 0.1);
+  --scrollbar-thumb-color: #2e2c40;
+  --scrollbar-track-color: #191823;
+  --shadow-inset: inset 0px -1px 0px rgba(240, 237, 232, 0.12);
+}
+
+/* ── Fonts ─────────────────────────────────────────────────────────────── */
+
+body,
+.frappe-control,
+.form-control,
+.dropdown-menu,
+.modal-content,
+.page-container {
+  font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6,
+.navbar-brand,
+.page-title,
+.widget-title,
+.dialog-title,
+.control-label {
+  font-family: 'Epilogue', sans-serif;
+  letter-spacing: 0.01em;
+}
+
+/* Labels, numeric/UI chrome */
+.form-control,
+.awesomplete input,
+kbd, code, pre,
+.grid-heading-row,
+.tab-link,
+.data-row div,
+.list-row,
+.ellipsis,
+.nav-link,
+.dropdown-item,
+.breadcrumb-item,
+.sidebar-item,
+.standard-sidebar-item,
+.workspace-sidebar {
+  font-family: 'Space Grotesk', 'Manrope', system-ui, sans-serif;
+}
+
+/* ── Structural fixes ──────────────────────────────────────────────────── */
+
+/* Gold primary buttons need dark text (Frappe assumes white-on-dark). */
+.btn-primary,
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  color: #0f0e1a !important;
+  border-color: #f5d76e;
+}
+
+.btn-primary:hover {
+  background-color: #e6c85e;
+}
+
+.btn-primary:active {
+  background-color: #d4b84e;
+}
+
+/* Navbar and sidebar surfaces */
+.navbar,
+.navbar-light,
+.navbar-default {
+  background-color: var(--navbar-bg);
+  border-bottom: 1px solid rgba(240, 237, 232, 0.1);
+}
+
+.navbar .nav-link,
+.navbar .dropdown-toggle {
+  color: #a09caf;
+}
+
+.navbar .nav-link:hover,
+.navbar .dropdown-toggle:hover {
+  color: #f0ede8;
+}
+
+/* Desk sidebar */
+.desk-sidebar,
+.sidebar {
+  background-color: #131222;
+}
+
+.standard-sidebar-item,
+.sidebar-item {
+  color: #a09caf;
+}
+
+.standard-sidebar-item:hover,
+.sidebar-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #f0ede8;
+}
+
+.standard-sidebar-item.active,
+.sidebar-item.active {
+  color: #f5d76e;
+  background-color: rgba(245, 215, 110, 0.1);
+}
+
+/* Standard gray "primary" text-on-color pairs */
+.text-on-primary {
+  color: #0f0e1a;
+}
+
+/* Inputs on dark surfaces */
+input.form-control,
+select.form-control,
+textarea.form-control,
+.ql-editor,
+.input-with-feedback {
+  background-color: var(--control-bg);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+input.form-control:focus,
+select.form-control:focus,
+textarea.form-control:focus {
+  background-color: rgba(255, 255, 255, 0.07);
+  border-color: rgba(245, 215, 110, 0.5);
+  color: var(--text-color);
+}
+
+/* Lists and grids keep readable row separation on dark. */
+.list-row,
+.grid-body .row {
+  border-bottom-color: var(--table-border-color);
+}
+
+.list-row:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* DataTable (frappe-datatable) surfaces */
+.datatable,
+.datatable .dt-cell,
+.datatable .dt-row-header {
+  background-color: transparent;
+  border-color: var(--table-border-color);
+  color: var(--text-color);
+}
+
+.datatable .dt-row--highlight .dt-cell {
+  background-color: rgba(245, 215, 110, 0.08);
+}
+
+/* Modals, dropdowns, dialogs */
+.modal-content,
+.dropdown-menu,
+.dialog-body {
+  background-color: var(--modal-bg);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+.dropdown-item {
+  color: var(--text-color);
+}
+
+.dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #f0ede8;
+}
+
+/* Workspace / app launcher tiles */
+.workspace-sidebar .workspace-icon {
+  color: #f5d76e;
+}
+
+.app-launcher-tile .app-icon {
+  color: #f5d76e;
+}
+
+/* Scrollbars (webkit) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2e2c40;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #191823;
+}
+
+/* Selection */
+::selection {
+  background: rgba(245, 215, 110, 0.3);
+  color: #f0ede8;
+}
