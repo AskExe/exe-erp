@@ -33,7 +33,7 @@ permissions: { actions: write, checks: read, contents: read }
 
 jobs:
   classified-auto-retry:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, mac-fast]
     steps:
       - name: Retry failed CI only for infra-classified failures
         env:
