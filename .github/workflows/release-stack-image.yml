@@ -125,18 +125,27 @@ jobs:
           # The API is the authority, not the runner's local refs: actions/checkout
           # fetches a single commit with no tags, so `git tag -l` here is empty for
           # every release and would fail even a correct one.
-          if ! resp="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" 2>/dev/null)"; then
+          # `gh --jq` uses gh's own built-in jq, so this needs no jq binary on
+          # the runner — the rest of this workflow reaches for python3 for the
+          # same reason, and the self-hosted release runner is not guaranteed
+          # to have jq installed.
+          if ! resp="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha, .object.type' 2>/dev/null)"; then
             echo "::error::stack.release.json declares version ${STACK_VERSION}, but git tag ${tag} does not exist in ${GITHUB_REPOSITORY}."
             echo "::error::Refusing to publish ghcr.io/askexe/exe-erp:${tag} — it would be a release-named image for a commit nobody tagged (bug 2c9bf186)."
             echo "::error::Push the tag at the reviewed commit first: git tag ${tag} <sha> && git push origin ${tag}. That alone triggers this workflow."
             exit 1
           fi
 
-          sha="$(printf '%s' "$resp" | jq -r '.object.sha')"
-          type="$(printf '%s' "$resp" | jq -r '.object.type')"
+          sha="$(printf '%s\n' "$resp" | sed -n '1p')"
+          type="$(printf '%s\n' "$resp" | sed -n '2p')"
           # Annotated tags point at a tag object; dereference to the commit.
           if [ "$type" = "tag" ]; then
             sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${sha}" --jq '.object.sha')"
+          fi
+
+          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
+            echo "::error::git tag ${tag} exists but could not be resolved to a commit. Unverifiable provenance fails closed."
+            exit 1
           fi
 
           if [ "$sha" != "${GITHUB_SHA}" ]; then
