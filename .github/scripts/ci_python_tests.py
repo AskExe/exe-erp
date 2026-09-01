@@ -72,6 +72,10 @@ EXPECTED_MODULES = (
 	# alongside ruff) because it drives the real `Request.application`
 	# boundary that raised the production TypeError.
 	"apps/erpnext/erpnext/exe_auth/test_sso_rate_limit_response.py",
+	# Bug 3cb4871c — /login must auto-redirect a FRESH unauthenticated visitor
+	# to SSO (parity with crm/wiki), while a bounce-back mid-handoff must not
+	# loop (bug 62c42448). Drives the real frappe/www/login.py get_context().
+	"apps/erpnext/erpnext/exe_auth/test_login_sso_autoredirect.py",
 	"apps/erpnext/erpnext/exe_monitor/test_error_reporter.py",
 	"apps/erpnext/erpnext/exe_auth/test_oauth_csrf_contract.py",
 )
@@ -104,6 +108,13 @@ REQUIRED_TEST_CLASSES = (
 	# the same stale branch returned as PR #66 and merged. This class is what
 	# makes a third return fail CI instead of sailing through green.
 	"TestOAuthStateCsrfContract",
+	# Bug 3cb4871c — the /login SSO handoff and its loop brake. ERP was the only
+	# product in the stack that stranded unauthenticated visitors on its local
+	# login form; these classes are what keep the handoff and the brake together.
+	"TestSsoAutoredirectDecisionFail",
+	"TestLoginPageRedirectsGuestToSsoFail",
+	"TestLoginPageDoesNotLoopFail",
+	"TestBaseTemplateGiveUpFail",
 )
 
 

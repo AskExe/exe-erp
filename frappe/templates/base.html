@@ -61,6 +61,14 @@
 	     Do NOT reintroduce `exe_sso_token` — that name is dead and gating on it
 	     produces an infinite login bounce (bug f1bb40d8 wiki, 9f60e8e6 crm,
 	     3938ac3d erp). See apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py. -->
+	<!-- `path != 'login'` is DELEGATION, not an exemption (bug 3cb4871c).
+	     The /login handoff is decided server-side in frappe/www/login.py, which
+	     can read the HttpOnly `exe_sso_state` loop brake and which renders
+	     no_cache — so it redirects on a Guest's FIRST arrival and stands down
+	     only while an SSO attempt is already in flight. This head script owns
+	     every OTHER guest page. Splitting them this way is what stops the two
+	     mechanisms re-deciding each other's page and spinning (bug 62c42448).
+	     Do NOT "restore" this script on /login. -->
 	{% if frappe.session.user == 'Guest' and path != 'login' %}
 	<script>
 	(function(){
@@ -104,8 +112,28 @@
 		try { attempted = window.sessionStorage.getItem(KEY) === '1'; } catch (e) {}
 
 		if (attempted) {
-			try { window.sessionStorage.removeItem(KEY); } catch (e) {}
-			window.location.href = '/login';
+			// GIVE UP TO THE LOCAL FORM, EXPLICITLY (bug 3cb4871c).
+			//
+			// Two changes from the original give-up branch, both closing the
+			// same residual spin:
+			//
+			// (a) `?sso=0`, not a bare `/login`. `/login` now decides the
+			//     handoff SERVER-side (frappe/www/login.py: a Guest with no
+			//     in-flight `exe_sso_state` cookie is 302'd to SSO). A bare
+			//     `/login` would therefore be bounced straight back out by
+			//     that redirect whenever the callback had already consumed the
+			//     state cookie — turning this give-up into the next hop of the
+			//     very loop it exists to end. `?sso=0` is the explicit "render
+			//     the local form" opt-out login.py honours.
+			//
+			// (b) the key is NOT cleared. Clearing it re-armed this guard on
+			//     the very next Guest page, so a handoff that completes but
+			//     whose session does not stick (blocked cookies, clock skew,
+			//     host mismatch) span /desk -> /login -> SSO -> /desk forever.
+			//     The key is per-tab and dies with the tab; a deliberate retry
+			//     is always one click away on the login page's own
+			//     "Sign in via Exe SSO" control.
+			window.location.href = '/login?sso=0';
 			return;
 		}
 

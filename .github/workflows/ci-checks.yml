@@ -66,7 +66,22 @@ concurrency:
 jobs:
   validate:
     name: Validate + lint + migration smoke
-    runs-on: [self-hosted, macOS, ARM64, mac-fast]
+    # Moved off mac-fast (2026-09-01): this job is pure validation (compose
+    # config check, build-plan check, Ruff lint, Python compile, migration
+    # smoke, pip/yarn audits) with no macOS-specific dependency — the Python
+    # setup step already has an apt-get branch for Linux, and RUNNER_OS
+    # macOS checks are optional Homebrew-path overrides, not requirements.
+    # Docker CLI invocations here (docker compose config, docker build
+    # --check) were triggering repeated macOS TCC "access other apps"
+    # (kTCCServiceSystemPolicyAppBundles) prompts via Docker Desktop's
+    # LaunchServices interaction on every job run, attributed to the Ghostty
+    # terminal hosting the runner process tree since the grant never stuck
+    # (confirmed via `log stream --predicate 'process == "tccd"'`, correlated
+    # by timestamp to this exact job). The docker-build job below already
+    # proves Docker works fine on this Linux lane. Also relieves load on the
+    # single mac-fast runner, which the watchdog comment below already flags
+    # as a scarce, easily-starved resource (2h19m stall incident, PR #65).
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -220,6 +235,9 @@ jobs:
 
       - name: Workflow gate integrity (bugs b7496cb1, 98fbb1a0)
         run: python3 scripts/workflow-gate-integrity.test.py
+
+      - name: Workflow timeout guard (bug 3136f36b)
+        run: python3 scripts/workflow-timeout-guard.test.py
 
       # Runs EVERY Exe-owned, frappe-free unit test (bug 483cc712).
       #
