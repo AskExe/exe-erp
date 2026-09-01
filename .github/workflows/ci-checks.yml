@@ -221,6 +221,9 @@ jobs:
       - name: Workflow gate integrity (bugs b7496cb1, 98fbb1a0)
         run: python3 scripts/workflow-gate-integrity.test.py
 
+      - name: Workflow timeout guard (bug 3136f36b)
+        run: python3 scripts/workflow-timeout-guard.test.py
+
       # Runs EVERY Exe-owned, frappe-free unit test (bug 483cc712).
       #
       # This replaces the previous hand-maintained allowlist of one-file
