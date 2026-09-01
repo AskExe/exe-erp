@@ -72,6 +72,9 @@ EXPECTED_MODULES = (
 	# alongside ruff) because it drives the real `Request.application`
 	# boundary that raised the production TypeError.
 	"apps/erpnext/erpnext/exe_auth/test_sso_rate_limit_response.py",
+	# Bug be1870d0 — the SSO redirect response must never be None at the
+	# Request.application boundary (the reported theory; pinned as FALSE).
+	"apps/erpnext/erpnext/exe_auth/test_sso_redirect_response.py",
 	"apps/erpnext/erpnext/exe_monitor/test_error_reporter.py",
 )
 
@@ -98,6 +101,12 @@ REQUIRED_TEST_CLASSES = (
 	"TestHandleExceptionNeverReturnsNone",
 	"TestTracingMiddlewareDoesNotReplayTheRequest",
 	"TestCiWerkzeugPinMatchesProduction",
+	# Bug be1870d0 — redirect (and JSON) response construction always hands
+	# Werkzeug a real, callable Response.
+	"TestRedirectResponseIsAWsgiCallable",
+	"TestRedirectThroughWerkzeugApplicationBoundary",
+	"TestNonSsoPathsReturnAResponse",
+	"TestSsoEndpointsStillUseTheRedirectContract",
 )
 
 
