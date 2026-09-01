@@ -73,6 +73,7 @@ EXPECTED_MODULES = (
 	# boundary that raised the production TypeError.
 	"apps/erpnext/erpnext/exe_auth/test_sso_rate_limit_response.py",
 	"apps/erpnext/erpnext/exe_monitor/test_error_reporter.py",
+	"apps/erpnext/erpnext/exe_auth/test_oauth_csrf_contract.py",
 )
 
 # Contract classes that MUST be collected and run. These are the SSO +
@@ -98,6 +99,11 @@ REQUIRED_TEST_CLASSES = (
 	"TestHandleExceptionNeverReturnsNone",
 	"TestTracingMiddlewareDoesNotReplayTheRequest",
 	"TestCiWerkzeugPinMatchesProduction",
+	# Bug 8eab0042 (repeat of fba616eb) — the SSO callback must keep requiring
+	# the token-bearing state echo. PR #59 relaxed it, was flagged and closed;
+	# the same stale branch returned as PR #66 and merged. This class is what
+	# makes a third return fail CI instead of sailing through green.
+	"TestOAuthStateCsrfContract",
 )
 
 
