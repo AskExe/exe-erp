@@ -81,7 +81,7 @@ jobs:
     # proves Docker works fine on this Linux lane. Also relieves load on the
     # single mac-fast runner, which the watchdog comment below already flags
     # as a scarce, easily-starved resource (2h19m stall incident, PR #65).
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, mac-local]
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -632,7 +632,7 @@ jobs:
   # A gate that cannot fail is not a gate. Keep these unconditional.
   trivy-scan:
     name: Container/deps scan (trivy)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, mac-local]
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -668,7 +668,7 @@ jobs:
     # the full production build correctly and 2-5x faster than qemu. This
     # job therefore pins driver: docker. On the native-x64 fallback host
     # the driver is irrelevant (everything is native).
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, mac-local]
     timeout-minutes: 45
     steps:
       - name: Checkout
