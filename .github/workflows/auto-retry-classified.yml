@@ -34,6 +34,9 @@ permissions: { actions: write, checks: read, contents: read }
 jobs:
   classified-auto-retry:
     runs-on: [self-hosted, macOS, ARM64, mac-fast]
+    # Job-level backstop: the classification is a handful of gh api calls; if
+    # it hangs (API stall, runner wedged) it must self-free the mac-fast slot.
+    timeout-minutes: 10
     steps:
       - name: Retry failed CI only for infra-classified failures
         env:
