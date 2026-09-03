@@ -163,7 +163,7 @@ jobs:
   container-vuln-scan:
     name: Container vulnerability scan (Trivy)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, mac-local]
     # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
     # 1.6-19.8 min over the last 15 runs -> 30 min caps a wedged scan at ~1.5x worst.
     timeout-minutes: 30

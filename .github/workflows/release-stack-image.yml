@@ -35,7 +35,7 @@ jobs:
   release-image:
     name: Build + push stack image
     needs: gate
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, mac-local]
     # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
     # 49-60 min over the last 10 runs -> 90 min caps a wedged build/push at 1.5x worst.
     timeout-minutes: 90
