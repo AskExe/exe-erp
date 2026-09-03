@@ -669,7 +669,11 @@ jobs:
     # job therefore pins driver: docker. On the native-x64 fallback host
     # the driver is irrelevant (everything is native).
     runs-on: [self-hosted, linux, x64, mac-local]
-    timeout-minutes: 45
+    # 90 (was 45): a COLD amd64 build under Rosetta on mac-vm-erp-1 takes
+    # ~40 min, and two runs were cancelled at exactly 45/46 min by this
+    # backstop (runs 33657791454 attempts 1-2). With a warm GHA restore the
+    # build itself is seconds; the budget covers the cold path.
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -714,5 +718,11 @@ jobs:
           platforms: linux/amd64
           push: false
           load: false
+          # cache-from (restore) kept: a warm restore completed the whole
+          # build in 15s. cache-to (export) deliberately REMOVED: the GHA
+          # cache EXPORT stalled for 45+ minutes twice (runs 33657791454
+          # attempt 2 and 33596130328) and was what the old 45-min timeout
+          # kept killing. The docker driver's build cache lives in dockerd's
+          # own persistent store on the pinned runner, which is the cache
+          # that actually matters here.
           cache-from: type=gha
-          cache-to: type=gha,mode=max
