@@ -35,7 +35,11 @@ jobs:
   release-image:
     name: Build + push stack image
     needs: gate
-    runs-on: [self-hosted, linux, x64, mac-local]
+    # FOUNDER DECISION 2026-09-05: erp image releases stay on NATIVE x64
+    # runners (the dedicated VPS lane). This multi-arch build always emulates
+    # one arch on any hardware we own; native x64 keeps the amd64 half native.
+    # Deliberately NOT mac-local — the one sanctioned VPS-lane exception.
+    runs-on: [self-hosted, linux, x64]
     # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
     # 49-60 min over the last 10 runs -> 90 min caps a wedged build/push at 1.5x worst.
     timeout-minutes: 90
