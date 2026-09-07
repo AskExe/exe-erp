@@ -2,9 +2,10 @@ $check-icon-dark: url("data:image/svg+xml, <svg viewBox='0 0 8 7' fill='none' xm
 [data-theme="dark"] {
 	--neutral: var(--neutral-black);
 	--invert-neutral: var(--neutral-white);
-	// TODO: Update Pallete for dark mode.
-	--gray-700: #383838;
-	--gray-800: #232323;
+	// The dark neutral ramp now lives with the rest of the dark palette in
+	// espresso/_colors.scss, brand values included. The two local overrides
+	// that used to sit here (--gray-700/--gray-800) loaded after Espresso and
+	// silently won, which is why the ramp had to be patched in two places.
 
 	// Type Colors
 	--text-neutral: var(--gray-50);
@@ -43,7 +44,25 @@ $check-icon-dark: url("data:image/svg+xml, <svg viewBox='0 0 8 7' fill='none' xm
 	--btn-default-bg: var(--gray-800);
 	--btn-default-hover-bg: var(--gray-700);
 	--btn-ghost-hover-bg: var(--gray-800);
-	--btn-primary: var(--gray-300);
+	// Accent. Bootstrap re-emits --primary on :root from $theme-colors, at the
+	// same specificity as [data-theme], so the themed value has to be declared
+	// after ~bootstrap — which is why this file is imported from desk/index.scss
+	// after the framework rather than from desk/variables.scss before it.
+	// Everything downstream follows: icon strokes (desk/filters.scss,
+	// desk/report.scss), focus rings, progress bars, checked controls and
+	// --brand-color (common/css_variables.scss).
+	--primary: var(--exe-accent, #f5d76e);
+
+	// The accent is the primary button surface. .btn-primary already pairs it
+	// with color: var(--neutral) (common/buttons.scss), which is black in this
+	// theme — the system handles light-accent-on-dark contrast itself, so no
+	// per-selector foreground patching is needed.
+	--btn-primary: var(--primary);
+	// css_variables.scss defines --primary-color from the light ramp; without
+	// this it resolves to the dark theme's page background and the accent
+	// borders/fills that read it (desk/notification.scss, desk/form.scss,
+	// desk/theme_switcher.scss) disappear.
+	--primary-color: var(--primary);
 
 	// Border Colors
 	--border-primary: var(--gray-200);

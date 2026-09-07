@@ -132,4 +132,7 @@ $grid-breakpoints: (
 @import "~bootstrap/scss/variables";
 @import "~bootstrap/scss/mixins";
 @import "css_variables";
-@import "dark";
+// NOTE: the dark theme is imported from index.scss immediately after bootstrap,
+// not here. Bootstrap's _root.scss re-emits --primary on :root at the same
+// specificity as [data-theme="dark"], so a theme imported before it silently
+// loses the accent.

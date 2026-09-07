@@ -5,6 +5,8 @@
 @import "../common/alert.scss";
 
 @import "~bootstrap/scss/bootstrap";
+// Dark theme after the framework it themes — see desk/variables.scss.
+@import "dark";
 @import "global";
 @import "../common/buttons";
 @import "../common/flex";

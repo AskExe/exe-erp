@@ -22,20 +22,21 @@
 			href="{{ favicon or "/assets/frappe/images/exe-erp-favicon.svg" }}" type="image/x-icon">
 		<link rel="icon"
 			href="{{ favicon or "/assets/frappe/images/exe-erp-favicon.svg" }}" type="image/x-icon">
-		{% for include in app_include_css -%}
-		{{ include_style(include) }}
-		{%- endfor -%}
-		<!-- Exe Foundry Bold desk theme — loaded AFTER the app bundles so the
-		     token overrides in exe-desk-brand.css win the cascade.
-		     tokens.css is vendored from @askexenow/exe-theme and must load
-		     first: exe-desk-brand.css resolves every value from its --exe-*
-		     custom properties. Resync with scripts/sync-exe-theme.sh. -->
+		<!-- Exe Foundry Bold brand values. tokens.css is vendored from
+		     @askexenow/exe-theme (resync with scripts/sync-exe-theme.sh) and only
+		     defines --exe-* properties. It loads BEFORE the app bundles because it
+		     supplies values, not overrides: Espresso's own tokens
+		     (public/scss/espresso/_colors.scss, _typography.scss) read them, and
+		     the desk is themed entirely through the design system. There is no
+		     brand override stylesheet. -->
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		<link rel="stylesheet"
 			href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700;900&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap">
 		<link rel="stylesheet" href="/assets/frappe/css/exe-theme/tokens.css">
-		<link rel="stylesheet" href="/assets/frappe/css/exe-desk-brand.css">
+		{% for include in app_include_css -%}
+		{{ include_style(include) }}
+		{%- endfor -%}
 
 		{% if lang == "eo" %}
 		<script type="text/javascript">
