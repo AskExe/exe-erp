@@ -333,7 +333,10 @@ frappe.ui.Sidebar = class Sidebar {
 				avatar: frappe.avatar(frappe.session.user, "avatar-medium-2"),
 				navbar_settings: frappe.boot.navbar_settings,
 			})
-		).prependTo("body");
+			// The sidebar belongs inside the shell row, under the full-width
+			// product bar. Falling back to <body> keeps any host page that has
+			// not adopted the .desk-shell wrapper (www/desk.html) working.
+		).prependTo(document.querySelector(".desk-shell") ? ".desk-shell" : "body");
 		this.$sidebar = this.wrapper.find(".sidebar-items");
 
 		this.wrapper.find(".body-sidebar .sidebar-resize-handle").on("click", () => {
