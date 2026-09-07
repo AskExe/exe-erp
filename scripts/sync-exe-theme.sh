@@ -82,5 +82,14 @@ CSS
 # tokens.css — prepend the provenance header.
 { css_header; fetch "packages/exe-theme/src/tokens.css"; } > "${DEST}/tokens.css"
 
+# Keep the vendored output prettier-clean so `pre-commit` stays green and a
+# resync produces a byte-identical file (idempotent). Skipped if prettier is
+# not installed.
+if npx --no-install prettier --write "${DEST}/tokens.css" "${DEST}/tokens.json" >/dev/null 2>&1; then
+  echo "sync-exe-theme: formatted vendored output with prettier"
+else
+  echo "sync-exe-theme: prettier unavailable — vendored output left unformatted" >&2
+fi
+
 echo "sync-exe-theme: wrote ${DEST}/tokens.json and ${DEST}/tokens.css at ref ${EXE_THEME_REF}"
 echo "sync-exe-theme: review 'git diff frappe/public/css/exe-theme/' before committing."

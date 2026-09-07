@@ -32,59 +32,59 @@
 
 :root,
 body {
-  /* Typography — the single highest-leverage override in this file.
+	/* Typography — the single highest-leverage override in this file.
    * Frappe reads var(--font-stack) for body text across desk, website and
    * bootstrap-derived components. */
-  --font-stack: var(--exe-font-body);
+	--font-stack: var(--exe-font-body);
 
-  /* Accent. --primary drives icon strokes, focus rings, progress bars and
+	/* Accent. --primary drives icon strokes, focus rings, progress bars and
    * links; --primary-color is the separate text/fill variant Frappe uses in
    * css_variables.scss. Both must be gold. */
-  --primary: var(--exe-accent);
-  --primary-color: var(--exe-accent);
-  --brand-color: var(--exe-accent);
+	--primary: var(--exe-accent);
+	--primary-color: var(--exe-accent);
+	--brand-color: var(--exe-accent);
 
-  /* Surfaces */
-  --bg-color: var(--exe-bg-primary);
-  --fg-color: var(--exe-bg-secondary);
-  --card-bg: var(--exe-bg-secondary);
-  --navbar-bg: var(--exe-bg-secondary);
-  --modal-bg: var(--exe-bg-tertiary);
-  --popover-bg: var(--exe-bg-tertiary);
-  --toast-bg: var(--exe-bg-tertiary);
-  --control-bg: var(--exe-input-bg);
-  --control-bg-on-gray: rgba(255, 255, 255, 0.08);
-  --awesomebar-focus-bg: var(--exe-bg-tertiary);
-  --subtle-accent: rgba(255, 255, 255, 0.04);
-  --subtle-fg: rgba(255, 255, 255, 0.06);
-  --fg-hover-color: rgba(255, 255, 255, 0.08);
-  --code-block-bg: var(--exe-bg-primary);
+	/* Surfaces */
+	--bg-color: var(--exe-bg-primary);
+	--fg-color: var(--exe-bg-secondary);
+	--card-bg: var(--exe-bg-secondary);
+	--navbar-bg: var(--exe-bg-secondary);
+	--modal-bg: var(--exe-bg-tertiary);
+	--popover-bg: var(--exe-bg-tertiary);
+	--toast-bg: var(--exe-bg-tertiary);
+	--control-bg: var(--exe-input-bg);
+	--control-bg-on-gray: rgba(255, 255, 255, 0.08);
+	--awesomebar-focus-bg: var(--exe-bg-tertiary);
+	--subtle-accent: rgba(255, 255, 255, 0.04);
+	--subtle-fg: rgba(255, 255, 255, 0.06);
+	--fg-hover-color: rgba(255, 255, 255, 0.08);
+	--code-block-bg: var(--exe-bg-primary);
 
-  /* Text */
-  --text-color: var(--exe-text);
-  --text-muted-color: var(--exe-text-muted);
-  --disabled-text-color: #5f5c70;
-  --placeholder-color: rgba(160, 156, 175, 0.4);
+	/* Text */
+	--text-color: var(--exe-text);
+	--text-muted-color: var(--exe-text-muted);
+	--disabled-text-color: #5f5c70;
+	--placeholder-color: rgba(160, 156, 175, 0.4);
 
-  /* Buttons */
-  --btn-primary: var(--exe-accent);
-  --sidebar-select-color: rgba(245, 215, 110, 0.14);
-  --btn-default-bg: rgba(255, 255, 255, 0.06);
-  --btn-default-hover-bg: rgba(255, 255, 255, 0.1);
-  --btn-ghost-hover-bg: rgba(255, 255, 255, 0.08);
+	/* Buttons */
+	--btn-primary: var(--exe-accent);
+	--sidebar-select-color: rgba(245, 215, 110, 0.14);
+	--btn-default-bg: rgba(255, 255, 255, 0.06);
+	--btn-default-hover-bg: rgba(255, 255, 255, 0.1);
+	--btn-ghost-hover-bg: rgba(255, 255, 255, 0.08);
 
-  /* Borders + scrollbars */
-  --border-color: rgba(240, 237, 232, 0.12);
-  --dark-border-color: rgba(240, 237, 232, 0.2);
-  --table-border-color: var(--exe-border);
-  --scrollbar-thumb-color: #2e2c40;
-  --scrollbar-track-color: var(--exe-bg-secondary);
-  --shadow-inset: inset 0px -1px 0px rgba(240, 237, 232, 0.12);
+	/* Borders + scrollbars */
+	--border-color: rgba(240, 237, 232, 0.12);
+	--dark-border-color: rgba(240, 237, 232, 0.2);
+	--table-border-color: var(--exe-border);
+	--scrollbar-thumb-color: #2e2c40;
+	--scrollbar-track-color: var(--exe-bg-secondary);
+	--shadow-inset: inset 0px -1px 0px rgba(240, 237, 232, 0.12);
 
-  /* Radii */
-  --border-radius: var(--exe-radius-sm);
-  --border-radius-md: var(--exe-radius);
-  --border-radius-lg: var(--exe-radius-lg);
+	/* Radii */
+	--border-radius: var(--exe-radius-sm);
+	--border-radius-md: var(--exe-radius);
+	--border-radius-lg: var(--exe-radius-lg);
 }
 
 /* ── Fonts ─────────────────────────────────────────────────────────────────
@@ -93,7 +93,12 @@ body {
  * in Epilogue and monospace/tabular chrome in Space Grotesk.
  */
 
-h1, h2, h3, h4, h5, h6,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
 .navbar-brand,
 .page-title,
 .page-head .title-text,
@@ -101,16 +106,19 @@ h1, h2, h3, h4, h5, h6,
 .dialog-title,
 .modal-title,
 .section-head {
-  font-family: var(--exe-font-heading);
-  letter-spacing: var(--exe-heading-letter-spacing);
-  font-weight: var(--exe-heading-weight);
+	font-family: var(--exe-font-heading);
+	letter-spacing: var(--exe-heading-letter-spacing);
+	font-weight: var(--exe-heading-weight);
 }
 
-kbd, code, pre, samp,
-.control-value.like-disabled-input[data-fieldtype='Code'],
+kbd,
+code,
+pre,
+samp,
+.control-value.like-disabled-input[data-fieldtype="Code"],
 .ace_editor,
 .result-content {
-  font-family: var(--exe-font-mono);
+	font-family: var(--exe-font-mono);
 }
 
 /* ── Contrast fixes for gold-on-dark ───────────────────────────────────────
@@ -123,40 +131,40 @@ kbd, code, pre, samp,
 .btn-primary:hover,
 .btn-primary:focus,
 .btn-primary:active {
-  color: var(--exe-text-inverted) !important;
-  border-color: var(--exe-accent);
+	color: var(--exe-text-inverted) !important;
+	border-color: var(--exe-accent);
 }
 
 .btn-primary:hover {
-  background-color: var(--exe-accent-hover);
+	background-color: var(--exe-accent-hover);
 }
 
 .btn-primary:active {
-  background-color: var(--exe-accent-active);
+	background-color: var(--exe-accent-active);
 }
 
 /* Checkbox / radio checked state uses background-color: var(--primary)
  * (element/checkbox.scss, element/radio.scss) with a white glyph. */
-.checkbox .input-area input[type='checkbox']:checked,
-input[type='checkbox']:checked,
-input[type='radio']:checked {
-  accent-color: var(--exe-accent);
+.checkbox .input-area input[type="checkbox"]:checked,
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+	accent-color: var(--exe-accent);
 }
 
-.checkbox .input-area input[type='checkbox']:checked::after,
+.checkbox .input-area input[type="checkbox"]:checked::after,
 .list-row-checkbox:checked::after {
-  color: var(--exe-text-inverted);
-  border-color: var(--exe-text-inverted);
+	color: var(--exe-text-inverted);
+	border-color: var(--exe-text-inverted);
 }
 
 /* Selected list rows paint var(--primary) as a background (desk/list.scss). */
 .list-row-container .list-row.is-selected,
 .list-row.level.is-selected {
-  color: var(--exe-text-inverted);
+	color: var(--exe-text-inverted);
 }
 
 .text-on-primary {
-  color: var(--exe-text-inverted);
+	color: var(--exe-text-inverted);
 }
 
 /* ── Chrome ────────────────────────────────────────────────────────────── */
@@ -164,40 +172,40 @@ input[type='radio']:checked {
 .navbar,
 .navbar-light,
 .navbar-default {
-  background-color: var(--navbar-bg);
-  border-bottom: 1px solid var(--exe-border);
+	background-color: var(--navbar-bg);
+	border-bottom: 1px solid var(--exe-border);
 }
 
 .navbar .nav-link,
 .navbar .dropdown-toggle {
-  color: var(--exe-text-muted);
+	color: var(--exe-text-muted);
 }
 
 .navbar .nav-link:hover,
 .navbar .dropdown-toggle:hover {
-  color: var(--exe-text);
+	color: var(--exe-text);
 }
 
 .desk-sidebar,
 .sidebar {
-  background-color: var(--exe-bg-secondary);
+	background-color: var(--exe-bg-secondary);
 }
 
 .standard-sidebar-item,
 .sidebar-item {
-  color: var(--exe-text-muted);
+	color: var(--exe-text-muted);
 }
 
 .standard-sidebar-item:hover,
 .sidebar-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--exe-text);
+	background-color: rgba(255, 255, 255, 0.05);
+	color: var(--exe-text);
 }
 
 .standard-sidebar-item.active,
 .sidebar-item.active {
-  color: var(--exe-accent);
-  background-color: rgba(245, 215, 110, 0.1);
+	color: var(--exe-accent);
+	background-color: rgba(245, 215, 110, 0.1);
 }
 
 /* ── Inputs ────────────────────────────────────────────────────────────── */
@@ -207,40 +215,40 @@ select.form-control,
 textarea.form-control,
 .ql-editor,
 .input-with-feedback {
-  background-color: var(--control-bg);
-  border-color: var(--border-color);
-  color: var(--text-color);
+	background-color: var(--control-bg);
+	border-color: var(--border-color);
+	color: var(--text-color);
 }
 
 input.form-control:focus,
 select.form-control:focus,
 textarea.form-control:focus {
-  background-color: var(--exe-input-bg-focus);
-  border-color: rgba(245, 215, 110, 0.5);
-  color: var(--text-color);
+	background-color: var(--exe-input-bg-focus);
+	border-color: rgba(245, 215, 110, 0.5);
+	color: var(--text-color);
 }
 
 /* ── Lists, grids, tables ──────────────────────────────────────────────── */
 
 .list-row,
 .grid-body .row {
-  border-bottom-color: var(--table-border-color);
+	border-bottom-color: var(--table-border-color);
 }
 
 .list-row:hover {
-  background-color: rgba(255, 255, 255, 0.03);
+	background-color: rgba(255, 255, 255, 0.03);
 }
 
 .datatable,
 .datatable .dt-cell,
 .datatable .dt-row-header {
-  background-color: transparent;
-  border-color: var(--table-border-color);
-  color: var(--text-color);
+	background-color: transparent;
+	border-color: var(--table-border-color);
+	color: var(--text-color);
 }
 
 .datatable .dt-row--highlight .dt-cell {
-  background-color: rgba(245, 215, 110, 0.08);
+	background-color: rgba(245, 215, 110, 0.08);
 }
 
 /* ── Overlays ──────────────────────────────────────────────────────────── */
@@ -248,44 +256,44 @@ textarea.form-control:focus {
 .modal-content,
 .dropdown-menu,
 .dialog-body {
-  background-color: var(--modal-bg);
-  color: var(--text-color);
-  border-color: var(--border-color);
+	background-color: var(--modal-bg);
+	color: var(--text-color);
+	border-color: var(--border-color);
 }
 
 .dropdown-item {
-  color: var(--text-color);
+	color: var(--text-color);
 }
 
 .dropdown-item:hover {
-  background-color: rgba(255, 255, 255, 0.06);
-  color: var(--exe-text);
+	background-color: rgba(255, 255, 255, 0.06);
+	color: var(--exe-text);
 }
 
 /* ── Workspace / app launcher icons ────────────────────────────────────── */
 
 .workspace-sidebar .workspace-icon,
 .app-launcher-tile .app-icon {
-  color: var(--exe-accent);
+	color: var(--exe-accent);
 }
 
 /* ── Scrollbars + selection ────────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+	width: 10px;
+	height: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb-color);
-  border-radius: 5px;
+	background: var(--scrollbar-thumb-color);
+	border-radius: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--scrollbar-track-color);
+	background: var(--scrollbar-track-color);
 }
 
 ::selection {
-  background: rgba(245, 215, 110, 0.3);
-  color: var(--exe-text);
+	background: rgba(245, 215, 110, 0.3);
+	color: var(--exe-text);
 }

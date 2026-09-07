@@ -18,62 +18,62 @@
    ============================================ */
 
 :root {
-  /* Colors — Background */
-  --exe-bg-primary: #0F0E1A;
-  --exe-bg-secondary: #15142A;
-  --exe-bg-tertiary: #1A1832;
+	/* Colors — Background */
+	--exe-bg-primary: #0f0e1a;
+	--exe-bg-secondary: #15142a;
+	--exe-bg-tertiary: #1a1832;
 
-  /* Colors — Accent */
-  --exe-accent: #F5D76E;
-  --exe-accent-hover: #FADF85;
-  --exe-accent-active: #E6C54F;
+	/* Colors — Accent */
+	--exe-accent: #f5d76e;
+	--exe-accent-hover: #fadf85;
+	--exe-accent-active: #e6c54f;
 
-  /* Colors — Text */
-  --exe-text: #F0EDE8;
-  --exe-text-muted: #A09CAF;
-  --exe-text-inverted: #0F0E1A;
+	/* Colors — Text */
+	--exe-text: #f0ede8;
+	--exe-text-muted: #a09caf;
+	--exe-text-inverted: #0f0e1a;
 
-  /* Colors — Border */
-  --exe-border: rgba(240, 237, 232, 0.1);
+	/* Colors — Border */
+	--exe-border: rgba(240, 237, 232, 0.1);
 
-  /* Colors — Status */
-  --exe-error: #F87171;
-  --exe-success: #86EFAC;
+	/* Colors — Status */
+	--exe-error: #f87171;
+	--exe-success: #86efac;
 
-  /* Colors — Input */
-  --exe-input-bg: rgba(255, 255, 255, 0.05);
-  --exe-input-bg-focus: rgba(255, 255, 255, 0.07);
+	/* Colors — Input */
+	--exe-input-bg: rgba(255, 255, 255, 0.05);
+	--exe-input-bg-focus: rgba(255, 255, 255, 0.07);
 
-  /* Colors — Tabs */
-  --exe-tab-active-bg: rgb(37, 35, 64);
-  --exe-tab-bg: rgba(255, 255, 255, 0.05);
+	/* Colors — Tabs */
+	--exe-tab-active-bg: rgb(37, 35, 64);
+	--exe-tab-bg: rgba(255, 255, 255, 0.05);
 
-  /* Typography — Font Families */
-  --exe-font-heading: 'Epilogue', 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --exe-font-body: 'Manrope', 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --exe-font-mono: 'Space Grotesk', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+	/* Typography — Font Families */
+	--exe-font-heading: "Epilogue", "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+	--exe-font-body: "Manrope", "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+	--exe-font-mono: "Space Grotesk", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Typography — Sizes */
-  --exe-text-h1: 30px;
-  --exe-text-h2: 24px;
-  --exe-text-h3: 20px;
-  --exe-text-body: 16px;
-  --exe-text-small: 14px;
-  --exe-text-caption: 12px;
+	/* Typography — Sizes */
+	--exe-text-h1: 30px;
+	--exe-text-h2: 24px;
+	--exe-text-h3: 20px;
+	--exe-text-body: 16px;
+	--exe-text-small: 14px;
+	--exe-text-caption: 12px;
 
-  /* Typography — Heading Rules */
-  --exe-heading-weight: 700;
-  --exe-heading-letter-spacing: -0.02em;
-  --exe-heading-transform: uppercase;
+	/* Typography — Heading Rules */
+	--exe-heading-weight: 700;
+	--exe-heading-letter-spacing: -0.02em;
+	--exe-heading-transform: uppercase;
 
-  /* Spacing — Border Radius */
-  --exe-radius: 8px;
-  --exe-radius-sm: 6px;
-  --exe-radius-lg: 12px;
+	/* Spacing — Border Radius */
+	--exe-radius: 8px;
+	--exe-radius-sm: 6px;
+	--exe-radius-lg: 12px;
 
-  /* Spacing — Component Sizes */
-  --exe-input-height: 42px;
-  --exe-btn-height: 42px;
-  --exe-card-max-width: 480px;
-  --exe-login-card-max-width: 340px;
+	/* Spacing — Component Sizes */
+	--exe-input-height: 42px;
+	--exe-btn-height: 42px;
+	--exe-card-max-width: 480px;
+	--exe-login-card-max-width: 340px;
 }
