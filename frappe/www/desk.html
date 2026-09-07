@@ -26,7 +26,15 @@
 		{{ include_style(include) }}
 		{%- endfor -%}
 		<!-- Exe Foundry Bold desk theme — loaded AFTER the app bundles so the
-		     token overrides in exe-desk-brand.css win the cascade. -->
+		     token overrides in exe-desk-brand.css win the cascade.
+		     tokens.css is vendored from @askexenow/exe-theme and must load
+		     first: exe-desk-brand.css resolves every value from its --exe-*
+		     custom properties. Resync with scripts/sync-exe-theme.sh. -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700;900&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+		<link rel="stylesheet" href="/assets/frappe/css/exe-theme/tokens.css">
 		<link rel="stylesheet" href="/assets/frappe/css/exe-desk-brand.css">
 
 		{% if lang == "eo" %}
