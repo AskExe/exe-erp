@@ -49,6 +49,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          # The "assert this version exists as a git tag at this commit" step
+          # below reads local refs. A default checkout is `--depth=1 --no-tags`,
+          # so the tag it is looking for is simply ABSENT from the clone and the
+          # guard fails closed on a correctly tagged release (v0.3.9, run
+          # 34121348233). Fetching tags is what makes the guard able to pass;
+          # it does not weaken it — a genuinely untagged commit still fails.
+          # exe-os fixed the identical defect in its publish checkouts in #1029.
+          fetch-depth: 0
+          fetch-tags: true
 
       # Prove the pin gate still REFUSES before trusting it to approve anything.
       # A guard nobody has watched refuse is not a guard — these 17 cases assert
