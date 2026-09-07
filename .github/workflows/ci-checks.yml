@@ -74,6 +74,34 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
+      - name: Acquire heavy-CI concurrency slot
+        # bug 4187ed64: mac-fast is the same physical mac-m4-1 box that
+        # exe-os and exe-wiki run heavy CI on, plus the two permanent
+        # Virtualization.framework VMs it hosts (Docker Desktop ~111% CPU,
+        # ci-linux Lima VM ~92% CPU). exe-erp ran no concurrency limiter, so
+        # this job's docker builds could land alongside those repos' full
+        # vitest suites with nothing arbitrating between them — measured
+        # loadavg 110 (then 102) with 19 concurrent workers across four
+        # repos' CI running at once.
+        #
+        # scripts/ci-concurrency-slot.sh and scripts/ci-portable.sh are
+        # verbatim copies of AskExe/exe-os's (same registry, same
+        # token-based release + TTL + GitHub-API liveness reclaim; edit in
+        # exe-os and re-copy, do not fork — see the PROVENANCE note in
+        # ci-portable.sh). Only this job is gated, not secret-scan below:
+        # gitleaks is a short, mostly I/O-bound scan and not the CPU source
+        # this bug is about.
+        env:
+          # This job's docker builds are not a fixed worker count like
+          # vitest --maxWorkers; 4 is a conservative estimate of concurrent
+          # build/compile threads, matched with the same
+          # CI_HOST_RESERVED_CORES as the other repos' mac-fast lanes.
+          CI_HEAVY_SLOT_WORKERS: "4"
+          CI_HOST_RESERVED_CORES: "4"
+          EXE_OS_CI_SLOT_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: bash scripts/ci-concurrency-slot.sh
+
       - name: Validate docker-compose.yml
         run: |
           # docker-compose interpolates required vars (SITE_NAME, etc.) and
@@ -220,6 +248,14 @@ jobs:
 
       - name: Workflow gate integrity (bugs b7496cb1, 98fbb1a0)
         run: python3 scripts/workflow-gate-integrity.test.py
+
+      - name: CI concurrency workflow guard (bug 4187ed64)
+        # Fails if the validate job's acquire/release steps or
+        # CI_HOST_RESERVED_CORES are removed or renamed from
+        # .github/workflows/ci-checks.yml, independent of
+        # scripts/ci-concurrency-slot.sh's own behavior (see exe-crm bug
+        # d859577c for why that regression class needs its own test).
+        run: bash scripts/ci-workflow-slot-guard.test.sh
 
       # Runs EVERY Exe-owned, frappe-free unit test (bug 483cc712).
       #
@@ -527,6 +563,11 @@ jobs:
               f"{len(ALLOWED_ADVISORY_IDS)} pre-triaged advisories excluded)"
           )
           PY
+
+      - name: Release heavy-CI concurrency slot
+        if: always()
+        shell: bash
+        run: bash scripts/ci-concurrency-slot.sh --release
 
   secret-scan:
     name: Secret scan (gitleaks)
