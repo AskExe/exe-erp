@@ -1,14 +1,28 @@
 <!DOCTYPE html>
-<html data-theme-mode="{{ desk_theme.lower() }}" data-theme="{{ desk_theme.lower() }}" dir={{ layout_direction }} lang="{{ lang }}" style="background-color:#0F0E1A;">
+{%- set theme = desk_theme.lower() -%}
+{%- set canvas = "#FFFFFF" if theme == "light" else "#0F0E1A" -%}
+<html data-theme-mode="{{ theme }}" data-theme="{{ theme }}" dir={{ layout_direction }} lang="{{ lang }}">
 	<head>
 		<meta charset="UTF-8">
-		<meta name="color-scheme" content="dark">
+		<!-- First paint follows the resolved desk theme. An unconditional dark
+		     canvas here paints #0F0E1A behind a Light desk, and every region that
+		     does not paint its own background shows it through — which is what
+		     made the sidebar dark on some Light-theme pages and rendered the New
+		     Customer form's Light labels at 2.4:1 against it. Automatic defers to
+		     the system, matching what frappe.ui.set_theme resolves once JS runs. -->
+		<style>
+			html { background-color: {{ canvas }}; }
+			{%- if theme == "automatic" %}
+			@media (prefers-color-scheme: light) { html { background-color: #FFFFFF; } }
+			{%- endif %}
+		</style>
+		<meta name="color-scheme" content="{{ "dark" if theme == "dark" else "light" if theme == "light" else "light dark" }}">
 		<!-- Chrome, Firefox OS and Opera -->
-		<meta name="theme-color" content="#0F0E1A">
+		<meta name="theme-color" content="{{ canvas }}">
 		<!-- Windows Phone -->
-		<meta name="msapplication-navbutton-color" content="#0F0E1A">
+		<meta name="msapplication-navbutton-color" content="{{ canvas }}">
 		<!-- iOS Safari -->
-		<meta name="apple-mobile-web-app-status-bar-style" content="#0F0E1A">
+		<meta name="apple-mobile-web-app-status-bar-style" content="{{ canvas }}">
 		<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
 		<meta content="utf-8" http-equiv="encoding">
 		<meta name="author" content="">
@@ -22,12 +36,21 @@
 			href="{{ favicon or "/assets/frappe/images/exe-erp-favicon.svg" }}" type="image/x-icon">
 		<link rel="icon"
 			href="{{ favicon or "/assets/frappe/images/exe-erp-favicon.svg" }}" type="image/x-icon">
+		<!-- Exe Foundry Bold brand values. tokens.css is vendored from
+		     @askexenow/exe-theme (resync with scripts/sync-exe-theme.sh) and only
+		     defines --exe-* properties. It loads BEFORE the app bundles because it
+		     supplies values, not overrides: Espresso's own tokens
+		     (public/scss/espresso/_colors.scss, _typography.scss) read them, and
+		     the desk is themed entirely through the design system. There is no
+		     brand override stylesheet. -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700;900&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+		<link rel="stylesheet" href="/assets/frappe/css/exe-theme/tokens.css">
 		{% for include in app_include_css -%}
 		{{ include_style(include) }}
 		{%- endfor -%}
-		<!-- Exe Foundry Bold desk theme — loaded AFTER the app bundles so the
-		     token overrides in exe-desk-brand.css win the cascade. -->
-		<link rel="stylesheet" href="/assets/frappe/css/exe-desk-brand.css">
 
 		{% if lang == "eo" %}
 		<script type="text/javascript">

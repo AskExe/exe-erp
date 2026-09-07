@@ -279,11 +279,52 @@ $light-yellow: #fef4e2;
 	--outline-gray-5: #ededed;
 }
 [data-theme="dark"] {
-	--outline-white: #1c1c1c;
-	--outline-gray-1: #232323;
-	--outline-gray-2: #343434;
-	--outline-gray-3: #424242;
-	--outline-gray-4: #808080;
+	/* ── Exe Foundry Bold ──────────────────────────────────────────────────
+	 * Brand values for the dark theme. Espresso already owns every role below;
+	 * only the neutral ramp and the accent carry brand values, and they resolve
+	 * from the --exe-* properties vendored in public/css/exe-theme/tokens.css
+	 * (@askexenow/exe-theme, resync with scripts/sync-exe-theme.sh) so exe-erp,
+	 * exe-crm and exe-wiki cannot drift apart. Literal fallbacks are the same
+	 * values, so the desk stays branded if tokens.css fails to load.
+	 *
+	 * In the dark theme the ramp is inverted: 900 is the page background and 50
+	 * is the primary text colour. desk/dark.scss reads it for every layout,
+	 * control, border and text role, so mapping it here is what turns the whole
+	 * desk — sidebar included — into the brand palette.
+	 *
+	 * The four interpolated steps (500, 300, 200, 100) sit between the brand
+	 * anchors; the color-mix() declaration is the derived value and the plain
+	 * hex above it is the identical static fallback for engines without it.
+	 */
+	--gray-900: var(--exe-bg-primary, #0f0e1a);
+	--gray-800: var(--exe-bg-secondary, #15142a);
+	--gray-700: var(--exe-bg-tertiary, #1a1832);
+	--gray-600: var(--exe-tab-active-bg, #252340);
+	/* 500 is a text step, not a surface one: --ink-gray-3/4 and .text-extra-muted
+	 * (desk/global.scss) read it, so it is weighted towards the muted text
+	 * anchor. Measured on the #0f0e1a canvas: 4.67:1, clearing WCAG AA 4.5:1 and
+	 * ahead of upstream's own dark #717171 (3.67:1). A background-weighted mix
+	 * here renders field help text at 2.35:1. */
+	--gray-500: #7e7b90;
+	--gray-500: color-mix(
+		in srgb,
+		var(--exe-text-muted, #a09caf) 75%,
+		var(--exe-bg-tertiary, #1a1832)
+	);
+	--gray-400: var(--exe-text-muted, #a09caf);
+	--gray-300: #c8c5cc;
+	--gray-300: color-mix(in srgb, var(--exe-text, #f0ede8) 50%, var(--exe-text-muted, #a09caf));
+	--gray-200: #dcd9da;
+	--gray-200: color-mix(in srgb, var(--exe-text, #f0ede8) 75%, var(--exe-text-muted, #a09caf));
+	--gray-100: #e8e5e2;
+	--gray-100: color-mix(in srgb, var(--exe-text, #f0ede8) 90%, var(--exe-text-muted, #a09caf));
+	--gray-50: var(--exe-text, #f0ede8);
+
+	--outline-white: var(--gray-800);
+	--outline-gray-1: var(--gray-700);
+	--outline-gray-2: var(--gray-600);
+	--outline-gray-3: var(--gray-500);
+	--outline-gray-4: var(--gray-400);
 	--outline-red-1: #521515;
 	--outline-red-2: #681916;
 	--outline-red-3: #901818;
@@ -293,15 +334,15 @@ $light-yellow: #fef4e2;
 	--outline-amber-2: #603007;
 	--outline-blue-1: #052b53;
 	--outline-orange-1: #683108;
-	--outline-gray-modals: #343434;
-	--surface-white: #0f0f0f;
-	--surface-gray-1: #232323;
-	--surface-gray-2: #2b2b2b;
-	--surface-gray-3: #343434;
-	--surface-gray-4: #424242;
-	--surface-gray-5: #afafaf;
-	--surface-gray-6: #d4d4d4;
-	--surface-gray-7: #f8f8f8;
+	--outline-gray-modals: var(--gray-600);
+	--surface-white: var(--gray-900);
+	--surface-gray-1: var(--gray-800);
+	--surface-gray-2: var(--gray-800);
+	--surface-gray-3: var(--gray-700);
+	--surface-gray-4: var(--gray-600);
+	--surface-gray-5: var(--gray-400);
+	--surface-gray-6: var(--gray-300);
+	--surface-gray-7: var(--gray-50);
 	--surface-red-1: #361515;
 	--surface-red-2: #361515e6;
 	--surface-red-3: #521515e6;
@@ -322,20 +363,20 @@ $light-yellow: #fef4e2;
 	--surface-violet-1: #221c42;
 	--surface-cyan-1: #0b252d;
 	--surface-pink-1: #471432cc;
-	--surface-menu-bar: #0f0f0f;
-	--surface-cards: #1c1c1c;
-	--surface-modal: #232323;
-	--surface-selected: #424242;
-	--ink-white: #0f0f0f;
-	--ink-gray-1: #232323;
-	--ink-gray-2: #424242;
-	--ink-gray-3: #717171;
-	--ink-gray-4: #717171;
-	--ink-gray-5: #808080;
-	--ink-gray-6: #999999;
-	--ink-gray-7: #afafaf;
-	--ink-gray-8: #d4d4d4;
-	--ink-gray-9: #f8f8f8;
+	--surface-menu-bar: var(--gray-900);
+	--surface-cards: var(--gray-800);
+	--surface-modal: var(--gray-700);
+	--surface-selected: var(--gray-600);
+	--ink-white: var(--gray-900);
+	--ink-gray-1: var(--gray-800);
+	--ink-gray-2: var(--gray-600);
+	--ink-gray-3: var(--gray-500);
+	--ink-gray-4: var(--gray-500);
+	--ink-gray-5: var(--gray-400);
+	--ink-gray-6: var(--gray-400);
+	--ink-gray-7: var(--gray-300);
+	--ink-gray-8: var(--gray-200);
+	--ink-gray-9: var(--gray-50);
 	--ink-red-2: #681916;
 	--ink-red-3: #e43838;
 	--ink-red-4: #fc7474;
