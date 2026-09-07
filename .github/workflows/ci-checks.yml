@@ -740,12 +740,31 @@ jobs:
         with:
           driver: docker
 
-      - name: Build production image (amd64, no push)
+      # NO `platforms:` — build for the runner's NATIVE architecture.
+      #
+      # This is a THROWAWAY build (push:false, load:false) that exists only to
+      # prove the Dockerfile still builds. Asking it for linux/amd64 on the
+      # arm64 VM forces emulation, and emulation CANNOT build this image:
+      #
+      #   $ uv venv env --seed --python python3.14
+      #   qemu: uncaught target signal 11 (Segmentation fault) - core dumped
+      #
+      # Note "qemu:", not Rosetta. The host has ONLY a rosetta binfmt handler
+      # registered (no qemu-x86_64), so the emulation is coming from the Docker
+      # daemon this build actually reaches, not from this VM's kernel — which is
+      # why the Rosetta preflight above passes and the build still emulates.
+      # `uv` reliably SIGSEGVs under qemu-user, so amd64-on-arm64 is not merely
+      # slow here, it is impossible (bug 01283e70).
+      #
+      # The multi-arch guarantee is NOT lost: release-stack-image.yml builds
+      # linux/amd64,linux/arm64 on a native x64 host (founder decision
+      # 2026-09-05 — releases on native x64, PR checks local), and that is the
+      # image that actually ships to the VPS.
+      - name: Build production image (native arch, no push)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64
           push: false
           load: false
           # cache-from (restore) kept: a warm restore completed the whole
