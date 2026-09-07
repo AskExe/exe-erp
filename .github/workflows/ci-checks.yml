@@ -196,24 +196,43 @@ jobs:
       - name: Install Python audit build prerequisites
         shell: bash
         run: |
-          set -uo pipefail
-          # Best effort, exactly like the else branch says: this step tops up a
-          # runner that is missing build prerequisites, it does not gate the
-          # code. A broken apt index on a self-hosted runner (2026-09-07: an
-          # arm64 VM with amd64 added as a foreign architecture asked
-          # ports.ubuntu.com for binary-amd64 and got 404s, exit 100) must not
-          # turn a code PR red. If a prerequisite is genuinely missing, the
-          # steps that need it fail with their own error.
+          set -euo pipefail
+          # This step tops up a runner that is missing build prerequisites, and
+          # it FAILS CLOSED on purpose. It was briefly made non-blocking in
+          # 1617e77 to get PR #89 green while the real defect was diagnosed;
+          # that defect was a runner misconfiguration, it has been corrected on
+          # the runner, and a warn-and-continue apt step would have hidden the
+          # next one just as effectively.
+          #
+          # The defect (mac-vm-erp-1 / lima-ci-linux, 2026-09-07): the VM is
+          # arm64 with amd64 added as a foreign dpkg architecture for the
+          # Rosetta x64 image builds. Its arm64 ubuntu.sources carried no
+          # `Architectures:` field, so apt asked the arm64-only ports mirror
+          # for binary-amd64 indexes and got four 404s -> exit 100:
+          #   E: Failed to fetch http://ports.ubuntu.com/ubuntu-ports/dists/
+          #      noble/main/binary-amd64/Packages  404  Not Found
+          # Fixed on the runner by pinning ubuntu.sources to `Architectures:
+          # arm64` and keeping amd64 on its own archive.ubuntu.com source.
+          # Any runner joining this lane must satisfy the same invariant.
           if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-            if ! sudo apt-get update -qq; then
-              echo "::warning::apt-get update failed on this runner; continuing with the prerequisites it already has"
-            elif ! sudo apt-get install -y -qq pkg-config default-libmysqlclient-dev build-essential python3-dev; then
-              echo "::warning::apt-get install failed on this runner; continuing with the prerequisites it already has"
+            # Preflight: name the misconfiguration before apt reports it as an
+            # opaque 404. ports.ubuntu.com carries only non-amd64 ports arches;
+            # amd64 lives on archive/security.ubuntu.com. If amd64 is enabled
+            # and any ports source does not restrict itself to non-amd64
+            # arches, apt WILL request binary-amd64 from ports and 404.
+            if apt-config dump | grep -q '^APT::Architectures:: "amd64"'; then
+              unpinned="$(grep -rlZ 'ports\.ubuntu\.com' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list 2>/dev/null \
+                | xargs -0 -r grep -LiE '^(Architectures:|deb \[[^]]*arch=)' 2>/dev/null || true)"
+              if [ -n "$unpinned" ]; then
+                echo "::error::Runner apt is arch-incoherent: amd64 is an enabled dpkg architecture, but these ports.ubuntu.com sources declare no architecture, so apt will request binary-amd64 from the arm64-only ports mirror and 404: ${unpinned//$'\n'/, }. Fix on the runner: add 'Architectures: arm64' to the ports source and keep amd64 on an archive.ubuntu.com source." >&2
+                exit 1
+              fi
             fi
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq pkg-config default-libmysqlclient-dev build-essential python3-dev
           else
             echo "::notice::apt/sudo unavailable; relying on runner-provided build prerequisites"
           fi
-          exit 0
 
       - name: Ruff lint (Exe fork code)
         run: |
