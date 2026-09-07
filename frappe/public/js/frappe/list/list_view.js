@@ -535,14 +535,27 @@ frappe.views.ListView = class ListView extends frappe.views.BaseList {
 		let help_link = this.get_documentation_link();
 		let filters = this.filter_area && this.filter_area.get();
 
+		// Two distinct states, deliberately kept distinct: a list that is empty
+		// because filters exclude everything is not a list that has never had a
+		// record in it, and only the second one should invite an explanation of
+		// what the DocType is for.
 		let has_filters_set = filters && filters.length;
 		let no_result_message = has_filters_set
 			? __("No {0} found with matching filters. Clear filters to see all {0}.", [
 					__(this.doctype),
 			  ])
-			: this.meta.description
-			? __(this.meta.description)
 			: __("You haven't created a {0} yet", [__(this.doctype)]);
+
+		// The DocType's own description is SUPPORTING copy beneath the headline,
+		// not a replacement for it. It used to be the headline, which meant any
+		// DocType that gained a description silently lost the "you haven't
+		// created one yet" state — so the useful two-tier empty state (what this
+		// is + what to do next) was unreachable, and describing a record type
+		// cost you the state message. Both now render.
+		let no_result_description =
+			!has_filters_set && this.meta.description
+				? `<p class="meta-description small text-muted">${__(this.meta.description)}</p>`
+				: "";
 
 		let new_button_label = has_filters_set
 			? __("Create a new {0}", [__(this.doctype)], "Create a new document from list view")
@@ -566,7 +579,8 @@ frappe.views.ListView = class ListView extends frappe.views.BaseList {
 					<use href="#icon-small-file"></use>
 				</svg>
 			</div>
-			<p>${no_result_message}</p>
+			<p class="msg-box-headline">${no_result_message}</p>
+			${no_result_description}
 			${new_button}
 			${help_link}
 		</div>`;
