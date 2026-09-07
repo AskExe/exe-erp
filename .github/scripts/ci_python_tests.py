@@ -76,6 +76,10 @@ EXPECTED_MODULES = (
 	# to SSO (parity with crm/wiki), while a bounce-back mid-handoff must not
 	# loop (bug 62c42448). Drives the real frappe/www/login.py get_context().
 	"apps/erpnext/erpnext/exe_auth/test_login_sso_autoredirect.py",
+	# Bug 2e8744b0 — the successful SSO callback redirected to `Location: desk`
+	# (get_home_page() returns a page NAME); browsers resolved it against
+	# /api/method/ and landed on /api/method/desk after a GOOD login.
+	"apps/erpnext/erpnext/exe_auth/test_sso_callback_redirect_target.py",
 	"apps/erpnext/erpnext/exe_monitor/test_error_reporter.py",
 	"apps/erpnext/erpnext/exe_auth/test_oauth_csrf_contract.py",
 )
@@ -115,6 +119,9 @@ REQUIRED_TEST_CLASSES = (
 	"TestLoginPageRedirectsGuestToSsoFail",
 	"TestLoginPageDoesNotLoopFail",
 	"TestBaseTemplateGiveUpFail",
+	# Bug 2e8744b0 — the callback's Location must be an absolute path/URL,
+	# never a bare page name a browser would resolve against /api/method/.
+	"TestSsoCallbackRedirectTarget",
 )
 
 

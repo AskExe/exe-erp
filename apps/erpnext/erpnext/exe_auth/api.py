@@ -97,6 +97,23 @@ _BOOTSTRAP_FLAG = "exe_bootstrap_admin_granted"
 _OAUTH_STATE_COOKIE = "exe_sso_state"
 
 
+def _absolute_location(path: str) -> str:
+	"""Normalize a redirect target to an absolute path (or full URL).
+
+	bug 2e8744b0: frappe.website.utils.get_home_page() returns the home page
+	NAME for this site ("desk"), not a URL path. A Location header of "desk"
+	is a RELATIVE reference (RFC 3986 section 5) that browsers resolve against
+	the CURRENT request directory — here /api/method/ — so a successful SSO
+	login landed on /api/method/desk (a Frappe error page) instead of /desk.
+	Names are prefixed with "/"; absolute paths and full URLs pass through.
+	"""
+	if not path:
+		return "/desk"
+	if path.startswith("/") or "://" in path:
+		return path
+	return f"/{path}"
+
+
 def _mark_managed_disabled(email: str) -> None:
 	"""Record that the MANAGED system (not an admin) disabled this user."""
 	frappe.db.set_default(f"{_MANAGED_DISABLED_PREFIX}{email}", "1")
@@ -666,10 +683,14 @@ def gotrue_login_callback():
 	# Fails closed (throws) on managed-deny, so login below never runs.
 	_apply_managed_roles(email, app_metadata)
 
-	# Login and redirect to desk
+	# Login and redirect to desk. Location MUST be absolute-path (bug
+	# 2e8744b0): get_home_page() returns the page NAME ("desk") for this
+	# site's config, and a bare "desk" Location resolves against the request
+	# directory /api/method/ per RFC 3986 — landing the freshly logged-in
+	# user on /api/method/desk (error page) instead of /desk.
 	frappe.local.login_manager.login_as(email)
 	frappe.local.response["type"] = "redirect"
-	frappe.local.response["location"] = get_home_page() or "/desk"
+	frappe.local.response["location"] = _absolute_location(get_home_page() or "/desk")
 
 
 @frappe.whitelist(allow_guest=True)
