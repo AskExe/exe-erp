@@ -23,13 +23,20 @@
 .body-sidebar-container {
 	display: flex;
 	flex-direction: column;
-	height: fit-content;
+	// Full height of .desk-shell (see desk/main.scss). This used to be
+	// fit-content, which was harmless while .body-sidebar measured itself
+	// against the viewport with 100vh; now that the sidebar sizes against its
+	// parent, fit-content would collapse the COLLAPSED rail to its icon stack
+	// and leave the rail's background and right border ending mid-page.
+	height: 100%;
 	width: fit-content;
 
 	.body-sidebar-placeholder {
 		display: none;
 		width: 50px;
-		height: 100vh;
+		// 100% of .desk-shell, which is the viewport minus the product bar.
+		// 100vh here would push the shell row past the bottom of the screen.
+		height: 100%;
 	}
 }
 
@@ -46,7 +53,10 @@
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
-	height: 100vh;
+	// See .body-sidebar-placeholder — height comes from .desk-shell, not the
+	// viewport, so the sidebar stops at the bottom edge instead of scrolling
+	// the product bar's height off-screen.
+	height: 100%;
 	z-index: 1020;
 	padding: 8px 8px 10px 8px;
 

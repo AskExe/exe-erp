@@ -229,10 +229,23 @@ body[data-route^="Form"] {
 			@include get_textstyle("base", "regular");
 		}
 
+		// Two-tier empty state (list/list_view.js:get_no_result_message): the
+		// headline carries the state ("you haven't created one yet"), the
+		// DocType's description explains the record type underneath it. Both
+		// paragraphs inherit `.msg-box p`'s base size and --text-muted, so
+		// without a weight/size/colour step they read as one wrapped sentence
+		// and the hierarchy the two tiers exist for is lost. Values come from
+		// Espresso's own type scale and text tokens.
+		.msg-box-headline {
+			color: var(--text-color);
+			@include get_textstyle("base", "medium");
+		}
+
 		.meta-description {
 			width: 45%;
 			margin-right: auto;
 			margin-left: auto;
+			@include get_textstyle("sm", "regular");
 		}
 	}
 }

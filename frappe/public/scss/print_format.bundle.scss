@@ -3,3 +3,6 @@
 @import "./common/global.scss";
 @import "./common/icons.scss";
 @import "~bootstrap/scss/bootstrap";
+// The dark theme moved out of desk/variables.scss (it now loads after bootstrap
+// in desk/index.scss); import it here so this bundle is unchanged.
+@import "./desk/dark";
