@@ -300,10 +300,15 @@ $light-yellow: #fef4e2;
 	--gray-800: var(--exe-bg-secondary, #15142a);
 	--gray-700: var(--exe-bg-tertiary, #1a1832);
 	--gray-600: var(--exe-tab-active-bg, #252340);
-	--gray-500: #504c64;
+	/* 500 is a text step, not a surface one: --ink-gray-3/4 and .text-extra-muted
+	 * (desk/global.scss) read it, so it is weighted towards the muted text
+	 * anchor. Measured on the #0f0e1a canvas: 4.67:1, clearing WCAG AA 4.5:1 and
+	 * ahead of upstream's own dark #717171 (3.67:1). A background-weighted mix
+	 * here renders field help text at 2.35:1. */
+	--gray-500: #7e7b90;
 	--gray-500: color-mix(
 		in srgb,
-		var(--exe-text-muted, #a09caf) 40%,
+		var(--exe-text-muted, #a09caf) 75%,
 		var(--exe-bg-tertiary, #1a1832)
 	);
 	--gray-400: var(--exe-text-muted, #a09caf);
