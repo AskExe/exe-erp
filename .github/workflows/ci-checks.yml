@@ -196,13 +196,24 @@ jobs:
       - name: Install Python audit build prerequisites
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          # Best effort, exactly like the else branch says: this step tops up a
+          # runner that is missing build prerequisites, it does not gate the
+          # code. A broken apt index on a self-hosted runner (2026-09-07: an
+          # arm64 VM with amd64 added as a foreign architecture asked
+          # ports.ubuntu.com for binary-amd64 and got 404s, exit 100) must not
+          # turn a code PR red. If a prerequisite is genuinely missing, the
+          # steps that need it fail with their own error.
           if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq pkg-config default-libmysqlclient-dev build-essential python3-dev
+            if ! sudo apt-get update -qq; then
+              echo "::warning::apt-get update failed on this runner; continuing with the prerequisites it already has"
+            elif ! sudo apt-get install -y -qq pkg-config default-libmysqlclient-dev build-essential python3-dev; then
+              echo "::warning::apt-get install failed on this runner; continuing with the prerequisites it already has"
+            fi
           else
             echo "::notice::apt/sudo unavailable; relying on runner-provided build prerequisites"
           fi
+          exit 0
 
       - name: Ruff lint (Exe fork code)
         run: |
