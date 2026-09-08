@@ -163,6 +163,13 @@ class ExeServiceSwitcher extends HTMLElement {
     return `
       :host {
         display: block;
+        /* Stretch to full viewport width in any mount context. Frappe's desk
+           sets body { display: flex }, which otherwise shrinks this element to
+           content width (~389px) and leaves a ragged edge where the dark bar
+           meets the page. width:100% + flex:1 1 auto cover both block and
+           flex-item parents. */
+        width: 100%;
+        flex: 1 1 auto;
         font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         font-size: 12px;
         font-weight: 600;

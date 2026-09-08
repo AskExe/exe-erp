@@ -16,9 +16,19 @@ function authenticate_with_frappe(socket, next) {
 
 	if (namespace != get_site_name(socket)) {
 		next(new Error("Invalid namespace"));
+		return;
 	}
 
-	if (get_hostname(socket.request.headers.host) != get_hostname(socket.request.headers.origin)) {
+	// Browsers omit the Origin header on same-origin GET requests — and the
+	// engine.io polling handshake that establishes every polling session IS a
+	// GET — so "no origin header" is the normal same-origin shape, not an
+	// attack. Cross-origin browser connections (websocket upgrades always
+	// carry Origin; cross-site scripts get Origin stamped by the browser) are
+	// still rejected here, and cookie/token auth below still gates everything.
+	// Rejecting absent origins made every polling-transport desk session die
+	// with "Invalid origin" (2026-09-02 demo verification).
+	const origin = socket.request.headers.origin;
+	if (origin && get_hostname(socket.request.headers.host) != get_hostname(origin)) {
 		next(new Error("Invalid origin"));
 		return;
 	}

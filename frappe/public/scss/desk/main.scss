@@ -25,18 +25,55 @@ body[data-route^="Module"] .main-menu {
 	@extend .hide-form-sidebar;
 }
 
+// Outer frame.
+//
+// The desk used to lay <body> out as a horizontal flex row, so every direct
+// body child became a COLUMN of the viewport. <exe-service-switcher> is a body
+// child (www/desk.html), so the product/account bar claimed a full-height
+// column beside the page instead of a full-width strip above it, and the
+// sidebar — prepended as a third body child by ui/sidebar/sidebar.js — sat
+// beside it rather than under it. Measured on a 1153px viewport before this
+// change: sidebar 220px, switcher column 467px, .main-section 467px, i.e. the
+// page content got 40% of the width and ~470px of viewport was dead space.
+//
+// Body is now a vertical stack — top bar, then a row. `.desk-shell` is that
+// row and owns the old horizontal flex; the sidebar mounts inside it. Heights
+// resolve through the flex chain (body 100vh -> .desk-shell flex:1 -> children
+// 100%) so no bar-height constant has to be hardcoded or kept in sync.
 body {
+	display: flex;
+	flex-direction: column;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	justify-content: flex-start;
+	position: relative;
+	height: 100vh;
+	overflow: hidden;
+}
+
+// The product/account bar spans the viewport above the shell row.
+exe-service-switcher {
+	flex: 0 0 auto;
+	width: 100%;
+}
+
+.desk-shell {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: nowrap;
 	align-items: flex-start;
 	justify-content: flex-start;
 	position: relative;
+	flex: 1 1 auto;
+	// Without this a flex item refuses to shrink below its content height and
+	// .main-section's own scrollbar never engages.
+	min-height: 0;
+	width: 100%;
 }
 
 .main-section {
 	width: 100%;
-	height: 100vh;
+	height: 100%;
 	overflow: scroll;
 	overflow-x: hidden;
 	overflow-y: visible;

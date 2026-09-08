@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 import frappe
 import frappe.sessions
 from frappe import _
+from frappe.sessions import get_default_desk_theme
 from frappe.utils.jinja_globals import is_rtl
 
 SCRIPT_TAG_PATTERN = re.compile(r"\<script[^<]*\</script\>")
@@ -53,7 +54,7 @@ def get_context(context):
 			"lang": frappe.local.lang,
 			"sounds": hooks["sounds"],
 			"boot": boot,
-			"desk_theme": boot.get("desk_theme") or "Light",
+			"desk_theme": boot.get("desk_theme") or get_default_desk_theme(),
 			"csrf_token": csrf_token,
 			"google_analytics_id": frappe.conf.get("google_analytics_id"),
 			"google_analytics_anonymize_ip": frappe.conf.get("google_analytics_anonymize_ip"),

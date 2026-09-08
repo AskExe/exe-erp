@@ -95,6 +95,7 @@
   },
   "resolutions": {
     "esbuild-plugin-vue3/esbuild": "^0.28.0",
+    "browserslist": "^4.25.0",
     "ws": "^8.21.0",
     "json5": "^2.2.2",
     "launch-editor": "^2.9.0",

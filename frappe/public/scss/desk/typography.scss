@@ -2,8 +2,18 @@
 $text-muted: var(--text-muted);
 $text-light: var(--text-light);
 $text-color: var(--text-color);
-$headings-color: var(--gray-900);
+// Semantic role, not a raw scale step: --heading-color is the token both
+// themes maintain (espresso/_typography.scss, desk/dark.scss). Reading
+// --gray-900 directly rendered headings in the dark theme's page background
+// colour.
+$headings-color: var(--heading-color);
 $font-family-base: var(--font-stack);
+// Bootstrap's own levers: $headings-font-family drives h1-h6 (_type.scss) and
+// $font-family-monospace drives code/kbd/pre/samp (_reboot.scss). Pointing them
+// at the Espresso tokens is how the brand faces reach headings and code
+// without a per-selector override sheet.
+$headings-font-family: var(--font-stack-heading);
+$font-family-monospace: var(--font-stack-mono);
 
 $font-size-xs: 0.6875rem !default;
 $font-size-sm: 0.75rem !default;

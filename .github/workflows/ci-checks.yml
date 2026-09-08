@@ -66,7 +66,22 @@ concurrency:
 jobs:
   validate:
     name: Validate + lint + migration smoke
-    runs-on: [self-hosted, macOS, ARM64, mac-fast]
+    # Moved off mac-fast (2026-09-01): this job is pure validation (compose
+    # config check, build-plan check, Ruff lint, Python compile, migration
+    # smoke, pip/yarn audits) with no macOS-specific dependency — the Python
+    # setup step already has an apt-get branch for Linux, and RUNNER_OS
+    # macOS checks are optional Homebrew-path overrides, not requirements.
+    # Docker CLI invocations here (docker compose config, docker build
+    # --check) were triggering repeated macOS TCC "access other apps"
+    # (kTCCServiceSystemPolicyAppBundles) prompts via Docker Desktop's
+    # LaunchServices interaction on every job run, attributed to the Ghostty
+    # terminal hosting the runner process tree since the grant never stuck
+    # (confirmed via `log stream --predicate 'process == "tccd"'`, correlated
+    # by timestamp to this exact job). The docker-build job below already
+    # proves Docker works fine on this Linux lane. Also relieves load on the
+    # single mac-fast runner, which the watchdog comment below already flags
+    # as a scarce, easily-starved resource (2h19m stall incident, PR #65).
+    runs-on: [self-hosted, linux, x64, mac-local]
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -210,7 +225,37 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # This step tops up a runner that is missing build prerequisites, and
+          # it FAILS CLOSED on purpose. It was briefly made non-blocking in
+          # 1617e77 to get PR #89 green while the real defect was diagnosed;
+          # that defect was a runner misconfiguration, it has been corrected on
+          # the runner, and a warn-and-continue apt step would have hidden the
+          # next one just as effectively.
+          #
+          # The defect (mac-vm-erp-1 / lima-ci-linux, 2026-09-07): the VM is
+          # arm64 with amd64 added as a foreign dpkg architecture for the
+          # Rosetta x64 image builds. Its arm64 ubuntu.sources carried no
+          # `Architectures:` field, so apt asked the arm64-only ports mirror
+          # for binary-amd64 indexes and got four 404s -> exit 100:
+          #   E: Failed to fetch http://ports.ubuntu.com/ubuntu-ports/dists/
+          #      noble/main/binary-amd64/Packages  404  Not Found
+          # Fixed on the runner by pinning ubuntu.sources to `Architectures:
+          # arm64` and keeping amd64 on its own archive.ubuntu.com source.
+          # Any runner joining this lane must satisfy the same invariant.
           if command -v apt-get >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+            # Preflight: name the misconfiguration before apt reports it as an
+            # opaque 404. ports.ubuntu.com carries only non-amd64 ports arches;
+            # amd64 lives on archive/security.ubuntu.com. If amd64 is enabled
+            # and any ports source does not restrict itself to non-amd64
+            # arches, apt WILL request binary-amd64 from ports and 404.
+            if apt-config dump | grep -q '^APT::Architectures:: "amd64"'; then
+              unpinned="$(grep -rlZ 'ports\.ubuntu\.com' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/sources.list.d/*.list 2>/dev/null \
+                | xargs -0 -r grep -LiE '^(Architectures:|deb \[[^]]*arch=)' 2>/dev/null || true)"
+              if [ -n "$unpinned" ]; then
+                echo "::error::Runner apt is arch-incoherent: amd64 is an enabled dpkg architecture, but these ports.ubuntu.com sources declare no architecture, so apt will request binary-amd64 from the arm64-only ports mirror and 404: ${unpinned//$'\n'/, }. Fix on the runner: add 'Architectures: arm64' to the ports source and keep amd64 on an archive.ubuntu.com source." >&2
+                exit 1
+              fi
+            fi
             sudo apt-get update -qq
             sudo apt-get install -y -qq pkg-config default-libmysqlclient-dev build-essential python3-dev
           else
@@ -256,6 +301,9 @@ jobs:
         # scripts/ci-concurrency-slot.sh's own behavior (see exe-crm bug
         # d859577c for why that regression class needs its own test).
         run: bash scripts/ci-workflow-slot-guard.test.sh
+
+      - name: Workflow timeout guard (bug 3136f36b)
+        run: python3 scripts/workflow-timeout-guard.test.py
 
       # Runs EVERY Exe-owned, frappe-free unit test (bug 483cc712).
       #
@@ -655,7 +703,13 @@ jobs:
   # A gate that cannot fail is not a gate. Keep these unconditional.
   trivy-scan:
     name: Container/deps scan (trivy)
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, mac-local]
+    # 45 -> unchanged as the outer backstop, but the scan now carries its OWN
+    # 25m trivy-level timeout so a hung vuln-DB download fails LOUDLY with a
+    # visible error long before the job backstop silently cancels it with no
+    # verdict (bug 529b695f: both Sep-5 runs burned the full 45m — 19.5 of
+    # those minutes stalled in the trivy-binary cache restore at 0.0 MB/s and
+    # the rest in a vuln-DB download from mirror.gcr.io that never finished).
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -663,15 +717,52 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Trivy filesystem scan (deps + IaC/Dockerfile misconfig + secrets)
+      # BUG 529b695f — put the vuln-DB cache OUTSIDE the workspace.
+      # trivy-action's default cache-dir is <workspace>/.cache/trivy, which
+      # the checkout step's `git clean -ffdx` deletes on every run; and a run
+      # cancelled by the timeout never saves the actions/cache archive. That
+      # combination turned every DB update into a full re-download from
+      # mirror.gcr.io — which stalls on this runner's network — so the job
+      # timed out, saved nothing, and guaranteed the next run re-downloaded
+      # from scratch: a no-verdict death spiral. $HOME on this pinned
+      # self-hosted runner survives both, so trivy only ever pulls DB DELTAs
+      # (vuln-scan.yml's equivalent scan with a persistent cache completes in
+      # ~10 min on the same host).
+      - name: Park the trivy vuln-DB cache outside the workspace (bug 529b695f)
+        run: echo "TRIVY_CACHE_DIR=$HOME/.cache/trivy-db" >> "$GITHUB_ENV"
+
+      - name: Trivy filesystem scan (deps + IaC/Dockerfile misconfig)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
-          scanners: vuln,misconfig,secret
+          # secret dropped (bug 529b695f scope cut): the gitleaks job in THIS
+          # pipeline already secret-scans the whole tree AND full git history;
+          # trivy's secret pass duplicated that and widened the scan surface.
+          scanners: vuln,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+          # Pinned to the same trivy version vuln-scan.yml installs (known
+          # good on this runner). setup-trivy defaults to latest, so an
+          # upstream release could otherwise change the DB schema out from
+          # under the cached database mid-flight.
+          version: v0.72.0
+          # Trivy-level fail-fast: a stalled DB download aborts with an
+          # explicit error inside 25m instead of consuming the job budget.
+          timeout: 25m
+          # Hygiene: never walk VCS internals or dependency installs.
+          skip-dirs: '.git,node_modules'
+          # Reuse the $HOME cache parked above (survives git clean + cancelled
+          # runs on this pinned host).
+          cache-dir: ${{ env.TRIVY_CACHE_DIR }}
+          # OFF (bug 529b695f): on this PERSISTENT self-hosted runner $HOME is
+          # the durable store, so the daily-keyed actions/cache round-trip is
+          # pure overhead — and it was the component that stalled for 19.5
+          # minutes at 0.0 MB/s in the Sep-5 run. The trivy binary falls back
+          # to a plain GitHub-releases download (the path vuln-scan.yml uses,
+          # which completes), and the DB deltas land straight in $HOME.
+          cache: false
 
   docker-build:
     name: Production Docker build (no push)
@@ -679,24 +770,92 @@ jobs:
     # `bench build --production` + websocket import smoke — heavy, and the
     # GHA layer cache is warmest on the persistent host. Release publish
     # (release-stack-image.yml) also stays self-hosted for GHCR secrets.
-    runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 45
+    #
+    # EMULATION CONTRACT (build-my migration, 2026-09-02): this job's
+    # [linux,x64] label now also matches mac-vm-erp-1 in the ci-linux VM —
+    # an ARM64 host, where amd64 RUN steps are EMULATED. The buildx
+    # docker-container driver (setup-buildx-action's default) executes
+    # cross-arch RUN with its own BUNDLED QEMU, and Frappe dies under it:
+    # `bench init` failed in 5s on main (run 33590824889). The `docker`
+    # driver (dockerd's integrated buildkit) executes cross-arch RUN
+    # through KERNEL binfmt_misc instead — Rosetta on the VM — which runs
+    # the full production build correctly and 2-5x faster than qemu. This
+    # job therefore pins driver: docker. On the native-x64 fallback host
+    # the driver is irrelevant (everything is native).
+    runs-on: [self-hosted, linux, x64, mac-local]
+    # 90 (was 45): a COLD amd64 build under Rosetta on mac-vm-erp-1 takes
+    # ~40 min, and two runs were cancelled at exactly 45/46 min by this
+    # backstop (runs 33657791454 attempts 1-2). With a warm GHA restore the
+    # build itself is seconds; the budget covers the cold path.
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      # driver: docker = the default dockerd builder. It still installs the
+      # buildx CLI; it just does NOT create the qemu-based docker-container
+      # builder. Single-platform builds don't need the container driver, and
+      # build cache lands in dockerd's own store (persistent on the runner)
+      # instead of a throwaway builder container.
+      # PREFLIGHT: the docker driver executes cross-arch RUN through kernel
+      # binfmt_misc, so an arm64 host MUST have an amd64 handler registered
+      # (Rosetta on the ci-linux VM). Assert it here, loudly, instead of
+      # failing mid-build with a confusing emulator error.
+      - name: Assert cross-arch capability (arm64 hosts need Rosetta)
+        shell: bash
+        run: |
+          set -euo pipefail
+          arch="$(uname -m)"
+          if [ "$arch" = "x86_64" ]; then
+            echo "native x64 host — no emulation needed"
+            exit 0
+          fi
+          if [ -r /proc/sys/fs/binfmt_misc/rosetta ] && grep -q '^enabled' /proc/sys/fs/binfmt_misc/rosetta; then
+            echo "arm64 host with Rosetta binfmt — OK"
+          else
+            echo "::error::arm64 host has no enabled Rosetta binfmt handler for linux/amd64 builds. Register Rosetta (Lima vz: rosetta.binfmt) or run this lane on a native x64 host." >&2
+            exit 1
+          fi
 
-      - name: Build production image (amd64, no push)
+      - name: Set up Docker Buildx (docker driver — Rosetta, not bundled qemu)
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          driver: docker
+
+      # NO `platforms:` — build for the runner's NATIVE architecture.
+      #
+      # This is a THROWAWAY build (push:false, load:false) that exists only to
+      # prove the Dockerfile still builds. Asking it for linux/amd64 on the
+      # arm64 VM forces emulation, and emulation CANNOT build this image:
+      #
+      #   $ uv venv env --seed --python python3.14
+      #   qemu: uncaught target signal 11 (Segmentation fault) - core dumped
+      #
+      # Note "qemu:", not Rosetta. The host has ONLY a rosetta binfmt handler
+      # registered (no qemu-x86_64), so the emulation is coming from the Docker
+      # daemon this build actually reaches, not from this VM's kernel — which is
+      # why the Rosetta preflight above passes and the build still emulates.
+      # `uv` reliably SIGSEGVs under qemu-user, so amd64-on-arm64 is not merely
+      # slow here, it is impossible (bug 01283e70).
+      #
+      # The multi-arch guarantee is NOT lost: release-stack-image.yml builds
+      # linux/amd64,linux/arm64 on a native x64 host (founder decision
+      # 2026-09-05 — releases on native x64, PR checks local), and that is the
+      # image that actually ships to the VPS.
+      - name: Build production image (native arch, no push)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64
           push: false
           load: false
+          # cache-from (restore) kept: a warm restore completed the whole
+          # build in 15s. cache-to (export) deliberately REMOVED: the GHA
+          # cache EXPORT stalled for 45+ minutes twice (runs 33657791454
+          # attempt 2 and 33596130328) and was what the old 45-min timeout
+          # kept killing. The docker driver's build cache lives in dockerd's
+          # own persistent store on the pinned runner, which is the cache
+          # that actually matters here.
           cache-from: type=gha
-          cache-to: type=gha,mode=max

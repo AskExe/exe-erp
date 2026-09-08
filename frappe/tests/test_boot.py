@@ -1,7 +1,10 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.boot import get_user_pages_or_reports
 from frappe.desk.doctype.note.note import _get_unseen_notes, get_unseen_notes, mark_as_seen
-from frappe.tests import IntegrationTestCase
+from frappe.sessions import get_default_desk_theme
+from frappe.tests import IntegrationTestCase, UnitTestCase
 
 
 class TestBootData(IntegrationTestCase):
@@ -76,3 +79,20 @@ class TestPermissionQueries(IntegrationTestCase):
 		# Test user must not see admin user's report
 		self.assertNotIn("Test Admin Report", allowed_reports)
 		self.assertIn("Test User Report", allowed_reports)
+
+
+class TestDefaultDeskTheme(UnitTestCase):
+	"""The desk defaults to the brand (dark) theme for users who never picked one."""
+
+	def test_default_is_dark(self):
+		with patch.dict(frappe.conf, {}, clear=False):
+			frappe.conf.pop("default_desk_theme", None)
+			self.assertEqual(get_default_desk_theme(), "Dark")
+
+	def test_site_config_overrides_default(self):
+		with patch.dict(frappe.conf, {"default_desk_theme": "Light"}):
+			self.assertEqual(get_default_desk_theme(), "Light")
+
+	def test_unknown_value_falls_back_to_default(self):
+		with patch.dict(frappe.conf, {"default_desk_theme": "Neon"}):
+			self.assertEqual(get_default_desk_theme(), "Dark")

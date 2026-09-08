@@ -26,6 +26,20 @@ from frappe.utils import cint, cstr, get_assets_json
 from frappe.utils.change_log import has_app_update_notifications
 from frappe.utils.data import add_to_date
 
+#: Desk theme served to a user who has never picked one. Espresso ships a full
+#: `[data-theme="dark"]` palette (public/scss/espresso/_colors.scss) and the
+#: brand values are mapped onto it, so Dark — not Light — is the correct
+#: unconfigured state for this product. Override per site with
+#: `"default_desk_theme": "Light"` in site_config.json. A user's own choice is
+#: stored on User.desk_theme by the shipped theme switcher and always wins.
+DEFAULT_DESK_THEME = "Dark"
+
+
+def get_default_desk_theme() -> str:
+	"""Return the desk theme for users who have not chosen one."""
+	theme = frappe.conf.get("default_desk_theme") or DEFAULT_DESK_THEME
+	return theme if theme in ("Light", "Dark", "Automatic") else DEFAULT_DESK_THEME
+
 
 @frappe.whitelist()
 def clear():
@@ -177,7 +191,9 @@ def get():
 		"default_path": get_default_path() or "",
 	}
 
-	bootinfo["desk_theme"] = frappe.get_cached_value("User", frappe.session.user, "desk_theme") or "Light"
+	bootinfo["desk_theme"] = (
+		frappe.get_cached_value("User", frappe.session.user, "desk_theme") or get_default_desk_theme()
+	)
 	bootinfo["user"]["impersonated_by"] = frappe.session.data.get("impersonated_by")
 	bootinfo["navbar_settings"] = frappe.client_cache.get_doc("Navbar Settings")
 	bootinfo.has_app_updates = has_app_update_notifications()

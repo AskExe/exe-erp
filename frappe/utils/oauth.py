@@ -225,12 +225,14 @@ def login_oauth_user(
 		else:
 			state = None
 
-	# CSRF protection: when the auth provider DOES echo a state back, it must
-	# carry the token we issued in get_oauth2_authorize_url(). Some auth domains
-	# legitimately do not echo state at all; in that case we must not hard-require
-	# it, otherwise SSO breaks for those providers. Enforcement is fully preserved
-	# whenever a state is present.
-	if state and not state.get("token"):
+	# CSRF protection (bug 8eab0042, repeat of fba616eb): the echoed state MUST
+	# carry the token we issued in get_oauth2_authorize_url(). An absent or empty
+	# state echo must be REJECTED, not waved through — that gate is the login-CSRF
+	# defence of the whole SSO flow. This exact relaxation was introduced on PR
+	# #59, flagged, and closed unmerged; the same branch returned as PR #66 and
+	# merged. Guarded by TestOAuthStateCsrfContract in CI — do not relax here;
+	# make the auth provider echo state instead.
+	if not (state and state.get("token")):
 		frappe.respond_as_web_page(_("Invalid Request"), _("Token is missing"), http_status_code=417)
 		return
 
@@ -268,7 +270,7 @@ def login_oauth_user(
 		frappe.response["login_token"] = login_token
 
 	else:
-		redirect_to = state.get("redirect_to") if state else None
+		redirect_to = state.get("redirect_to")
 		redirect_post_login(
 			desk_user=frappe.local.response.get("message") == "Logged In",
 			redirect_to=redirect_to,
