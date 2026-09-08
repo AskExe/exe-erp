@@ -203,25 +203,29 @@ jobs:
       # "Up" and not registered in `docker buildx ls`. Manual `docker rm` on
       # both immediately unblocked the next run.
       #
-      # This runner label maps to one job at a time per physical runner, so
-      # any buildx_buildkit_builder-* container still present HERE, before
-      # this run's own setup-buildx step has created one, can only be an
-      # orphan from an earlier, already-finished-or-cancelled run on this
-      # same host — never a container this run itself is using.
+      # Bug df3264de: that fix's predicate matched EVERY repo's
+      # auto-generated "buildx_buildkit_builder-*" container, because none
+      # of them carry any repo identity. Once exe-erp, exe-crm and exe-os
+      # runners moved onto one shared Docker host, this step started
+      # SIGKILLing other repos' in-flight builders. Scoped out in
+      # scripts/cleanup-orphaned-buildx-builders.sh: this job's builder now
+      # gets an explicit, workflow-exclusive name (set on the "Set up Docker
+      # Buildx" step below) and the cleanup only ever matches that exact
+      # name -- a positive "I only created this" check, not a narrowed
+      # guess. Anything whose ownership isn't provably ours is left alone.
       - name: Clean up orphaned buildx builder containers
-        run: |
-          set -uo pipefail
-          orphans="$(docker ps -aq --filter 'name=buildx_buildkit_builder-' 2>/dev/null || true)"
-          if [ -n "$orphans" ]; then
-            echo "Removing orphaned buildx builder container(s) from a prior cancelled run:"
-            docker ps -a --filter 'name=buildx_buildkit_builder-' --format '  {{.Names}} ({{.Status}})'
-            docker rm -f $orphans >/dev/null 2>&1 || true
-          else
-            echo "No orphaned buildx builder containers found."
-          fi
+        run: scripts/cleanup-orphaned-buildx-builders.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          # Must match BUILDX_BUILDER_NAME's default in
+          # scripts/cleanup-orphaned-buildx-builders.sh -- that script only
+          # ever removes a container named after THIS value, so the name is
+          # the ownership proof. Stable (not per-run): this job's runner
+          # label runs one job at a time, so no two attempts of this same
+          # job ever hold this name concurrently (bug df3264de).
+          name: erp-release-buildx
 
       - name: Build and push image
         id: build
