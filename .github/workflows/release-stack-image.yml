@@ -32,25 +32,20 @@ jobs:
     with:
       ref: ${{ github.sha }}
 
-  release-image:
-    name: Build + push stack image
+  # ── Release gates (fail closed) ─────────────────────────────────
+  # Every pre-build gate, unchanged and in the same order, hoisted into one job
+  # so it runs ONCE and blocks BOTH build legs. Nothing is weakened: pin-gate
+  # self-tests, compose reconciliation, the release contract, the git-tag
+  # provenance gate (bug 2c9bf186) and the tag immutability guard (bug 2fe79166)
+  # all still fail closed before a single layer is built or byte pushed.
+  preflight:
+    name: Release gates (fail closed)
     needs: gate
-    # FOUNDER DECISION 2026-09-05: erp image releases stay on NATIVE x64
-    # runners (the dedicated VPS lane). Deliberately NOT mac-local — the one
-    # sanctioned VPS-lane exception.
-    #
-    # `vps-x64` (bug b56fa021) is what actually ENFORCES that decision. The
-    # label set above used to be [self-hosted, linux, x64], which does NOT
-    # identify the VPS: mac-vm-erp-1, an aarch64 Lima VM, also advertises `X64`
-    # so that x64-labelled PR checks can land on it. Release runs therefore
-    # could and did schedule onto ARM hardware, where the amd64 build emulates.
-    # `vps-x64` is carried by exactly one runner — the dedicated x86_64 VPS —
-    # so this lane is deterministic
-    # instead of depending on which runner happened to be free.
     runs-on: [self-hosted, linux, x64, vps-x64]
-    # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
-    # 49-60 min over the last 10 runs -> 90 min caps a wedged build/push at 1.5x worst.
-    timeout-minutes: 90
+    timeout-minutes: 20
+    outputs:
+      stack_version: ${{ steps.release.outputs.stack_version }}
+      image: ${{ steps.release.outputs.image }}
     env:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
     steps:
@@ -215,52 +210,125 @@ jobs:
         run: |
           python3 scripts/assert-release-tag-unpublished.py --repository askexe/exe-erp --tag "v${{ steps.release.outputs.stack_version }}"
 
-      # Bug 5f2fb4fa: docker/setup-buildx-action creates a fresh named
-      # `buildx_buildkit_builder-<uuid>` container per run but does not clean
-      # up the previous run's builder container when that run is cancelled
-      # mid-setup. On 2026-08-31 this stalled three consecutive release
-      # builds on the self-hosted ERP release runner — each one hung for 2+ minutes inside "Set
-      # up Docker Buildx" itself, before any build layer ran, because two
-      # orphaned builder containers from earlier cancelled runs were still
-      # "Up" and not registered in `docker buildx ls`. Manual `docker rm` on
-      # both immediately unblocked the next run.
-      #
-      # Bug df3264de: that fix's predicate matched EVERY repo's
-      # auto-generated "buildx_buildkit_builder-*" container, because none
-      # of them carry any repo identity. Once exe-erp, exe-crm and exe-os
-      # runners moved onto one shared Docker host, this step started
-      # SIGKILLing other repos' in-flight builders. Scoped out in
-      # scripts/cleanup-orphaned-buildx-builders.sh: this job's builder now
-      # gets an explicit, workflow-exclusive name (set on the "Set up Docker
-      # Buildx" step below) and the cleanup only ever matches that exact
-      # name -- a positive "I only created this" check, not a narrowed
-      # guess. Anything whose ownership isn't provably ours is left alone.
+  # ── Restore the arm64 leg, natively (bug b56fa021, follow-up) ───
+  # The previous change made this lane amd64-only to unblock the deployment,
+  # because the arm64 half could only be produced under QEMU and QEMU is where
+  # every current failure lives. This restores arm64 by building it on
+  # hardware that IS arm64, so no emulation returns with it.
+  #
+  # MEASURED, not assumed (proof run 34181133798, both legs fully cold, zero
+  # CACHED steps):
+  #   linux/amd64 on the x86_64 VPS runner — image built and pushed,
+  #     18m52s wall for the job.
+  #   linux/arm64 on mac-vm-erp-1 (aarch64 Lima VM) — image built and pushed
+  #     in 19m05s: "#45 pushing manifest for ghcr.io/askexe/exe-erp ... #45
+  #     DONE 148.1s". No network stall, no uv SIGSEGV — the two failures that
+  #     kill the emulated legs simply do not occur natively.
+  # For comparison, the emulated multi-arch releases took 60+ minutes when they
+  # passed at all, and every recent one failed.
+  #
+  # WHY `cache-to` IS GONE. That same proof run is also why there is no GHA
+  # cache here. `cache-to: type=gha,mode=max` cost more than the builds it was
+  # meant to accelerate on these self-hosted runners:
+  #   amd64: "#46 DONE 754.8s" — 12m35s of cache export on an 18m52s job.
+  #   arm64: cache export ran from 03:34:53Z until the 90-minute job cap
+  #          killed it at 04:47:36Z — 72+ minutes, still writing layers. The
+  #          IMAGE was already built and pushed at 03:36:54Z; the only thing
+  #          that failed was the cache upload.
+  # GitHub's Actions cache is sized for GitHub-hosted runners on GitHub's own
+  # network; from our runners, exporting every intermediate layer over the
+  # public internet dominates the job. With it removed, a fully cold release is
+  # roughly 6 minutes for amd64 and 19 for arm64 — faster than the cache export
+  # alone used to be. `cache-from` goes with it: nothing writes that scope any
+  # more, so reading it is dead configuration.
+  build:
+    name: Build ${{ matrix.platform }} (native)
+    needs: preflight
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # The dedicated x86_64 VPS (label `vps-x64`). Ships to the customer stack.
+          - arch: amd64
+            platform: linux/amd64
+            expect_uname: x86_64
+            runner: [self-hosted, linux, x64, vps-x64]
+          # mac-vm-erp-1 — the aarch64 Lima `ci-linux` VM. Genuinely arm64
+          # hardware; its `X64` label is a routing convenience, not a fact,
+          # which is exactly why the uname assertion below exists. Targeting
+          # `ARM64` + `mac-local` (never `x64`) keeps this leg off both the
+          # VPS and any host that only lies about being arm64.
+          - arch: arm64
+            platform: linux/arm64
+            expect_uname: aarch64
+            runner: [self-hosted, linux, ARM64, mac-local]
+    runs-on: ${{ matrix.runner }}
+    # BOUNDED (bug 3136f36b). Measured cold: 19 min for the slower (arm64) leg.
+    # 60 min is a >3x cap on a wedged build without letting one hang for an
+    # hour and a half, as the cache-export run did.
+    timeout-minutes: 60
+    env:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
+    steps:
+      # FAIL CLOSED ON MIS-SCHEDULING. Labels are assertions a runner makes
+      # about itself, and mac-vm-erp-1 demonstrably lies about `X64`. If a leg
+      # lands on the wrong hardware it would silently emulate and reintroduce
+      # this bug — so refuse in seconds instead of stalling for an hour.
+      - name: Assert this leg is running on native ${{ matrix.arch }} hardware
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          if [ "$actual" != "${{ matrix.expect_uname }}" ]; then
+            echo "::error::${{ matrix.platform }} leg scheduled onto a $actual runner (${RUNNER_NAME:-unknown})."
+            echo "::error::Building ${{ matrix.platform }} here would emulate — the failure mode of bug b56fa021. Refusing."
+            exit 1
+          fi
+          echo "✓ $actual runner (${RUNNER_NAME:-unknown}) is native for ${{ matrix.platform }}."
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ env.GHCR_TOKEN }}
+
+      # Bug 5f2fb4fa / bug df3264de: see scripts/cleanup-orphaned-buildx-builders.sh
+      # for the full history. It removes ONLY a container carrying this leg's
+      # own workflow-exclusive builder name (BUILDX_BUILDER_NAME below, which
+      # the "Set up Docker Buildx" step further down also uses) — a positive
+      # ownership check, never an age heuristic or a broad name-prefix match.
+      # That matters here specifically because the arm64 leg's runner shares
+      # one Docker daemon with exe-crm's and exe-os's runners (the `ci-linux`
+      # Lima VM): an unconditional or age-based sweep there has previously
+      # SIGKILLed another repo's in-flight build. Per-arch names
+      # (`erp-release-buildx-<arch>`) additionally keep the two legs of this
+      # very matrix from ever matching each other's builder.
       - name: Clean up orphaned buildx builder containers
+        env:
+          BUILDX_BUILDER_NAME: erp-release-buildx-${{ matrix.arch }}
         run: scripts/cleanup-orphaned-buildx-builders.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
         with:
-          # Must match BUILDX_BUILDER_NAME's default in
-          # scripts/cleanup-orphaned-buildx-builders.sh -- that script only
-          # ever removes a container named after THIS value, so the name is
-          # the ownership proof. Stable (not per-run): this job's runner
-          # label runs one job at a time, so no two attempts of this same
-          # job ever hold this name concurrently (bug df3264de).
-          name: erp-release-buildx
+          # Must match BUILDX_BUILDER_NAME above -- see
+          # scripts/cleanup-orphaned-buildx-builders.sh. Per-arch so the two
+          # legs of this matrix never share (or fight over) one builder name.
+          name: erp-release-buildx-${{ matrix.arch }}
 
       # ── Measure tree cleanliness, fail closed (bug b46bc7fd) ─────────────
       # org.exe.tree_clean is a provenance claim: it certifies the published
       # image corresponds EXACTLY to the checked-out commit, with no
       # uncommitted or untracked files baked in by `COPY . .`. A label that
       # cannot fail certifies nothing, so this MEASURES the tree with
-      # `git status --porcelain` -- the same method exe-os's
-      # scripts/bake-version.sh uses, and the same reasoning: untracked,
-      # non-ignored files count as dirty because they end up inside the image
-      # too, and a `git status` that cannot even run must NOT be read as
-      # clean. Unlike a label, this is fail-closed: a dirty tree stops the
-      # release here, before Docker Buildx builds a single layer, rather than
-      # publishing an image with a false clean claim.
+      # `git status --porcelain` on EACH leg independently, rather than
+      # asserting a constant -- a dirty tree on either arch's checkout must
+      # stop that leg before Buildx builds a single layer.
       - name: Measure tree cleanliness (fail closed)
         id: tree_clean
         shell: bash
@@ -286,89 +354,154 @@ jobs:
           fi
           echo "✓ Working tree is clean (git status --porcelain reported nothing)."
 
-      - name: Build and push image
+      # Push by DIGEST only — no tag. Each leg uploads its own single-platform
+      # image as loose blobs+manifest; nothing is reachable by a tag name until
+      # `publish` joins the two. That is what keeps tag immutability intact: a
+      # half-built release can never leave a partially-populated :vX.Y.Z behind.
+      - name: Build and push by digest (${{ matrix.platform }}, native)
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile
-          # amd64 ONLY, built natively on this x86_64 host — no emulation.
-          #
-          # WHY (bug b56fa021). This used to be `linux/amd64,linux/arm64`, which
-          # means one of the two legs is ALWAYS emulated under QEMU on any
-          # hardware we own, and both emulation directions are now failing:
-          #   - arm64-under-QEMU on the x64 VPS: the dependency install cannot
-          #     open a connection — "Failed to connect to github.com port 443
-          #     after 132519 ms" — while the NATIVE amd64 leg in the very same
-          #     run, on the same host, cloned the same repos in ~3s.
-          #   - amd64-under-QEMU on the aarch64 VM: `bench init ... uv venv env
-          #     --seed --python python3.14` dies in ~4s. Same signature PR #93
-          #     already fixed in the PR-check lane by going native.
-          # Emulation is the common factor. It is NOT proven to be the root
-          # cause — v0.3.8 (run 33590838337) did build its emulated arm64 leg
-          # successfully, and Dockerfile/pyproject.toml are byte-identical
-          # between v0.3.8 and v0.3.11 — but it is the variable that separates
-          # every passing leg from every failing one right now.
-          #
-          # Dropping arm64 is a DELIBERATE, temporary narrowing: the customer
-          # stack runs on an x64 VPS, so amd64 is what actually ships, and this
-          # unblocks the deployment today. Consequence to be aware of: the
-          # published tag is single-arch until the arm64 leg returns, so an
-          # `docker pull` on Apple Silicon will no longer resolve natively.
-          # Native arm64 + a manifest list is the immediate follow-up.
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ steps.release.outputs.image }}
-            ghcr.io/askexe/exe-erp:sha-${{ github.sha }}
+          platforms: ${{ matrix.platform }}
           # org.exe.* provenance labels let a running container be traced back to
           # a commit even when a tag was reused (bug 2fe79166). They must stay
           # OUTSIDE the block scalar below -- every line inside `labels: |` is a
           # literal label, so a `#` there becomes a garbage label, not a comment.
           # org.exe.tree_clean is DERIVED from the "Measure tree cleanliness"
-          # step above, never a literal (bug b46bc7fd) -- that step already
-          # failed the job closed if the tree was dirty, so this always reads
-          # "true" here, but it reads the MEASUREMENT rather than asserting a
-          # constant that would have carried an unproven claim regardless.
+          # step above, never a literal (bug b46bc7fd).
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.release.outputs.stack_version }}
+            org.opencontainers.image.version=${{ needs.preflight.outputs.stack_version }}
             org.exe.git_sha=${{ github.sha }}
             org.exe.repo=${{ github.repository }}
             org.exe.git_ref=${{ github.ref }}
             org.exe.tree_clean=${{ steps.tree_clean.outputs.clean }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          outputs: type=image,name=ghcr.io/askexe/exe-erp,push-by-digest=true,name-canonical=true,push=true
+          # No cache-to/cache-from — see the measurement in the job comment.
 
-      # Assert what was actually published, rather than just that SOMETHING
-      # resolves. The old check was `docker manifest inspect >/dev/null`, which
-      # passes for any image that exists — it would not have noticed the wrong
-      # architecture. `imagetools inspect` reports platforms directly.
-      - name: Verify published image is linux/amd64 (fail closed)
+      # Hand the digest to `publish` as an artifact rather than a job output:
+      # matrix legs share one output namespace, so two legs writing `digest`
+      # would clobber each other and the manifest list would be built from one
+      # arch twice. Fail closed if a leg produced no digest.
+      - name: Export digest
+        shell: bash
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          case "${DIGEST:-}" in
+            sha256:*) : ;;
+            *) echo "::error::${{ matrix.platform }} leg produced no usable digest ('${DIGEST:-}'). Refusing."; exit 1 ;;
+          esac
+          mkdir -p "${RUNNER_TEMP}/digests"
+          printf '%s' "${DIGEST}" > "${RUNNER_TEMP}/digests/${{ matrix.arch }}"
+          echo "${{ matrix.platform }} -> ${DIGEST}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  # ── Join the native legs into one multi-arch manifest list ──────
+  # The published tag is a SINGLE multi-arch reference, so
+  # `docker pull ghcr.io/askexe/exe-erp:vX.Y.Z` resolves per-platform exactly
+  # as it did before this lane went amd64-only. The difference is that each
+  # per-arch digest under that list was pushed by hardware of that
+  # architecture rather than by QEMU.
+  publish:
+    name: Publish multi-arch manifest + pin digest
+    needs: [preflight, build]
+    runs-on: [self-hosted, linux, x64, vps-x64]
+    timeout-minutes: 30
+    env:
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
+      IMAGE: ${{ needs.preflight.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Download per-arch digests
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Login to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ env.GHCR_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # Fail closed on a missing leg: `imagetools create` given one source
+      # would happily publish a single-arch image under a tag every downstream
+      # pin believes is multi-arch. Require BOTH files, well formed.
+      - name: Create multi-arch manifest list
+        id: manifest
         shell: bash
         run: |
           set -euo pipefail
-          docker buildx imagetools inspect "${{ steps.release.outputs.image }}"
-          docker buildx imagetools inspect "${{ steps.release.outputs.image }}" --raw \
+          srcs=()
+          for arch in amd64 arm64; do
+            f="${RUNNER_TEMP}/digests/${arch}"
+            [ -s "$f" ] || { echo "::error::Missing digest for ${arch}. Refusing to publish a partial manifest list."; exit 1; }
+            d="$(cat "$f")"
+            case "$d" in
+              sha256:*) : ;;
+              *) echo "::error::Malformed ${arch} digest '$d'."; exit 1 ;;
+            esac
+            echo "  ${arch}: ${d}"
+            srcs+=("ghcr.io/askexe/exe-erp@${d}")
+          done
+
+          docker buildx imagetools create \
+            --tag "${IMAGE}" \
+            --tag "ghcr.io/askexe/exe-erp:sha-${GITHUB_SHA}" \
+            "${srcs[@]}"
+
+          # The manifest LIST digest is the release's authoritative reference —
+          # that is what gets pinned into stack.release.json, not a per-arch one.
+          list_digest="$(docker buildx imagetools inspect "${IMAGE}" --format '{{ .Manifest.Digest }}')"
+          case "$list_digest" in
+            sha256:*) : ;;
+            *) echo "::error::Could not resolve a manifest-list digest for ${IMAGE} (got '${list_digest}')."; exit 1 ;;
+          esac
+          echo "digest=${list_digest}" >> "$GITHUB_OUTPUT"
+          echo "manifest list ${IMAGE} -> ${list_digest}"
+
+      - name: Verify published image is multi-arch (fail closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${IMAGE}"
+          docker buildx imagetools inspect "${IMAGE}" --raw \
             > "${RUNNER_TEMP}/exe-erp-manifest.json"
           python3 - <<'PY'
           import json, os
           m = json.load(open(os.environ['RUNNER_TEMP'] + '/exe-erp-manifest.json'))
-          # buildx pushes a manifest list even for a single platform (the image
-          # plus its provenance attestation, which carries platform
-          # unknown/unknown and is not a real target).
-          plats = sorted(
+          plats = {
               f"{p.get('os')}/{p.get('architecture')}"
               for d in m.get('manifests', [])
-              if (p := d.get('platform')) and p.get('architecture') != 'unknown')
-          if not plats:
-              raise SystemExit('::error::Could not determine any platform for the published image.')
-          if 'linux/amd64' not in plats:
-              raise SystemExit(f'::error::Published image does not provide linux/amd64. Found: {plats}')
-          print('✓ published image provides:', ', '.join(plats))
+              if (p := d.get('platform')) and p.get('architecture') != 'unknown'
+          }
+          missing = {'linux/amd64', 'linux/arm64'} - plats
+          if missing:
+              raise SystemExit(
+                  f'::error::Published manifest list is missing {sorted(missing)}. '
+                  f'Found: {sorted(plats)}')
+          print('✓ multi-arch manifest list covers:', ', '.join(sorted(plats)))
           PY
-          echo "Published and verified ${{ steps.release.outputs.image }}"
 
       # ── Digest capture (the step whose absence caused this bug) ─────────────
       # v0.3.0 shipped with all four components on the MUTABLE tag :v0.3.0
@@ -383,7 +516,7 @@ jobs:
         id: pin
         shell: bash
         env:
-          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.manifest.outputs.digest }}
         run: |
           set -euo pipefail
           if [ -z "${IMAGE_DIGEST:-}" ]; then
@@ -423,7 +556,7 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/verify-stack-pins.py \
             --phase post \
-            --built-digest "${{ steps.build.outputs.digest }}"
+            --built-digest "${{ steps.manifest.outputs.digest }}"
 
       # The digest-pinned manifest is the release's authoritative output. It is
       # what the exe-os stack manifest pins from — the digest is an OUTPUT of a
@@ -443,9 +576,9 @@ jobs:
             echo ""
             echo "| field | value |"
             echo "|-------|-------|"
-            echo "| release tag | \`${{ steps.release.outputs.image }}\` |"
-            echo "| digest | \`${{ steps.build.outputs.digest }}\` |"
-            echo "| pinned ref | \`ghcr.io/askexe/exe-erp@${{ steps.build.outputs.digest }}\` |"
+            echo "| release tag | \`${{ needs.preflight.outputs.image }}\` |"
+            echo "| digest | \`${{ steps.manifest.outputs.digest }}\` |"
+            echo "| pinned ref | \`ghcr.io/askexe/exe-erp@${{ steps.manifest.outputs.digest }}\` |"
             echo "| commit | \`${{ github.sha }}\` |"
             echo ""
             echo "All four components (erp, erp-websocket, erp-queue, erp-scheduler)"
