@@ -36,16 +36,43 @@ jobs:
     name: Build + push stack image
     needs: gate
     # FOUNDER DECISION 2026-09-05: erp image releases stay on NATIVE x64
-    # runners (the dedicated VPS lane). This multi-arch build always emulates
-    # one arch on any hardware we own; native x64 keeps the amd64 half native.
-    # Deliberately NOT mac-local — the one sanctioned VPS-lane exception.
-    runs-on: [self-hosted, linux, x64]
+    # runners (the dedicated VPS lane). Deliberately NOT mac-local — the one
+    # sanctioned VPS-lane exception.
+    #
+    # `vps-x64` (bug b56fa021) is what actually ENFORCES that decision. The
+    # label set above used to be [self-hosted, linux, x64], which does NOT
+    # identify the VPS: mac-vm-erp-1, an aarch64 Lima VM, also advertises `X64`
+    # so that x64-labelled PR checks can land on it. Release runs therefore
+    # could and did schedule onto ARM hardware, where the amd64 build emulates.
+    # `vps-x64` is carried by exactly one runner — the dedicated x86_64 VPS —
+    # so this lane is deterministic
+    # instead of depending on which runner happened to be free.
+    runs-on: [self-hosted, linux, x64, vps-x64]
     # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
     # 49-60 min over the last 10 runs -> 90 min caps a wedged build/push at 1.5x worst.
     timeout-minutes: 90
     env:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
     steps:
+      # FIRST STEP, deliberately — before checkout and before every gate, so a
+      # wrong-arch scheduling is refused in seconds rather than after minutes of
+      # setup. Labels are assertions a runner makes about itself, and mac-vm-erp-1
+      # demonstrably lies about `X64`. If this job ever lands on ARM hardware
+      # anyway, `platforms: linux/amd64` would silently emulate and reintroduce
+      # exactly this bug — so refuse in seconds rather than stall for an hour.
+      # This is the check that makes "native" a fact rather than a hope.
+      - name: Assert this runner is native x86_64 (fail closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          if [ "$actual" != "x86_64" ]; then
+            echo "::error::Release build scheduled onto a $actual runner (${RUNNER_NAME:-unknown})."
+            echo "::error::Building linux/amd64 here would emulate under QEMU — the failure mode of bug b56fa021. Refusing."
+            exit 1
+          fi
+          echo "✓ $actual runner (${RUNNER_NAME:-unknown}) is native for linux/amd64."
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -188,11 +215,6 @@ jobs:
         run: |
           python3 scripts/assert-release-tag-unpublished.py --repository askexe/exe-erp --tag "v${{ steps.release.outputs.stack_version }}"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-        with:
-          platforms: arm64
-
       # Bug 5f2fb4fa: docker/setup-buildx-action creates a fresh named
       # `buildx_buildkit_builder-<uuid>` container per run but does not clean
       # up the previous run's builder container when that run is cancelled
@@ -229,7 +251,31 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64,linux/arm64
+          # amd64 ONLY, built natively on this x86_64 host — no emulation.
+          #
+          # WHY (bug b56fa021). This used to be `linux/amd64,linux/arm64`, which
+          # means one of the two legs is ALWAYS emulated under QEMU on any
+          # hardware we own, and both emulation directions are now failing:
+          #   - arm64-under-QEMU on the x64 VPS: the dependency install cannot
+          #     open a connection — "Failed to connect to github.com port 443
+          #     after 132519 ms" — while the NATIVE amd64 leg in the very same
+          #     run, on the same host, cloned the same repos in ~3s.
+          #   - amd64-under-QEMU on the aarch64 VM: `bench init ... uv venv env
+          #     --seed --python python3.14` dies in ~4s. Same signature PR #93
+          #     already fixed in the PR-check lane by going native.
+          # Emulation is the common factor. It is NOT proven to be the root
+          # cause — v0.3.8 (run 33590838337) did build its emulated arm64 leg
+          # successfully, and Dockerfile/pyproject.toml are byte-identical
+          # between v0.3.8 and v0.3.11 — but it is the variable that separates
+          # every passing leg from every failing one right now.
+          #
+          # Dropping arm64 is a DELIBERATE, temporary narrowing: the customer
+          # stack runs on an x64 VPS, so amd64 is what actually ships, and this
+          # unblocks the deployment today. Consequence to be aware of: the
+          # published tag is single-arch until the arm64 leg returns, so an
+          # `docker pull` on Apple Silicon will no longer resolve natively.
+          # Native arm64 + a manifest list is the immediate follow-up.
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ steps.release.outputs.image }}
@@ -249,9 +295,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Verify published image
+      # Assert what was actually published, rather than just that SOMETHING
+      # resolves. The old check was `docker manifest inspect >/dev/null`, which
+      # passes for any image that exists — it would not have noticed the wrong
+      # architecture. `imagetools inspect` reports platforms directly.
+      - name: Verify published image is linux/amd64 (fail closed)
+        shell: bash
         run: |
-          docker manifest inspect "${{ steps.release.outputs.image }}" >/dev/null
+          set -euo pipefail
+          docker buildx imagetools inspect "${{ steps.release.outputs.image }}"
+          docker buildx imagetools inspect "${{ steps.release.outputs.image }}" --raw \
+            > "${RUNNER_TEMP}/exe-erp-manifest.json"
+          python3 - <<'PY'
+          import json, os
+          m = json.load(open(os.environ['RUNNER_TEMP'] + '/exe-erp-manifest.json'))
+          # buildx pushes a manifest list even for a single platform (the image
+          # plus its provenance attestation, which carries platform
+          # unknown/unknown and is not a real target).
+          plats = sorted(
+              f"{p.get('os')}/{p.get('architecture')}"
+              for d in m.get('manifests', [])
+              if (p := d.get('platform')) and p.get('architecture') != 'unknown')
+          if not plats:
+              raise SystemExit('::error::Could not determine any platform for the published image.')
+          if 'linux/amd64' not in plats:
+              raise SystemExit(f'::error::Published image does not provide linux/amd64. Found: {plats}')
+          print('✓ published image provides:', ', '.join(plats))
+          PY
           echo "Published and verified ${{ steps.release.outputs.image }}"
 
       # ── Digest capture (the step whose absence caused this bug) ─────────────
