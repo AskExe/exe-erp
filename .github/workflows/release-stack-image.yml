@@ -53,6 +53,25 @@ jobs:
     env:
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
     steps:
+      # FIRST STEP, deliberately — before checkout and before every gate, so a
+      # wrong-arch scheduling is refused in seconds rather than after minutes of
+      # setup. Labels are assertions a runner makes about itself, and mac-vm-erp-1
+      # demonstrably lies about `X64`. If this job ever lands on ARM hardware
+      # anyway, `platforms: linux/amd64` would silently emulate and reintroduce
+      # exactly this bug — so refuse in seconds rather than stall for an hour.
+      # This is the check that makes "native" a fact rather than a hope.
+      - name: Assert this runner is native x86_64 (fail closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          if [ "$actual" != "x86_64" ]; then
+            echo "::error::Release build scheduled onto a $actual runner (${RUNNER_NAME:-unknown})."
+            echo "::error::Building linux/amd64 here would emulate under QEMU — the failure mode of bug b56fa021. Refusing."
+            exit 1
+          fi
+          echo "✓ $actual runner (${RUNNER_NAME:-unknown}) is native for linux/amd64."
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -169,23 +188,6 @@ jobs:
           fi
 
           echo "✓ ${tag} exists in ${GITHUB_REPOSITORY} and points at ${GITHUB_SHA}."
-
-      # Labels are assertions a runner makes about itself, and mac-vm-erp-1
-      # demonstrably lies about `X64`. If this job ever lands on ARM hardware
-      # anyway, `platforms: linux/amd64` would silently emulate and reintroduce
-      # exactly this bug — so refuse in seconds rather than stall for an hour.
-      # This is the check that makes "native" a fact rather than a hope.
-      - name: Assert this runner is native x86_64 (fail closed)
-        shell: bash
-        run: |
-          set -euo pipefail
-          actual="$(uname -m)"
-          if [ "$actual" != "x86_64" ]; then
-            echo "::error::Release build scheduled onto a $actual runner (${RUNNER_NAME:-unknown})."
-            echo "::error::Building linux/amd64 here would emulate under QEMU — the failure mode of bug b56fa021. Refusing."
-            exit 1
-          fi
-          echo "✓ $actual runner (${RUNNER_NAME:-unknown}) is native for linux/amd64."
 
       - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
