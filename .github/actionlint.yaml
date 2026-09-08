@@ -1,3 +1,8 @@
 self-hosted-runner:
   labels:
     - mac-fast
+    - mac-local
+    # The dedicated x86_64 VPS release runner (bug 20973fdd / b56fa021).
+    # Added so the release lane can name that host unambiguously; plain
+    # `x64` also matches mac-vm-erp-1, which is genuinely aarch64.
+    - vps-x64
