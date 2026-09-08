@@ -44,7 +44,8 @@ jobs:
     # identify the VPS: mac-vm-erp-1, an aarch64 Lima VM, also advertises `X64`
     # so that x64-labelled PR checks can land on it. Release runs therefore
     # could and did schedule onto ARM hardware, where the amd64 build emulates.
-    # `vps-x64` was added to build-my-erp-1 only, so this lane is deterministic
+    # `vps-x64` is carried by exactly one runner — the dedicated x86_64 VPS —
+    # so this lane is deterministic
     # instead of depending on which runner happened to be free.
     runs-on: [self-hosted, linux, x64, vps-x64]
     # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
