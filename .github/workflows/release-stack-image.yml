@@ -249,6 +249,43 @@ jobs:
           # job ever hold this name concurrently (bug df3264de).
           name: erp-release-buildx
 
+      # ── Measure tree cleanliness, fail closed (bug b46bc7fd) ─────────────
+      # org.exe.tree_clean is a provenance claim: it certifies the published
+      # image corresponds EXACTLY to the checked-out commit, with no
+      # uncommitted or untracked files baked in by `COPY . .`. A label that
+      # cannot fail certifies nothing, so this MEASURES the tree with
+      # `git status --porcelain` -- the same method exe-os's
+      # scripts/bake-version.sh uses, and the same reasoning: untracked,
+      # non-ignored files count as dirty because they end up inside the image
+      # too, and a `git status` that cannot even run must NOT be read as
+      # clean. Unlike a label, this is fail-closed: a dirty tree stops the
+      # release here, before Docker Buildx builds a single layer, rather than
+      # publishing an image with a false clean claim.
+      - name: Measure tree cleanliness (fail closed)
+        id: tree_clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          if tree_status="$(git status --porcelain 2>/dev/null)"; then
+            if [ -z "$tree_status" ]; then
+              clean="true"
+            else
+              clean="false"
+            fi
+          else
+            # git status could not be determined -- refuse to assert clean.
+            clean="false"
+          fi
+          echo "clean=$clean" >> "$GITHUB_OUTPUT"
+          if [ "$clean" != "true" ]; then
+            echo "::error::Working tree is dirty at build time -- refusing to publish an image labelled org.exe.tree_clean=true over an unproven claim (bug b46bc7fd)."
+            echo "::group::git status --porcelain"
+            echo "$tree_status"
+            echo "::endgroup::"
+            exit 1
+          fi
+          echo "✓ Working tree is clean (git status --porcelain reported nothing)."
+
       - name: Build and push image
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -288,6 +325,11 @@ jobs:
           # a commit even when a tag was reused (bug 2fe79166). They must stay
           # OUTSIDE the block scalar below -- every line inside `labels: |` is a
           # literal label, so a `#` there becomes a garbage label, not a comment.
+          # org.exe.tree_clean is DERIVED from the "Measure tree cleanliness"
+          # step above, never a literal (bug b46bc7fd) -- that step already
+          # failed the job closed if the tree was dirty, so this always reads
+          # "true" here, but it reads the MEASUREMENT rather than asserting a
+          # constant that would have carried an unproven claim regardless.
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -295,7 +337,7 @@ jobs:
             org.exe.git_sha=${{ github.sha }}
             org.exe.repo=${{ github.repository }}
             org.exe.git_ref=${{ github.ref }}
-            org.exe.tree_clean=true
+            org.exe.tree_clean=${{ steps.tree_clean.outputs.clean }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

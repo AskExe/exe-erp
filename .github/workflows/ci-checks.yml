@@ -305,6 +305,9 @@ jobs:
       - name: Workflow timeout guard (bug 3136f36b)
         run: python3 scripts/workflow-timeout-guard.test.py
 
+      - name: Tree-clean provenance label is measured, not asserted (bug b46bc7fd)
+        run: python3 scripts/tree-clean-label.test.py
+
       # Runs EVERY Exe-owned, frappe-free unit test (bug 483cc712).
       #
       # This replaces the previous hand-maintained allowlist of one-file
