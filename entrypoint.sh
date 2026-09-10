@@ -391,22 +391,58 @@ read_admin_pw_marker() {
 #   2 — COULD NOT DETERMINE (bench missing, site down, migration pending,
 #       any unrecognised error). Callers must change nothing on a 2.
 admin_password_authenticates() {
-    # `out=$(...)` is a FAILING ASSIGNMENT under `set -e` and would abort the
-    # whole boot on a wrong password — turning a diagnostic into an outage.
-    # `|| rc=$?` keeps the non-zero exit as data instead of a fatal signal.
+    # THE PASSWORD IS NEVER INTERPOLATED INTO CODE OR ARGV.
+    #
+    # The first version of this used
+    #   bench ... execute frappe.utils.password.check_password --args "[\"Administrator\", \"${ADMIN_PASSWORD}\"]"
+    # which builds a Python expression by string interpolation, and
+    # frappe/commands/execute.py evaluates that value directly. Two real
+    # failures, both reachable now that the lint above accepts any special
+    # character (Codex review, PR #106):
+    #   * a `"` makes --args syntactically invalid, so the call fails with an
+    #     unrecognised error, this function returns 2, and a STALE MARKER IS
+    #     TRUSTED — the exact bug this fix exists to close, still open for
+    #     those passwords;
+    #   * a `\n` or `\t` is changed by escape processing, so a CORRECTLY
+    #     configured password reads as wrong and is reset on EVERY boot.
+    # It is also an eval of an operator-supplied string, which should not
+    # exist regardless of who controls the value.
+    #
+    # The password goes in on STDIN instead — off argv (so it never appears in
+    # `ps`) and never parsed as code. Only the site name, which is not secret,
+    # is passed as an argument.
+    #
+    # The verdict is carried by an explicit TOKEN rather than an exit code or a
+    # traceback substring, so "the checker itself broke" can never be mistaken
+    # for "the password is wrong".
     local out rc=0
-    out="$(bench --site "${SITE_NAME}" execute frappe.utils.password.check_password \
-        --args "[\"Administrator\", \"${ADMIN_PASSWORD}\"]" 2>&1)" || rc=$?
+    out="$(printf '%s' "${ADMIN_PASSWORD}" | (
+        cd "${FRAPPE_BENCH}/sites" 2>/dev/null || exit 97
+        "${FRAPPE_BENCH}/env/bin/python" -c '
+import sys
+site = sys.argv[1]
+pw = sys.stdin.read()
+import frappe
+from frappe.utils.password import check_password
+frappe.init(site=site)
+frappe.connect()
+try:
+    check_password("Administrator", pw)
+    print("EXE_ADMIN_PW:OK")
+except Exception as exc:
+    if type(exc).__name__ == "AuthenticationError":
+        print("EXE_ADMIN_PW:WRONG")
+    else:
+        print("EXE_ADMIN_PW:UNKNOWN:%s" % type(exc).__name__)
+' "${SITE_NAME}"
+    ) 2>&1)" || rc=$?
 
-    if [ "${rc}" -eq 0 ]; then
-        return 0
-    fi
-
-    # Only this ONE named condition counts as a negative answer. Anything else
-    # is unrecognised, and unrecognised means unknown, not absent.
     case "${out}" in
-        *AuthenticationError*) return 1 ;;
+        *EXE_ADMIN_PW:OK*)    return 0 ;;
+        *EXE_ADMIN_PW:WRONG*) return 1 ;;
     esac
+    # No token at all: interpreter missing, site unreachable, import failure,
+    # a non-zero exit we did not recognise (rc=${rc}). Unknown, not absent.
     return 2
 }
 
@@ -432,6 +468,11 @@ admin_password_authenticates() {
 # password. An invalid new password there is a real operator error and is still
 # fatal — but now it is fatal before migrations, not after them.
 ADMIN_PW_ACTION="none"
+# Set ONLY when a matching marker was proven stale. `ADMIN_PW_ACTION=rotate` is
+# NOT a usable substitute: the fresh-bootstrap path also sets it, and there
+# `create_site` has already applied the password via `bench new-site` and
+# seeded the marker (Codex review, PR #106).
+ADMIN_PW_MARKER_STALE=0
 admin_password_preflight() {
     local erpnext_installed="${1}"
 
@@ -473,6 +514,7 @@ admin_password_preflight() {
                 ;;
         esac
 
+        ADMIN_PW_MARKER_STALE=1
         echo "WARNING: the admin-password marker says ERP_ADMIN_PASSWORD is already"
         echo "         applied, but it does NOT authenticate against this site."
         echo "         The marker is stale (bug 293a3c8f) — reconverging."
@@ -514,10 +556,16 @@ rotate_admin_password_if_changed() {
     # here on a fresh install the password is already applied.
     #
     # NOTE: this early-return is safe ONLY because the preflight already
-    # verified a matching marker against the live site (bug 293a3c8f). Reaching
-    # here with ADMIN_PW_ACTION=rotate AND a matching marker means the preflight
-    # found the marker stale, so the equality below must not short-circuit it.
-    if [ "${current_hash}" = "${stored_hash}" ] && [ "${ADMIN_PW_ACTION}" != "rotate" ]; then
+    # verified a matching marker against the live site (bug 293a3c8f). The one
+    # case where a MATCHING marker must NOT short-circuit is a marker the
+    # preflight proved stale — and that is exactly what ADMIN_PW_MARKER_STALE
+    # records. Gating on `ADMIN_PW_ACTION != rotate` instead was wrong: the
+    # fresh-bootstrap path also sets rotate, so the guard could never fire
+    # there and every successful `bench new-site` was followed by a redundant
+    # `set-admin-password`. If that extra command failed, the one-shot
+    # configurator exited non-zero and every dependent service stayed blocked
+    # on a site that had in fact been created correctly (Codex review, PR #106).
+    if [ "${current_hash}" = "${stored_hash}" ] && [ "${ADMIN_PW_MARKER_STALE}" != "1" ]; then
         return 0
     fi
 
