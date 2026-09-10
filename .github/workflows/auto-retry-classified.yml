@@ -10,7 +10,11 @@
 #   1. NO failed job has a genuinely failed STEP (a real code failure has a
 #      named failed step that is NOT a setup/checkout/cache/post step). If any
 #      such step exists -> REAL failure -> do nothing.
-#   2. At least one failed job's annotation matches an infra SIGNATURE below.
+#   2. At least one failed job has a FAILURE-level annotation matching an infra
+#      SIGNATURE below. warning/notice-level annotations are ignored — GitHub
+#      emits a benign Node-20-deprecation WARNING naming actions/checkout and
+#      setup-node, and those are signatures, so an unfiltered guard 2 would be
+#      satisfied by annotations that carry no infra evidence.
 #
 # Retry is capped at 1: only run_attempt < 2 is ever retried, so this can
 # never loop. Additive-only: does not touch the CI workflow itself.
@@ -120,8 +124,23 @@ jobs:
             fi
             check_run_path="${check_run_url#https://api.github.com}"
             annotations_json="$(gh api --paginate --slurp "$check_run_path/annotations?per_page=100")"
+            # Only annotation_level == "failure" is infra evidence. An
+            # annotation set is not just failures: GitHub emits a benign
+            # WARNING-level Node-20 deprecation notice naming actions/checkout
+            # and actions/setup-node, and steps emit their own warning/notice
+            # annotations. Both action names — and the bare word "cancelled" —
+            # are entries in SIGNATURES above, so an unfiltered guard 2 can be
+            # satisfied by annotations carrying no infra evidence at all. That
+            # is worse than a dead guard: it classifies a genuine code failure
+            # as infra and re-runs it, spending a scarce self-hosted runner on
+            # work that fails identically and hiding real red behind a retry.
+            # Measured on sibling repo exe-monitor, job 101945131045
+            # (1 failure-level + 2 warning-level): unfiltered -> 1 match, and
+            # that match was the benign Node-20 warning; filtered -> 0.
             matched="$(jq --argjson sigs "$SIGNATURES" -r '
-              [ .[][] as $a
+              [ .[][]
+                | select((.annotation_level // "") == "failure") ] as $failures
+              | [ $failures[] as $a
                 | $sigs[] as $s
                 | select(
                     (($a.message     // "") | ascii_downcase | contains($s))
