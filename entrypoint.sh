@@ -581,6 +581,124 @@ rotate_admin_password_if_changed() {
     echo "Administrator password rotated."
 }
 
+# ── Provision the site encryption key BEFORE any worker starts ───────────
+# Bug bd1458f5: "Failed to decrypt key User.Administrator.api_secret /
+# Encryption key is invalid".
+#
+# Frappe NEVER provisions encryption_key at site creation. It is generated
+# lazily on first use, in frappe/utils/password.py:
+#
+#     def get_encryption_key():
+#         if "encryption_key" not in frappe.local.conf:
+#             encryption_key = Fernet.generate_key().decode()
+#             update_site_config("encryption_key", encryption_key)
+#             frappe.local.conf.encryption_key = encryption_key
+#         return frappe.local.conf.encryption_key
+#
+# The test is against frappe.local.conf — the process's IN-MEMORY conf, loaded
+# once at startup. A gunicorn worker that started while the key was absent has
+# it absent from its cached conf FOREVER, so it generates its OWN key and
+# writes it over whatever another process wrote. With N workers plus a bench
+# CLI process you get up to N+1 different keys written in sequence, each
+# process encrypting and decrypting with its own.
+#
+# That is exactly the reported signature: `bench ... generate_keys` encrypts
+# api_secret with the CLI's key, the FIRST request happens to land on a worker
+# holding the same one and succeeds, and every subsequent request lands on a
+# worker holding a different one and fails. Inspecting site_config.json
+# afterwards shows an encryption_key present — the last one written, matching
+# almost nobody — which is why "the key is not missing" was true and the
+# mismatch was real at the same time.
+#
+# Writing the key to disk here removes the race by construction rather than by
+# timing: after this runs, `"encryption_key" not in frappe.local.conf` is never
+# true in any process, so the lazy branch above can never execute and no
+# process can generate a competing key.
+#
+# SAFE TO DO WITHOUT LOCKING, and only here. docker-compose.yml makes
+# exe-erp-configurator a one-shot service that every other service waits on:
+#   exe-erp            depends_on exe-erp-configurator (service_completed_successfully)
+#   websocket/queue/scheduler/nginx  depend_on exe-erp (service_healthy)
+# so this runs to completion before any worker exists. It is additionally
+# gated on ADMIN_PASSWORD, the same discriminator this file already uses to
+# mean "this is the configurator, not a migrate-only service" — exe-erp runs
+# this entrypoint too and must NOT write.
+ensure_encryption_key() {
+    # Migrate-only services (gunicorn/worker/scheduler) never receive
+    # ADMIN_PASSWORD. Only the configurator provisions.
+    if [ -z "${ADMIN_PASSWORD:-}" ]; then
+        return 0
+    fi
+
+    local cfg="${SITE_DIR}/site_config.json"
+    if [ ! -f "${cfg}" ]; then
+        echo "WARNING: ${cfg} does not exist — cannot provision encryption_key."
+        return 0
+    fi
+
+    # Idempotent: a site that already has a key keeps it. Rotating it would
+    # make every already-encrypted value undecryptable, which is a far worse
+    # outage than the one this prevents.
+    local out rc=0
+    out="$("${FRAPPE_BENCH}/env/bin/python" - "${cfg}" 2>&1 <<'PY'
+import json, os, sys, tempfile
+
+cfg = sys.argv[1]
+with open(cfg) as fh:
+    conf = json.load(fh)
+
+if conf.get("encryption_key"):
+    print("EXE_ENCKEY:PRESENT")
+    raise SystemExit(0)
+
+from cryptography.fernet import Fernet
+
+conf["encryption_key"] = Fernet.generate_key().decode()
+
+# Atomic replace: a torn site_config.json would take the whole site down, and
+# this file also carries db_name/db_password.
+d = os.path.dirname(cfg) or "."
+fd, tmp = tempfile.mkstemp(dir=d, prefix=".site_config.", suffix=".tmp")
+try:
+    with os.fdopen(fd, "w") as fh:
+        json.dump(conf, fh, indent=1)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, cfg)
+except BaseException:
+    try:
+        os.unlink(tmp)
+    except OSError:
+        pass
+    raise
+print("EXE_ENCKEY:PROVISIONED")
+PY
+)" || rc=$?
+
+    case "${out}" in
+        *EXE_ENCKEY:PRESENT*)
+            return 0
+            ;;
+        *EXE_ENCKEY:PROVISIONED*)
+            echo "Provisioned site encryption_key (bug bd1458f5) — no worker can now generate a competing one."
+            return 0
+            ;;
+    esac
+
+    # No token: interpreter missing, unreadable config, import failure. Do NOT
+    # fail the boot — this is the one-shot configurator that every other
+    # service waits on with service_completed_successfully, so exiting non-zero
+    # here takes the ENTIRE stack down. Frappe still works without this; it
+    # just falls back to the lazy generation this exists to prevent. Same
+    # availability lesson as bug 593fe59f.
+    echo "WARNING: could not provision encryption_key (rc=${rc}). The site will"
+    echo "         fall back to Frappe's lazy generation, which can produce a"
+    echo "         per-process key mismatch (bug bd1458f5). Details:"
+    printf '%s\n' "${out}" | sed 's/^/         /'
+    return 0
+}
+
 # ── Main ─────────────────────────────────────────────────────
 main() {
     wait_for_db
@@ -619,6 +737,11 @@ main() {
     else
         run_migrations
     fi
+
+    # Provision the site encryption key before any worker can lazily generate a
+    # competing one (bug bd1458f5). After the branch above, site_config.json
+    # exists on both paths.
+    ensure_encryption_key
 
     # Apply a changed ERP_ADMIN_PASSWORD to the live Administrator (bug 43854b31).
     # Only meaningful where the password is provided (the configurator service);

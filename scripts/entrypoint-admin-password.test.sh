@@ -21,6 +21,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENTRYPOINT="${REPO_ROOT}/entrypoint.sh"
 FAILURES=0
 
+# The venv-python stub delegates the encryption-key program to a real
+# interpreter so the test exercises the actual file semantics.
+TEST_SYSTEM_PYTHON="$(command -v python3 || command -v python)"
+if [ -z "${TEST_SYSTEM_PYTHON}" ]; then
+    echo "FATAL: python3 is required to run these tests" >&2
+    exit 1
+fi
+
 # Portable SHA-256 — the harness must not depend on GNU coreutils either.
 _sha256() {
     if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1
@@ -52,6 +60,22 @@ run_boot() {
     if [ "${marker_mode}" != "fresh" ]; then
         touch "${site_dir}/.exe_install_complete"
     fi
+
+    # A real EXISTING site always has one; it carries db_name/db_password
+    # alongside the encryption_key, which is why the provisioner must preserve
+    # other keys. A "fresh" site has none — and seeding one there would make
+    # is_site_db_initialized report an initialized site, so `bench new-site`
+    # would be skipped and case 7 would silently stop testing the bootstrap
+    # path it exists to cover.
+    if [ "${marker_mode}" = "fresh" ]; then
+        :
+    elif [ -z "${SITE_CONFIG_SEED:-}" ]; then
+        printf '%s' '{"db_name": "exe_erp", "db_password": "fixture-not-a-real-secret"}' \
+            > "${site_dir}/site_config.json"
+    else
+        printf '%s' "${SITE_CONFIG_SEED}" > "${site_dir}/site_config.json"
+    fi
+    SITE_CONFIG="${site_dir}/site_config.json"
 
     if [ "${marker_mode}" = "marker" ]; then
         # Any value that is not the hash of ${password} reads as "the operator
@@ -85,6 +109,23 @@ STUB
     PW_SEEN="${BOOT_DIR}/pw_seen.txt"
     cat > "${bench_root}/env/bin/python" <<STUB
 #!/usr/bin/env bash
+# Two callers reach this stub, distinguished the same way the real interpreter
+# would be: the encryption-key provisioner passes the config path as an
+# argument, the password checker passes the site name.
+if [ "\$1" = "-" ] && [ -n "\$2" ] && case "\$2" in */site_config.json) true ;; *) false ;; esac; then
+  # Run the REAL provisioning program on the REAL system python so the test
+  # exercises the actual JSON read/modify/atomic-write, not a paraphrase of it.
+  # cryptography may be absent locally; fall back to a stand-in generator that
+  # produces a Fernet-shaped key so the test still proves the FILE semantics.
+  prog="\$(cat)"
+  printf '%s' "\$prog" | ${TEST_SYSTEM_PYTHON} - "\$2" 2>&1 || {
+    printf '%s' "\$prog" \
+      | sed 's/^from cryptography.fernet import Fernet\$/import base64, os/' \
+      | sed 's/Fernet.generate_key().decode()/base64.urlsafe_b64encode(os.urandom(32)).decode()/' \
+      | ${TEST_SYSTEM_PYTHON} - "\$2" 2>&1
+  }
+  exit 0
+fi
 cat > "${PW_SEEN}"
 case "${CHECK_VERDICT:-ok}" in
   ok)       echo "EXE_ADMIN_PW:OK" ;;
@@ -287,6 +328,65 @@ if grep -q 'set-admin-password' "${BENCH_LOG}"; then
     sed 's/^/       | /' "${BENCH_LOG}"
 else
     pass "no redundant set-admin-password after bootstrap"
+fi
+rm -rf "${BOOT_DIR}"
+
+# ── Case 8 (bug bd1458f5): encryption_key must be provisioned, not lazy ─────
+# Frappe generates encryption_key lazily, in-process, keyed on
+# `"encryption_key" not in frappe.local.conf` — the process's IN-MEMORY conf.
+# A gunicorn worker that started while the key was absent never sees a later
+# one, generates its OWN, and writes it over another process's. With N workers
+# plus a bench CLI you get up to N+1 competing keys, which is exactly the
+# reported "first request succeeds, all subsequent fail to decrypt".
+# Provisioning it in the one-shot configurator, before any worker exists,
+# makes that lazy branch unreachable.
+echo "case 8: a site with no encryption_key gets one provisioned at boot"
+run_boot marker-matching "Str0ng-Valid-Pass!"
+
+if "${TEST_SYSTEM_PYTHON}" -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("encryption_key") else 1)' "${SITE_CONFIG}"; then
+    pass "encryption_key provisioned"
+else
+    fail "no encryption_key written — Frappe will lazily generate a per-process key"
+    printf '%s\n' "${BOOT_OUT}" | tail -12 | sed 's/^/       | /'
+fi
+
+# The file also carries db_name/db_password; a clobbering write would take the
+# site down harder than the bug it fixes.
+if "${TEST_SYSTEM_PYTHON}" -c 'import json,sys; c=json.load(open(sys.argv[1])); sys.exit(0 if c.get("db_name")=="exe_erp" and c.get("db_password") else 1)' "${SITE_CONFIG}"; then
+    pass "existing site_config keys preserved"
+else
+    fail "provisioning clobbered other site_config keys"
+fi
+rm -rf "${BOOT_DIR}"
+
+# ── Case 9 (bug bd1458f5): provisioning is idempotent ───────────────────────
+# Rotating an existing key would make every already-encrypted value
+# undecryptable — a worse outage than the one being prevented.
+echo "case 9: an existing encryption_key is never rotated"
+SITE_CONFIG_SEED='{"db_name": "exe_erp", "db_password": "fixture-not-a-real-secret", "encryption_key": "PRE-EXISTING-KEY-DO-NOT-TOUCH"}' \
+    run_boot marker-matching "Str0ng-Valid-Pass!"
+
+if [ "$("${TEST_SYSTEM_PYTHON}" -c 'import json,sys; print(json.load(open(sys.argv[1])).get("encryption_key"))' "${SITE_CONFIG}")" = "PRE-EXISTING-KEY-DO-NOT-TOUCH" ]; then
+    pass "existing key left untouched"
+else
+    fail "rotated an existing encryption_key — every stored secret becomes undecryptable"
+fi
+unset SITE_CONFIG_SEED
+rm -rf "${BOOT_DIR}"
+
+# ── Case 10 (bug bd1458f5): only the configurator writes ────────────────────
+# exe-erp (gunicorn) runs this same entrypoint. If it also provisioned, two
+# containers could race and write different keys — reintroducing the very
+# mismatch this closes. ADMIN_PASSWORD is the existing "I am the configurator"
+# discriminator; migrate-only services never receive it.
+echo "case 10: a migrate-only service does not write an encryption_key"
+# An empty ADMIN_PASSWORD is exactly what a migrate-only service gets.
+run_boot marker-matching ""
+
+if "${TEST_SYSTEM_PYTHON}" -c 'import json,sys; sys.exit(1 if json.load(open(sys.argv[1])).get("encryption_key") else 0)' "${SITE_CONFIG}"; then
+    pass "migrate-only service wrote nothing"
+else
+    fail "a non-configurator service provisioned a key — two writers can race"
 fi
 rm -rf "${BOOT_DIR}"
 
