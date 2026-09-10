@@ -21,6 +21,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENTRYPOINT="${REPO_ROOT}/entrypoint.sh"
 FAILURES=0
 
+# Portable SHA-256 — the harness must not depend on GNU coreutils either.
+_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1
+    else shasum -a 256 | cut -d' ' -f1
+    fi
+}
+
 pass() { printf '  ok   %s\n' "$1"; }
 fail() { printf '  FAIL %s\n' "$1"; FAILURES=$((FAILURES + 1)); }
 
@@ -40,13 +47,21 @@ run_boot() {
     mkdir -p "${site_dir}" "${BOOT_DIR}/bin"
 
     # An existing, fully installed site: the fast path in is_erpnext_installed
-    # reads this marker, so no DB is needed.
-    touch "${site_dir}/.exe_install_complete"
+    # reads this marker, so no DB is needed. "fresh" omits it so the boot takes
+    # the create_site path instead.
+    if [ "${marker_mode}" != "fresh" ]; then
+        touch "${site_dir}/.exe_install_complete"
+    fi
 
     if [ "${marker_mode}" = "marker" ]; then
         # Any value that is not the hash of ${password} reads as "the operator
         # changed ERP_ADMIN_PASSWORD".
         printf '%s' "0000000000000000000000000000000000000000000000000000000000000000" \
+            > "${site_dir}/.exe_admin_pw_hash"
+    elif [ "${marker_mode}" = "marker-matching" ]; then
+        # The marker AGREES with the configured password — the state that made
+        # bug 293a3c8f permanent. Computed the same way entrypoint.sh does.
+        printf '%s' "$(printf '%s' "${password}:${site}" | _sha256)" \
             > "${site_dir}/.exe_admin_pw_hash"
     fi
 
@@ -56,6 +71,29 @@ run_boot() {
 printf '%s\n' "\$*" >> "${BENCH_LOG}"
 exit 0
 STUB
+
+    # The password checker runs the bench venv python DIRECTLY with the password
+    # on STDIN — never through `bench`, never via argv — so the stub lives at
+    # the interpreter path and reads stdin exactly as the real one does.
+    # CHECK_VERDICT selects the token it emits:
+    #   ok        — authenticates
+    #   authfail  — definitively wrong
+    #   unknown   — the checker itself broke (emits NO token at all)
+    # It also records the password EXACTLY as received, so a test can prove the
+    # value survived the trip byte-for-byte.
+    mkdir -p "${bench_root}/env/bin"
+    PW_SEEN="${BOOT_DIR}/pw_seen.txt"
+    cat > "${bench_root}/env/bin/python" <<STUB
+#!/usr/bin/env bash
+cat > "${PW_SEEN}"
+case "${CHECK_VERDICT:-ok}" in
+  ok)       echo "EXE_ADMIN_PW:OK" ;;
+  authfail) echo "EXE_ADMIN_PW:WRONG" ;;
+  unknown)  echo "ImportError: cannot import name frappe" >&2; exit 1 ;;
+esac
+exit 0
+STUB
+    chmod +x "${bench_root}/env/bin/python"
     printf '#!/usr/bin/env bash\nexit 0\n' > "${BOOT_DIR}/bin/pg_isready"
     chmod +x "${BOOT_DIR}/bin/bench" "${BOOT_DIR}/bin/pg_isready"
     : > "${BENCH_LOG}"
@@ -66,6 +104,7 @@ STUB
         FRAPPE_BENCH="${bench_root}" \
         SITE_NAME="${site}" \
         ADMIN_PASSWORD="${password}" \
+        CHECK_VERDICT="${CHECK_VERDICT:-ok}" \
         DB_HOST="db.invalid" \
         REDIS_CACHE="" REDIS_QUEUE="" REDIS_SOCKETIO="" \
         GOTRUE_URL="" GOTRUE_EXTERNAL_URL="" \
@@ -128,6 +167,126 @@ if grep -q 'set-admin-password' "${BENCH_LOG}"; then
     fail "applied an invalid password"
 else
     pass "invalid password never applied"
+fi
+rm -rf "${BOOT_DIR}"
+
+# ── Case 3 (bug 293a3c8f): the marker agrees but the password does NOT work ──
+# erp.askexe.com's live state. The marker matched the configured password
+# exactly, so the preflight concluded "nothing to do" — while that password
+# returned 401 against the site. Nothing verified the marker, so no boot could
+# ever converge it and the operator lockout was permanent by construction.
+echo "case 3: marker matches but the password does not authenticate (stale marker)"
+CHECK_VERDICT=authfail run_boot marker-matching "Str0ng-Valid-Pass!"
+
+if grep -q 'set-admin-password' "${BENCH_LOG}"; then
+    pass "stale marker detected — Administrator password reconverged"
+else
+    fail "trusted the stale marker and never rotated — the lockout stays permanent"
+    printf '%s\n' "${BOOT_OUT}" | sed 's/^/       | /'
+fi
+
+case "${BOOT_OUT}" in
+    *"does NOT authenticate"*) pass "stale marker is announced in the boot log" ;;
+    *)                         fail "stale marker was reconverged silently" ;;
+esac
+rm -rf "${BOOT_DIR}"
+
+# ── Case 4 (bug 293a3c8f): "could not check" must NEVER mean "wrong" ─────────
+# A read that fails for an UNRECOGNISED reason must change nothing. Treating it
+# as a negative would reset the Administrator password every time the site was
+# briefly unreachable at boot.
+echo "case 4: verification fails for an unrecognised reason — must change nothing"
+CHECK_VERDICT=unknown run_boot marker-matching "Str0ng-Valid-Pass!"
+
+if grep -q 'set-admin-password' "${BENCH_LOG}"; then
+    fail "rotated on an INDETERMINATE result — 'could not check' was read as 'wrong'"
+else
+    pass "indeterminate verification changed nothing"
+fi
+
+# Same signal case 1 uses: currentsite.txt is written only after the password
+# step completes. BOOT_RC is not usable here — this sandbox cannot create the
+# hardcoded /home/frappe path, so the boot always ends non-zero for a reason
+# unrelated to anything under test.
+if [ -f "${CURRENTSITE}" ]; then
+    pass "boot stayed up despite being unable to verify"
+else
+    fail "an unverifiable password check took the service down"
+    printf '%s\n' "${BOOT_OUT}" | sed 's/^/       | /'
+fi
+rm -rf "${BOOT_DIR}"
+
+# ── Case 5 (bug 293a3c8f): a long alphanumeric secret is not "weak" ──────────
+# erp.askexe.com's ERP_ADMIN_PASSWORD is 32 alphanumeric characters (~190 bits).
+# The special-character rule rejected it, which closed the ONLY path that could
+# repair the lockout. Length now substitutes for the character class.
+echo "case 5: 32-char alphanumeric secret is accepted and can reconverge"
+CHECK_VERDICT=authfail run_boot marker-matching "aB3xK9mQ7pL2rT5vW8yZ4nC6hJ1sD0gF"
+
+if grep -q 'set-admin-password' "${BENCH_LOG}"; then
+    pass "long alphanumeric secret passes the lint and reconverges"
+else
+    fail "long alphanumeric secret still refused — the lockout cannot be repaired"
+    printf '%s\n' "${BOOT_OUT}" | sed 's/^/       | /'
+fi
+
+if [ -f "${CURRENTSITE}" ]; then
+    pass "boot stayed up"
+else
+    fail "boot died on a strong 32-char secret"
+    printf '%s\n' "${BOOT_OUT}" | sed 's/^/       | /'
+fi
+rm -rf "${BOOT_DIR}"
+
+# ── Case 6 (PR #106 review, P1): the password must never be parsed as code ───
+# The first version of the checker interpolated the password into a Python
+# expression passed to `bench execute --args`, which the vendored executor
+# evaluates. A `"` made the expression invalid — so the call failed in an
+# UNRECOGNISED way, the checker returned "could not determine", and THE STALE
+# MARKER WAS TRUSTED: this bug's own failure mode, still open for any password
+# containing a quote. A backslash escape silently CHANGED the password, so a
+# correctly configured one read as wrong and was reset on every boot.
+echo "case 6: password containing quotes and backslashes survives byte-for-byte"
+TRICKY='pa"ss\word'"'"'x $(id) `id`'
+CHECK_VERDICT=authfail run_boot marker-matching "${TRICKY}"
+
+if [ -f "${PW_SEEN}" ] && [ "$(cat "${PW_SEEN}")" = "${TRICKY}" ]; then
+    pass "checker received the password unmodified (no escape processing, no eval)"
+else
+    fail "password was mangled or never reached the checker"
+    printf '       | expected: %s\n' "${TRICKY}"
+    printf '       | received: %s\n' "$(cat "${PW_SEEN}" 2>/dev/null)"
+fi
+
+if grep -q 'set-admin-password' "${BENCH_LOG}"; then
+    pass "stale marker still detected with an awkward password"
+else
+    fail "awkward password broke the checker — stale marker went undetected"
+fi
+rm -rf "${BOOT_DIR}"
+
+# ── Case 7 (PR #106 review, P2): fresh bootstrap must not re-apply ──────────
+# On a fresh site the preflight sets ADMIN_PW_ACTION=rotate, and create_site
+# already applies the password via `bench new-site` and seeds the marker.
+# Gating the early-return on `ADMIN_PW_ACTION != rotate` could never fire here,
+# so every successful bootstrap ran a redundant `set-admin-password`; if that
+# failed, the one-shot configurator exited non-zero and every dependent service
+# stayed blocked on a site that had been created correctly.
+echo "case 7: fresh bootstrap does not re-apply the password after new-site"
+run_boot fresh "Str0ng-Valid-Pass!"
+
+if grep -q 'new-site' "${BENCH_LOG}"; then
+    pass "fresh bootstrap ran new-site"
+else
+    fail "fresh bootstrap did not run new-site — the case is not exercising what it claims"
+    sed 's/^/       | /' "${BENCH_LOG}"
+fi
+
+if grep -q 'set-admin-password' "${BENCH_LOG}"; then
+    fail "re-applied the password after new-site had already set it"
+    sed 's/^/       | /' "${BENCH_LOG}"
+else
+    pass "no redundant set-admin-password after bootstrap"
 fi
 rm -rf "${BOOT_DIR}"
 
