@@ -49,16 +49,29 @@ check_admin_password() {
             return 1
         fi
     done
-    # Require at least one special character. Uses a shell glob rather than
-    # `grep -P`, which is a GNU extension unavailable on BSD/macOS grep — there
-    # it errors out and makes EVERY password look non-compliant.
-    case "${pw}" in
-        *[!a-zA-Z0-9]*) ;;
-        *)
-            echo "ADMIN_PASSWORD must contain at least one special character."
-            return 1
-            ;;
-    esac
+    # Require at least one special character — UNLESS the password is long
+    # enough that the character class buys nothing (bug 293a3c8f).
+    #
+    # A 24-char random alphanumeric secret carries ~143 bits of entropy; a
+    # 12-char password with one special character carries far less. Rejecting
+    # the former while accepting the latter is backwards, and it is not
+    # academic: erp.askexe.com's configured ERP_ADMIN_PASSWORD is a 32-char
+    # alphanumeric secret, so this rule was the ONLY thing standing between the
+    # rotation path and a fix for a live operator lockout. The rule has already
+    # cost one outage on its own (bug 593fe59f); it should not also be the
+    # reason a lockout cannot be repaired.
+    #
+    # Shorter passwords keep the original requirement, and the weak-defaults
+    # check above still applies at every length.
+    if [ "${len}" -lt 24 ]; then
+        case "${pw}" in
+            *[!a-zA-Z0-9]*) ;;
+            *)
+                echo "ADMIN_PASSWORD must contain at least one special character (or be at least 24 characters)."
+                return 1
+                ;;
+        esac
+    fi
     return 0
 }
 
@@ -330,13 +343,71 @@ ADMIN_PW_MARKER="${SITE_DIR}/.exe_admin_pw_hash"
 admin_password_hash() {
     # SHA-256 of the password; salted with the site name so the marker isn't a
     # bare reusable hash. Reads the password from stdin to keep it off argv.
-    printf '%s' "${1}:${SITE_NAME}" | sha256sum | cut -d' ' -f1
+    #
+    # PORTABLE + FAIL-CLOSED (bug 293a3c8f). `sha256sum` is GNU coreutils and is
+    # absent on BSD/macOS — the same portability trap this file already
+    # documents avoiding for `grep -P`. When it was missing this function
+    # printed NOTHING, and an empty hash compares equal to an empty/absent
+    # marker, so the preflight concluded "already applied" and never rotated:
+    # the precise failure mode of this bug, reached by a second route. It also
+    # made scripts/entrypoint-admin-password.test.sh — the suite guarding the
+    # 593fe59f outage — report that outage on any non-GNU machine.
+    #
+    # An unusable hasher must stop the boot, not silently produce a marker that
+    # matches everything.
+    local hasher
+    if command -v sha256sum >/dev/null 2>&1; then
+        hasher="sha256sum"
+    elif command -v shasum >/dev/null 2>&1; then
+        hasher="shasum -a 256"
+    else
+        echo "ERROR: neither sha256sum nor shasum is available; cannot compute the" >&2
+        echo "       admin-password marker. Refusing to boot rather than treat an" >&2
+        echo "       empty hash as a match (bug 293a3c8f)." >&2
+        exit 1
+    fi
+    printf '%s' "${1}:${SITE_NAME}" | ${hasher} | cut -d' ' -f1
 }
 
 read_admin_pw_marker() {
     if [ -f "${ADMIN_PW_MARKER}" ]; then
         cat "${ADMIN_PW_MARKER}" 2>/dev/null || true
     fi
+}
+
+# ── Is the configured password ACTUALLY the Administrator password? ───────
+# The marker records what we last INTENDED to apply, never what is true. Bug
+# 293a3c8f is what that costs: on erp.askexe.com the marker matched the
+# configured password exactly, so the preflight below concluded "nothing to
+# do" — while that password returned 401 AuthenticationError against the live
+# site, verified both over HTTP and through Frappe's own check_password. The
+# marker was a cache that nothing ever validated, so NO boot could converge
+# the state. The lockout was permanent by construction.
+#
+# Exit codes are deliberately three-valued, because "I could not check" must
+# never be read as "the password is wrong":
+#   0 — authenticates
+#   1 — definitively WRONG (Frappe raised AuthenticationError)
+#   2 — COULD NOT DETERMINE (bench missing, site down, migration pending,
+#       any unrecognised error). Callers must change nothing on a 2.
+admin_password_authenticates() {
+    # `out=$(...)` is a FAILING ASSIGNMENT under `set -e` and would abort the
+    # whole boot on a wrong password — turning a diagnostic into an outage.
+    # `|| rc=$?` keeps the non-zero exit as data instead of a fatal signal.
+    local out rc=0
+    out="$(bench --site "${SITE_NAME}" execute frappe.utils.password.check_password \
+        --args "[\"Administrator\", \"${ADMIN_PASSWORD}\"]" 2>&1)" || rc=$?
+
+    if [ "${rc}" -eq 0 ]; then
+        return 0
+    fi
+
+    # Only this ONE named condition counts as a negative answer. Anything else
+    # is unrecognised, and unrecognised means unknown, not absent.
+    case "${out}" in
+        *AuthenticationError*) return 1 ;;
+    esac
+    return 2
 }
 
 # ── Admin-password preflight (bug 593fe59f) ──────────────────
@@ -383,8 +454,30 @@ admin_password_preflight() {
     stored_hash="$(read_admin_pw_marker)"
 
     if [ "${current_hash}" = "${stored_hash}" ]; then
-        ADMIN_PW_ACTION="none"
-        return 0
+        # The marker agrees — but agreement is not proof (bug 293a3c8f).
+        # Verify against the live site before trusting it. Same `set -e` care as
+        # inside the helper: a bare call would abort the boot on a non-zero.
+        local verdict=0
+        admin_password_authenticates || verdict=$?
+        case "${verdict}" in
+            0)
+                ADMIN_PW_ACTION="none"
+                return 0
+                ;;
+            2)
+                echo "WARNING: could not verify the Administrator password (site not"
+                echo "         reachable, migration pending, or an unrecognised error)."
+                echo "         Trusting the marker and changing NOTHING this boot."
+                ADMIN_PW_ACTION="none"
+                return 0
+                ;;
+        esac
+
+        echo "WARNING: the admin-password marker says ERP_ADMIN_PASSWORD is already"
+        echo "         applied, but it does NOT authenticate against this site."
+        echo "         The marker is stale (bug 293a3c8f) — reconverging."
+        # Fall through to the same validate-then-rotate decision as a changed
+        # password. A stale marker must not be a shortcut past the lint.
     fi
 
     if reason="$(check_admin_password)"; then
@@ -419,7 +512,12 @@ rotate_admin_password_if_changed() {
 
     # create_site seeds the marker on the bootstrap path, so by the time we get
     # here on a fresh install the password is already applied.
-    if [ "${current_hash}" = "${stored_hash}" ]; then
+    #
+    # NOTE: this early-return is safe ONLY because the preflight already
+    # verified a matching marker against the live site (bug 293a3c8f). Reaching
+    # here with ADMIN_PW_ACTION=rotate AND a matching marker means the preflight
+    # found the marker stale, so the equality below must not short-circuit it.
+    if [ "${current_hash}" = "${stored_hash}" ] && [ "${ADMIN_PW_ACTION}" != "rotate" ]; then
         return 0
     fi
 
