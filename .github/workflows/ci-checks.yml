@@ -293,7 +293,9 @@ jobs:
 
       - name: Completed setup desk home regression
         run: python3 scripts/desk-home-page.test.py
-          python3 scripts/desk-switcher-cache.test.py
+
+      - name: Switcher asset cache regression
+        run: python3 scripts/desk-switcher-cache.test.py
 
       - name: Desk navigation and widget error regressions
         run: node --test scripts/desk-widget-ux.test.cjs
