@@ -6,10 +6,10 @@
   "packageName": "@askexenow/exe-erp",
   "version": "0.3.14",
   "components": {
-    "erp": "ghcr.io/askexe/exe-erp:v0.3.14",
-    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.3.14",
-    "erp-queue": "ghcr.io/askexe/exe-erp:v0.3.14",
-    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.3.14"
+    "erp": "ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c",
+    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c",
+    "erp-queue": "ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c",
+    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c"
   },
   "stackParticipation": {
     "required": false,
