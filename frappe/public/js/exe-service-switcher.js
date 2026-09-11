@@ -130,9 +130,10 @@ class ExeServiceSwitcher extends HTMLElement {
       ? `
         <div class="exe-ss-user">
           <span class="exe-ss-email">${this._escapeHtml(user)}</span>
-          <a href="https://${domain}/auth/logout" class="exe-ss-logout" title="Sign out">
+          <button type="button" class="exe-ss-logout" title="Sign out" aria-label="Sign out">
             ${ICONS.logout}
-          </a>
+          </button>
+          <span class="exe-ss-logout-status" role="status"></span>
         </div>
       `
       : "";
@@ -149,6 +150,36 @@ class ExeServiceSwitcher extends HTMLElement {
         </div>
       </nav>
     `;
+    this._shadow.querySelector(".exe-ss-logout")?.addEventListener("click", () => this._logout());
+  }
+
+  async _logout() {
+    if (this._signingOut) return;
+    const button = this._shadow.querySelector(".exe-ss-logout");
+    const status = this._shadow.querySelector(".exe-ss-logout-status");
+    if (!window.frappe?.call) {
+      status.textContent = "ERP is still loading. Try signing out again shortly.";
+      return;
+    }
+    this._signingOut = true;
+    button.disabled = true;
+    status.textContent = "Signing out…";
+    try {
+      // Clear the local Frappe session first. Its existing on_logout hook
+      // revokes central SSO; the Auth landing then clears browser SSO cookies.
+      await new Promise((resolve, reject) => {
+        window.frappe.call({
+          method: "logout",
+          callback: (response) => response.exc ? reject(new Error("logout_failed")) : resolve(),
+          error: reject,
+        });
+      });
+      window.location.assign(`https://auth.${this._baseDomain}/logout`);
+    } catch (_error) {
+      this._signingOut = false;
+      button.disabled = false;
+      status.textContent = "Could not sign out. Please try again.";
+    }
   }
 
   _escapeHtml(str) {
@@ -279,6 +310,9 @@ class ExeServiceSwitcher extends HTMLElement {
       }
 
       .exe-ss-logout {
+        border: 0;
+        background: transparent;
+        cursor: pointer;
         display: inline-flex;
         align-items: center;
         padding: 3px;
