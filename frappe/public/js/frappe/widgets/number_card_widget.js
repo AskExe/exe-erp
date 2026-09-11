@@ -1,4 +1,5 @@
 import Widget from "./base_widget.js";
+import { request_widget_data, widget_error_state } from "./widget_request.js";
 
 frappe.provide("frappe.utils");
 
@@ -28,28 +29,31 @@ export default class NumberCardWidget extends Widget {
 	}
 
 	make_card() {
-		frappe.model.with_doc("Number Card", this.number_card_name || this.name).then((card) => {
-			if (!card) {
-				if (this.document_type) {
-					frappe.run_serially([
-						() => this.create_number_card(),
-						() => this.render_card(),
-					]);
+		frappe.model
+			.with_doc("Number Card", this.number_card_name || this.name)
+			.then((card) => {
+				if (!card) {
+					if (this.document_type) {
+						frappe.run_serially([
+							() => this.create_number_card(),
+							() => this.render_card(),
+						]);
+					} else {
+						// widget doesn't exist so delete
+						this.delete(false);
+						return;
+					}
 				} else {
-					// widget doesn't exist so delete
-					this.delete(false);
-					return;
+					this.card_doc = card;
+					this.render_card();
 				}
-			} else {
-				this.card_doc = card;
-				this.render_card();
-			}
 
-			this.set_events();
-		}).catch((err) => {
-			console.error("Number card doc fetch failed:", this.name, err);
-			this.render_error_state();
-		});
+				this.set_events();
+			})
+			.catch((err) => {
+				console.error("Number card doc fetch failed:", this.name, err);
+				this.render_error_state(err);
+			});
 	}
 
 	create_number_card() {
@@ -67,7 +71,7 @@ export default class NumberCardWidget extends Widget {
 
 	set_events() {
 		$(this.body).click(() => {
-			if (this.in_customize_mode) return;
+			if (this.in_customize_mode || this.widget.hasClass("section-degraded-state")) return;
 			this.set_route();
 		});
 	}
@@ -170,6 +174,7 @@ export default class NumberCardWidget extends Widget {
 	}
 
 	async render_card() {
+		this.widget.removeClass("section-degraded-state");
 		this.prepare_actions();
 		this.set_title();
 		this.card_doc?.background_color &&
@@ -188,7 +193,7 @@ export default class NumberCardWidget extends Widget {
 			this.render_stats();
 		} catch (err) {
 			console.error("Number card failed to load:", this.name, err);
-			this.render_error_state();
+			this.render_error_state(err);
 		}
 	}
 
@@ -198,24 +203,30 @@ export default class NumberCardWidget extends Widget {
 		</div>`);
 	}
 
-	render_error_state() {
-		$(this.body).html(`<div class="widget-content section-degraded">
-			<div class="number text-muted" style="font-size: var(--text-lg);">
-				${__("Unavailable")}
-			</div>
-			<button class="btn btn-xs btn-default mt-2 btn-section-retry">
-				${__("Retry")}
-			</button>
+	render_error_state(error) {
+		const state = widget_error_state(error);
+		$(this.body).html(`<div class="widget-content section-degraded" role="status">
+			<div class="number-card-error-message text-muted"></div>
+			${
+				state.retry
+					? `<button class="btn btn-xs btn-default mt-2 btn-section-retry">${__(
+							"Retry"
+					  )}</button>`
+					: ""
+			}
 		</div>`);
+		$(this.body).find(".number-card-error-message").text(state.message);
 		this.widget.addClass("section-degraded-state");
-		$(this.body).find(".btn-section-retry").on("click", () => {
-			this.widget.removeClass("section-degraded-state");
-			this.render_card();
-		});
+		$(this.body)
+			.find(".btn-section-retry")
+			.on("click", (event) => {
+				event.stopPropagation();
+				this.card_doc ? this.render_card() : this.make_card();
+			});
 	}
 
 	async get_data() {
-		this.data = await frappe.xcall(this.settings.method, this.settings.args);
+		this.data = await request_widget_data(this.settings.method, this.settings.args);
 		return this.settings.get_number(this.data);
 	}
 
@@ -361,16 +372,21 @@ export default class NumberCardWidget extends Widget {
 	}
 
 	get_percentage_stats() {
-		return frappe
-			.xcall("frappe.desk.doctype.number_card.number_card.get_percentage_difference", {
+		return request_widget_data(
+			"frappe.desk.doctype.number_card.number_card.get_percentage_difference",
+			{
 				doc: this.card_doc,
 				filters: this.filters,
 				result: this.number,
-			})
+			}
+		)
 			.then((res) => {
 				if (res !== undefined) {
 					this.percentage_stat = frappe.utils.shorten_number(res);
 				}
+			})
+			.catch(() => {
+				delete this.percentage_stat;
 			});
 	}
 

@@ -836,6 +836,9 @@ frappe.ui.Sidebar = class Sidebar {
 	}
 
 	get_workspace_sidebars(link_to) {
+		// The desktop route has no link target. Missing targets must not match
+		// section breaks, which also have no link_to, and select a fake sidebar.
+		if (typeof link_to !== "string" || !link_to) return [];
 		let sidebars = [];
 		Object.entries(this.all_sidebar_items).forEach(([name, sidebar]) => {
 			const { items, label } = sidebar;

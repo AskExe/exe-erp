@@ -155,6 +155,11 @@ frappe.request.call = function (opts) {
 			) {
 				// session expired
 				frappe.app.handle_session_expired();
+			} else if (opts.silent) {
+				// Background widgets render their own permission state. Keep the
+				// response so they can distinguish denied access from an outage.
+				opts.error_callback && opts.error_callback(xhr);
+				return;
 			} else if (xhr.responseJSON && xhr.responseJSON._error_message) {
 				frappe.msgprint({
 					title: __("Not permitted"),

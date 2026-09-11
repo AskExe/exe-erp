@@ -130,7 +130,7 @@ class ExeServiceSwitcher extends HTMLElement {
       ? `
         <div class="exe-ss-user">
           <span class="exe-ss-email">${this._escapeHtml(user)}</span>
-          <a href="https://${domain}/auth/logout" class="exe-ss-logout" title="Sign out">
+          <a href="https://auth.${domain}/logout" class="exe-ss-logout" title="Sign out">
             ${ICONS.logout}
           </a>
         </div>

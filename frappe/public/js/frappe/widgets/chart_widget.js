@@ -1,4 +1,5 @@
 import Widget from "./base_widget.js";
+import { request_widget_data, widget_error_state } from "./widget_request.js";
 
 frappe.provide("frappe.widget.utils");
 frappe.provide("frappe.dashboards");
@@ -61,7 +62,9 @@ export default class ChartWidget extends Widget {
 		this.empty.hide().appendTo(this.body);
 
 		this.error_state = $(
-			`<div class="chart-loading-state chart-error-state text-danger" style="height: ${this.height}px;">
+			`<div class="chart-loading-state chart-error-state text-danger" style="height: ${
+				this.height
+			}px;">
 				<div class="text-center">
 					<div class="chart-error-message mb-2"></div>
 					<button class="btn btn-xs btn-default btn-section-retry">
@@ -221,17 +224,21 @@ export default class ChartWidget extends Widget {
 			heatmap_year: this.selected_heatmap_year || this.chart_settings.heatmap_year,
 		};
 
-		this.fetch(this.filters, true, this.args).then((data) => {
-			if (this.chart_doc.chart_type == "Report") {
-				this.report_result = data;
-				this.summary = data.report_summary;
-				data = this.get_report_chart_data(data);
-			}
+		return this.fetch(this.filters, true, this.args)
+			.then((data) => {
+				if (this.chart_doc.chart_type == "Report") {
+					this.report_result = data;
+					this.summary = data.report_summary;
+					data = this.get_report_chart_data(data);
+				}
 
-			this.update_chart_object();
-			this.data = data;
-			this.render();
-		});
+				this.update_chart_object();
+				this.data = data;
+				this.render();
+			})
+			.catch(() => {
+				// fetch has already rendered the inline error state.
+			});
 	}
 
 	render_date_range_field() {
@@ -568,22 +575,16 @@ export default class ChartWidget extends Widget {
 				heatmap_year: args && args.heatmap_year ? args.heatmap_year : null,
 			};
 		}
-		return frappe.xcall(method, args, undefined, {
-			silent: true,
-			error: (err) => {
-				let message;
-				try {
-					message = JSON.parse(JSON.parse(err._server_messages)[0])?.message;
-				} catch (_e) {
-					message = __("Failed to load chart data");
-				}
-				this.chart_wrapper.hide();
-				this.loading.hide();
-				this.$summary && this.$summary.hide();
-				this.empty.hide();
-				this.error_state.find(".chart-error-message").text(message);
-				this.error_state.show();
-			},
+		return request_widget_data(method, args).catch((error) => {
+			const state = widget_error_state(error);
+			this.chart_wrapper.hide();
+			this.loading.hide();
+			this.$summary && this.$summary.hide();
+			this.empty.hide();
+			this.error_state.find(".chart-error-message").text(state.message);
+			this.error_state.find(".btn-section-retry").toggle(state.retry);
+			this.error_state.attr("role", "status").show();
+			throw error;
 		});
 	}
 

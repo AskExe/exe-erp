@@ -294,6 +294,9 @@ jobs:
       - name: Completed setup desk home regression
         run: python3 scripts/desk-home-page.test.py
 
+      - name: Desk navigation and widget error regressions
+        run: node --test scripts/desk-widget-ux.test.cjs
+
       - name: Workflow gate integrity (bugs b7496cb1, 98fbb1a0)
         run: python3 scripts/workflow-gate-integrity.test.py
 
