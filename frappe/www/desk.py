@@ -1,6 +1,8 @@
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
 import os
+from hashlib import sha256
+from pathlib import Path
 
 no_cache = 1
 
@@ -16,6 +18,12 @@ from frappe.utils.jinja_globals import is_rtl
 
 SCRIPT_TAG_PATTERN = re.compile(r"\<script[^<]*\</script\>")
 CLOSING_SCRIPT_TAG_PATTERN = re.compile(r"</script\>")
+
+
+def get_service_switcher_version():
+	"""Change the immutable asset URL whenever its actual bytes change."""
+	path = Path(frappe.get_app_path("frappe", "public", "js", "exe-service-switcher.js"))
+	return sha256(path.read_bytes()).hexdigest()[:16]
 
 
 def get_context(context):
@@ -47,6 +55,7 @@ def get_context(context):
 		{
 			"no_cache": 1,
 			"build_version": frappe.utils.get_build_version(),
+			"service_switcher_version": get_service_switcher_version(),
 			"app_include_js": app_include_js,
 			"app_include_css": app_include_css,
 			"app_include_icons": app_include_icons,

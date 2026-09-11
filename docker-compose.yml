@@ -9,7 +9,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
     # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c
+    image: ghcr.io/askexe/exe-erp:v0.3.15
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -62,7 +62,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
     # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c
+    image: ghcr.io/askexe/exe-erp:v0.3.15
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -125,7 +125,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
     # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c
+    image: ghcr.io/askexe/exe-erp:v0.3.15
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -161,7 +161,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
     # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c
+    image: ghcr.io/askexe/exe-erp:v0.3.15
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -232,7 +232,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
     # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c
+    image: ghcr.io/askexe/exe-erp:v0.3.15
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -295,7 +295,7 @@ services:
 
   # -- Nginx reverse proxy ------------------------------------------------
   exe-erp-nginx:
-    image: ghcr.io/askexe/exe-erp:v0.3.14@sha256:b2d2b6dae80216f3023bd412edb2ebc9c080cb96163069ff2b6d8b904e028e8c
+    image: ghcr.io/askexe/exe-erp:v0.3.15
     security_opt:
       - no-new-privileges:true
     cap_drop:
