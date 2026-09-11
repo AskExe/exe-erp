@@ -291,6 +291,9 @@ jobs:
       - name: Asset healthcheck script lints (bug f6552d32)
         run: sh -n scripts/asset-healthcheck.sh
 
+      - name: Completed setup desk home regression
+        run: python3 scripts/desk-home-page.test.py
+
       - name: Workflow gate integrity (bugs b7496cb1, 98fbb1a0)
         run: python3 scripts/workflow-gate-integrity.test.py
 
