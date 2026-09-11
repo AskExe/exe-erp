@@ -374,7 +374,13 @@ def add_home_page(bootinfo, docs):
 		return
 	home_page = frappe.db.get_default("desktop:home_page")
 
-	if not frappe.is_setup_complete():
+	if frappe.is_setup_complete():
+		# Install-time defaults can survive setup completed through automation.
+		# Loading the wizard after completion redirects straight back to /desk,
+		# so using it as the home page causes an endless reload loop.
+		if home_page == "setup-wizard":
+			home_page = "desktop"
+	else:
 		bootinfo.setup_wizard_requires = frappe.get_hooks("setup_wizard_requires")
 
 	try:
