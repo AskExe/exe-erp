@@ -94,34 +94,79 @@ test("an empty desk route does not select section breaks as workspace links", ()
   sidebar.set_workspace_sidebar({});
   assert.deepEqual(calls, []);
 });
-test("shared header logout points to the customer auth service", () => {
-  for (const domain of ["askexe.com", "customer.example"]) {
-    let component;
-    class HTMLElement {
-      attachShadow() {
-        return {};
-      }
-      getAttribute(name) {
-        return { user: "qa@example.invalid", current: "ERP" }[name];
-      }
+function switcher(domain, call) {
+  let component;
+  const button = { addEventListener() {}, disabled: false };
+  const status = { textContent: "" };
+  const redirects = [];
+  class HTMLElement {
+    attachShadow() {
+      return {
+        querySelector: (selector) =>
+          selector === ".exe-ss-logout" ? button : status,
+      };
     }
-    load("frappe/public/js/exe-service-switcher.js", {
-      HTMLElement,
-      window: { location: { hostname: `erp.${domain}` } },
-      customElements: {
-        get: () => null,
-        define: (_name, type) => {
-          component = type;
-        },
+    getAttribute(name) {
+      return { user: "qa@example.invalid", current: "ERP" }[name];
+    }
+  }
+  load("frappe/public/js/exe-service-switcher.js", {
+    HTMLElement,
+    window: {
+      frappe: call ? { call } : undefined,
+      location: {
+        hostname: `erp.${domain}`,
+        assign: (url) => redirects.push(url),
       },
+    },
+    customElements: {
+      get: () => null,
+      define: (_name, type) => {
+        component = type;
+      },
+    },
+  });
+  const instance = new component();
+  instance.connectedCallback();
+  return { instance, button, status, redirects };
+}
+test("shared header signs out locally before clearing central cookies", async () => {
+  for (const domain of ["askexe.com", "customer.example"]) {
+    let request;
+    const { instance, button, redirects } = switcher(domain, (options) => {
+      request = options;
     });
-    const instance = new component();
-    instance.connectedCallback();
-    assert.ok(
-      instance._shadow.innerHTML.includes(
-        `href="https://auth.${domain}/logout" class="exe-ss-logout"`
-      )
+    assert.match(
+      instance._shadow.innerHTML,
+      /<button[^>]+class="exe-ss-logout"/
     );
+    const pending = instance._logout();
+    assert.equal(request.method, "logout");
+    assert.equal(button.disabled, true);
+    assert.deepEqual(redirects, []);
+    request.callback({});
+    await pending;
+    assert.deepEqual(redirects, [`https://auth.${domain}/logout`]);
+  }
+});
+test("failed or premature sign-out shows an error without claiming success", async () => {
+  const loading = switcher("askexe.com");
+  await loading.instance._logout();
+  assert.match(loading.status.textContent, /still loading/);
+  assert.deepEqual(loading.redirects, []);
+  for (const failure of ["callback", "error"]) {
+    let request;
+    const state = switcher("askexe.com", (options) => {
+      request = options;
+    });
+    const pending = state.instance._logout();
+    failure === "callback"
+      ? request.callback({ exc: "failure" })
+      : request.error({ status: 503 });
+    await pending;
+    assert.match(state.status.textContent, /Could not sign out/);
+    assert.equal(state.button.disabled, false);
+    assert.deepEqual(state.redirects, []);
   }
 });
 test("permission/configuration failures have no retry, transient failures retain it", () => {
@@ -214,13 +259,14 @@ test("chart denial settles the request and removes the misleading retry button",
   const chart = Object.create(Chart.prototype);
   Object.assign(chart, {
     settings: { method: "chart" },
+    chart_settings: {},
     chart_doc: { name: "Test" },
     chart_wrapper: element(),
     loading: element(),
     empty: element(),
     error_state: element(),
   });
-  await assert.rejects(chart.fetch({}), (error) => error === denied);
+  await chart.fetch_and_update_chart();
   assert.equal(chart.error_state.visible, true);
   assert.equal(chart.error_state.find(".btn-section-retry").visible, false);
   assert.match(
@@ -308,4 +354,35 @@ test("number-card data failures retain permission status for inline rendering", 
     get_number: () => assert.fail("denied data must not render"),
   };
   await assert.rejects(card.get_data(), (error) => error === denied);
+});
+
+test("successful chart responses with rendering failures show an inline retry state", async () => {
+  const ctx = policy();
+  const Chart = load(
+    "frappe/public/js/frappe/widgets/chart_widget.js",
+    {
+      Widget: class {},
+      frappe: { provide() {} },
+      widget_error_state: ctx.widget_error_state,
+      request_widget_data: () => Promise.resolve({ labels: [], datasets: [] }),
+    },
+    "ChartWidget"
+  ).Exported;
+  const chart = Object.create(Chart.prototype);
+  Object.assign(chart, {
+    settings: { method: "chart" },
+    chart_settings: {},
+    chart_doc: { name: "Test" },
+    chart_wrapper: element(),
+    loading: element(),
+    empty: element(),
+    error_state: element(),
+    update_chart_object() {},
+    render() {
+      throw new Error("bad chart data");
+    },
+  });
+  await chart.fetch_and_update_chart();
+  assert.equal(chart.error_state.visible, true);
+  assert.equal(chart.error_state.find(".btn-section-retry").visible, true);
 });

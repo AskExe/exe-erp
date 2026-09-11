@@ -236,9 +236,7 @@ export default class ChartWidget extends Widget {
 				this.data = data;
 				this.render();
 			})
-			.catch(() => {
-				// fetch has already rendered the inline error state.
-			});
+			.catch((error) => this.render_error_state(error));
 	}
 
 	render_date_range_field() {
@@ -575,17 +573,18 @@ export default class ChartWidget extends Widget {
 				heatmap_year: args && args.heatmap_year ? args.heatmap_year : null,
 			};
 		}
-		return request_widget_data(method, args).catch((error) => {
-			const state = widget_error_state(error);
-			this.chart_wrapper.hide();
-			this.loading.hide();
-			this.$summary && this.$summary.hide();
-			this.empty.hide();
-			this.error_state.find(".chart-error-message").text(state.message);
-			this.error_state.find(".btn-section-retry").toggle(state.retry);
-			this.error_state.attr("role", "status").show();
-			throw error;
-		});
+		return request_widget_data(method, args);
+	}
+
+	render_error_state(error) {
+		const state = widget_error_state(error);
+		this.chart_wrapper.hide();
+		this.loading.hide();
+		this.$summary && this.$summary.hide();
+		this.empty.hide();
+		this.error_state.find(".chart-error-message").text(state.message);
+		this.error_state.find(".btn-section-retry").toggle(state.retry);
+		this.error_state.attr("role", "status").show();
 	}
 
 	async get_source_doctype() {
