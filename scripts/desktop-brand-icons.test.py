@@ -32,9 +32,16 @@ class DesktopBrandTests(unittest.TestCase):
 		self.assertEqual([node.attrib.get("fill") for node in svg], ["#F5D76E", "#0F0E1A"])
 		self.assertEqual(len(list(svg)), 2)
 
+	def test_framework_stock_logo_uses_the_same_palette(self):
+		svg = ET.parse(ROOT / "frappe/public/images/frappe-framework-logo.svg").getroot()
+		self.assertEqual(svg.attrib["viewBox"], "0 0 50 50")
+		self.assertEqual([node.attrib.get("fill") for node in svg], ["#F5D76E", "#0F0E1A"])
+
 	def test_custom_image_branch_is_not_filtered_or_recolored(self):
 		template = (ROOT / "frappe/public/js/frappe/ui/desktop_icon.html").read_text()
-		self.assertIn('src="{{ icon.logo_url || icon.icon_image }}"', template)
+		self.assertIn(
+			'src="{{ frappe.utils.desktop_brand_image_url(icon.logo_url || icon.icon_image) }}"', template
+		)
 		css = (ROOT / "frappe/desk/page/desktop/desktop.css").read_text()
 		self.assertNotIn("filter:", css.split("/* Exe desktop palette:")[1])
 		self.assertIn(".icon-container:has(.desktop-alphabet)", css)

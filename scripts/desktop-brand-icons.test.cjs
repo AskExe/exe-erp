@@ -15,3 +15,16 @@ for (const app of ["frappe", "erpnext", "customer_app"]) {
     assert.equal(getIcon.call(receiver, "Missing", "Solid"), false);
   });
 }
+
+test("persisted stock logos refresh while customer images remain byte-identical", () => {
+  const start = source.indexOf("desktop_brand_image_url(url) {");
+  const method = source.slice(start, source.indexOf("\n\tget_desktop_icon(", start));
+  const imageUrl = new Function(`return ({${method}}).desktop_brand_image_url`)();
+  for (const stock of ["/assets/frappe/images/frappe-framework-logo.svg", "/assets/erpnext/images/erpnext-logo.svg"]) {
+    assert.equal(imageUrl(stock), stock + "?v=exe-gold-1");
+    assert.equal(imageUrl(imageUrl(stock)), imageUrl(stock));
+  }
+  for (const custom of ["/files/company-logo.svg", "https://customer.test/logo.svg", "/assets/frappe/images/frappe-framework-logo.svg?custom=1", null]) {
+    assert.equal(imageUrl(custom), custom);
+  }
+});

@@ -1487,6 +1487,16 @@ Object.assign(frappe.utils, {
 		);
 	},
 
+	desktop_brand_image_url(url) {
+		// Persisted stock logo URLs also need the updated artwork. Customer
+		// uploads and externally hosted images retain their exact original URLs.
+		const stock_logos = [
+			"/assets/frappe/images/frappe-framework-logo.svg",
+			"/assets/erpnext/images/erpnext-logo.svg",
+		];
+		return stock_logos.includes(url) ? `${url}?v=exe-gold-1` : url;
+	},
+
 	get_desktop_icon(icon_name, variant) {
 		let exists = false;
 		let icon_data = this.get_desktop_icon_by_label(icon_name);
