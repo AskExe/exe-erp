@@ -4,13 +4,13 @@
     --desktop-modal-height: 450px;
     --folder-thumbnail-icon-height: 16px;
     --desktop-icon-dimension: 54px;
-    --folder-icon-background-color: var(--surface-gray-1);
+    --folder-icon-background-color: var(--exe-bg-tertiary, #1a1832);
     --desktop-modal-radius: 30px;
     --desktop-icon-line-height: 115%;
     --desktop-navbar-height: 52px;
 }
 [data-theme="dark"]{
-    --folder-icon-background-color: #2b2b2b;
+    --folder-icon-background-color: var(--exe-bg-tertiary, #1a1832);
 }
 .desktop-wrapper{
     max-width: 100%;
@@ -563,4 +563,15 @@
     font-size: var(--text-2xl);
     font-family: inherit;
     padding: 0 4px;
+}
+
+/* Exe desktop palette: custom uploaded image tiles are deliberately untouched. */
+.desktop-icon .icon-container:has(.desktop-alphabet) {
+    background-color: var(--exe-accent, #f5d76e) !important;
+}
+.desktop-icon .desktop-alphabet {
+    color: var(--exe-text-inverted, #0f0e1a) !important;
+}
+.folder-icon {
+    border: 1px solid var(--exe-accent, #f5d76e);
 }

@@ -294,6 +294,11 @@ jobs:
       - name: Completed setup desk home regression
         run: python3 scripts/desk-home-page.test.py
 
+      - name: Desktop brand icon regression
+        run: |
+          python3 scripts/desktop-brand-icons.test.py
+          node --test scripts/desktop-brand-icons.test.cjs
+
       - name: Switcher asset cache regression
         run: python3 scripts/desk-switcher-cache.test.py
 

@@ -1501,7 +1501,9 @@ Object.assign(frappe.utils, {
 			frappe.boot.desktop_icon_urls[app_name] &&
 			frappe.boot.desktop_icon_urls[app_name][variant].includes(icon_url)
 		) {
-			return `/${icon_url}`;
+			// First-party artwork changed; immutable asset caches need a new URL.
+			const brand_version = ["frappe", "erpnext"].includes(app_name) ? "?v=exe-gold-1" : "";
+			return `/${icon_url}${brand_version}`;
 		}
 		return exists;
 	},
