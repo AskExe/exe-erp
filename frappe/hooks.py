@@ -12,12 +12,10 @@ app_name = "frappe"
 # Pattern mirrors frappe.www.login (EXE_AUTH_URL) and exe_bridge env config.
 app_title = os.environ.get("EXE_APP_TITLE", "ERP")
 app_publisher = os.environ.get("EXE_APP_PUBLISHER", "ERP")
-app_description = os.environ.get(
-	"EXE_APP_DESCRIPTION", "ERP — inventory, orders, invoicing"
-)
+app_description = os.environ.get("EXE_APP_DESCRIPTION", "ERP — inventory, orders, invoicing")
 app_license = os.environ.get("EXE_APP_LICENSE", "GPL-3.0")
 app_logo_url = os.environ.get(
-	"EXE_APP_LOGO_URL", "/assets/frappe/images/frappe-framework-logo.svg"
+	"EXE_APP_LOGO_URL", "/assets/frappe/images/frappe-framework-logo.svg?v=exe-gold-1"
 )
 develop_version = "17.x.x-develop"
 app_home = "/app/build"

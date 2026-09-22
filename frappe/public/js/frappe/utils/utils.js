@@ -1487,6 +1487,16 @@ Object.assign(frappe.utils, {
 		);
 	},
 
+	desktop_brand_image_url(url) {
+		// Persisted stock logo URLs also need the updated artwork. Customer
+		// uploads and externally hosted images retain their exact original URLs.
+		const stock_logos = [
+			"/assets/frappe/images/frappe-framework-logo.svg",
+			"/assets/erpnext/images/erpnext-logo.svg",
+		];
+		return stock_logos.includes(url) ? `${url}?v=exe-gold-1` : url;
+	},
+
 	get_desktop_icon(icon_name, variant) {
 		let exists = false;
 		let icon_data = this.get_desktop_icon_by_label(icon_name);
@@ -1501,7 +1511,9 @@ Object.assign(frappe.utils, {
 			frappe.boot.desktop_icon_urls[app_name] &&
 			frappe.boot.desktop_icon_urls[app_name][variant].includes(icon_url)
 		) {
-			return `/${icon_url}`;
+			// First-party artwork changed; immutable asset caches need a new URL.
+			const brand_version = ["frappe", "erpnext"].includes(app_name) ? "?v=exe-gold-1" : "";
+			return `/${icon_url}${brand_version}`;
 		}
 		return exists;
 	},

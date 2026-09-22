@@ -16,9 +16,7 @@ app_color = os.environ.get("EXE_APP_COLOR", "#7575FF")
 app_email = os.environ.get("EXE_APP_EMAIL", "")  # vendor-neutral; set via env
 app_license = os.environ.get("EXE_APP_LICENSE", "GNU General Public License (v3)")
 source_link = os.environ.get("EXE_APP_SOURCE_LINK", "")  # set to your source repo
-app_logo_url = os.environ.get(
-	"EXE_APP_LOGO_URL", "/assets/erpnext/images/erpnext-logo.svg"
-)
+app_logo_url = os.environ.get("EXE_APP_LOGO_URL", "/assets/erpnext/images/erpnext-logo.svg?v=exe-gold-1")
 app_home = "/desk"
 
 add_to_apps_screen = [
@@ -131,11 +129,9 @@ calendars = ["Task", "Work Order", "Sales Order", "Holiday List", "ToDo"]
 website_generators = ["BOM", "Sales Partner"]
 
 website_context = {
-	"favicon": os.environ.get(
-		"EXE_APP_FAVICON_URL", "/assets/erpnext/images/erpnext-favicon.svg"
-	),
+	"favicon": os.environ.get("EXE_APP_FAVICON_URL", "/assets/erpnext/images/erpnext-favicon.svg"),
 	"splash_image": os.environ.get(
-		"EXE_APP_SPLASH_URL", "/assets/erpnext/images/erpnext-logo.svg"
+		"EXE_APP_SPLASH_URL", "/assets/erpnext/images/erpnext-logo.svg?v=exe-gold-1"
 	),
 }
 
@@ -555,9 +551,7 @@ scheduler_events = {
 	],
 }
 
-email_brand_image = os.environ.get(
-	"EXE_APP_EMAIL_BRAND_IMAGE", "assets/erpnext/images/erpnext-logo.svg"
-)
+email_brand_image = os.environ.get("EXE_APP_EMAIL_BRAND_IMAGE", "assets/erpnext/images/erpnext-logo.svg")
 
 # Vendor-neutral, config-driven mail footer. With no env override the footer
 # shows only the (neutral) app title and no operator-specific URL/company.

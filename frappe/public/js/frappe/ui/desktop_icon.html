@@ -5,7 +5,7 @@
         </div>
     {% else if (icon.logo_url || icon.icon_image) { %}
         <div class="icon-container">
-            <img class="app-icon" src="{{ icon.logo_url || icon.icon_image }}" alt="{{ icon.label }}" />
+            <img class="app-icon" src="{{ frappe.utils.desktop_brand_image_url(icon.logo_url || icon.icon_image) }}" alt="{{ icon.label }}" />
         </div>
     {% } else if (icon.icon_type == "Folder") { %}
         <div class="icon-container folder-icon">
