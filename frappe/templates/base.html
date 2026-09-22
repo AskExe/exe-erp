@@ -103,9 +103,10 @@
 		// ONE-SHOT LOOP GUARD. If the handoff comes back and we are STILL Guest,
 		// bouncing again would spin forever (the failure mode bugs f1bb40d8 /
 		// 9f60e8e6 / 3938ac3d were all made of). Attempt the handoff at most
-		// once per tab; on the second arrival, fall back to the local login page
-		// — which still offers password and Login Token sign-in — instead of
-		// looping. sessionStorage is per-tab and cleared with the tab, so a
+		// once per tab; on the second arrival, fall back to the login page. Hosted
+		// sites show a stable central-auth retry there; standalone sites retain
+		// their local credentials. sessionStorage is per-tab and cleared with the
+		// tab, so a
 		// genuine later sign-in attempt is not blocked.
 		var KEY = 'exe_sso_handoff_attempted';
 		var attempted = false;
@@ -132,7 +133,7 @@
 			//     host mismatch) span /desk -> /login -> SSO -> /desk forever.
 			//     The key is per-tab and dies with the tab; a deliberate retry
 			//     is always one click away on the login page's own
-			//     "Sign in via Exe SSO" control.
+			//     central sign-in control.
 			window.location.href = '/login?sso=0';
 			return;
 		}

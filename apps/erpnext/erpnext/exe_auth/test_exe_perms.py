@@ -229,6 +229,36 @@ class TestComputeDecision(unittest.TestCase):
 		self.assertTrue(d["deny"])
 
 
+class TestManagedProvisioningAdmission(unittest.TestCase):
+	def testPositiveConfiguredErpClaimAllowsProvisioningAcrossDomains(self):
+		metadata = {"exe_perms": {"orgs": {"askexe": {"caps": ["erp:read"]}}}}
+		self.assertTrue(ep.managed_decision_allows_provisioning(metadata, "askexe"))
+
+	def testAbsentMetadataDoesNotBypassLegacyDomainGate(self):
+		self.assertFalse(ep.managed_decision_allows_provisioning(None, "askexe"))
+
+	def testWrongOrgDoesNotBypassLegacyDomainGate(self):
+		metadata = {"exe_perms": {"orgs": {"other": {"caps": ["erp:admin"]}}}}
+		self.assertFalse(ep.managed_decision_allows_provisioning(metadata, "askexe"))
+
+	def testDeniedErpClaimDoesNotBypassLegacyDomainGate(self):
+		for claim in ({"caps": []}, {"role": "none", "caps": ["erp:admin"]}):
+			with self.subTest(claim=claim):
+				metadata = {"exe_perms": {"orgs": {"askexe": claim}}}
+				self.assertFalse(ep.managed_decision_allows_provisioning(metadata, "askexe"))
+
+	def testUnconfiguredTenantDoesNotInferSingleClaimOrg(self):
+		metadata = {"exe_perms": {"orgs": {"askexe": {"caps": ["erp:admin"]}}}}
+		self.assertFalse(ep.managed_decision_allows_provisioning(metadata, None))
+
+	def testBothLoginPathsPassAuthoritativeMetadataToAdmissionGate(self):
+		api_path = os.path.join(os.path.dirname(__file__), "api.py")
+		with open(api_path, encoding="utf-8") as handle:
+			api_source = handle.read()
+		self.assertEqual(api_source.count("_assert_provisioning_allowed(email, app_metadata)"), 2)
+		self.assertNotIn("_assert_provisioning_allowed(email)\n", api_source)
+
+
 class TestDenyDecision(unittest.TestCase):
 	"""The fail-closed decision shape used for org cases that cannot bind."""
 
@@ -449,6 +479,43 @@ class TestBuildLogoutRevocationRequest(unittest.TestCase):
 
 if __name__ == "__main__":
 	unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Hosted central-auth route policy
+# ---------------------------------------------------------------------------
+
+
+class TestCentralizedAuthRequestDecision(unittest.TestCase):
+	def testHostedLocalWebFormsRedirect(self):
+		for path in ("/signup", "/complete-signup", "/update-password"):
+			with self.subTest(path=path):
+				self.assertEqual(ep.centralized_auth_request_decision(path, None, True), "redirect")
+
+	def testHostedCredentialAndRecoveryApisReject(self):
+		for path in (
+			"/api/method/login",
+			"/api/method/erpnext.exe_auth.api.gotrue_login",
+			"/api/method/frappe.core.doctype.user.user.reset_password",
+			"/api/method/frappe.core.doctype.user.user.update_password",
+			"/api/method/frappe.core.doctype.user.user.sign_up",
+		):
+			with self.subTest(path=path):
+				self.assertEqual(ep.centralized_auth_request_decision(path, None, True), "reject")
+
+	def testStandaloneKeepsLocalAuth(self):
+		self.assertEqual(
+			ep.centralized_auth_request_decision("/api/method/login", "login", False), "allow"
+		)
+
+	def testSsoAndMachineAdminEndpointsRemainAvailable(self):
+		for path in (
+			"/api/method/erpnext.exe_auth.api.gotrue_login_start",
+			"/api/method/erpnext.exe_auth.api.gotrue_login_callback",
+			"/api/method/erpnext.exe_auth.api.admin_token",
+		):
+			with self.subTest(path=path):
+				self.assertEqual(ep.centralized_auth_request_decision(path, None, True), "allow")
 
 
 # ---------------------------------------------------------------------------
