@@ -477,6 +477,23 @@ def compute_decision(app_metadata, configured_org_id, admin_role=None, write_rol
     return decision, ORG_RESOLVED
 
 
+def managed_decision_allows_provisioning(app_metadata, configured_org_id):
+    """True only for a positive claim bound to this configured ERP tenant.
+
+    The API uses this as an alternative to the legacy email-domain gate only
+    after GoTrue ``/user`` has authenticated and subject-bound the identity.
+    Missing metadata, an unset tenant, a wrong-org claim, and managed deny all
+    remain unable to provision.
+    """
+    decision, status = compute_decision(app_metadata, configured_org_id)
+    return bool(
+        configured_org_id
+        and status == ORG_RESOLVED
+        and decision is not None
+        and not decision.get("deny", True)
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SSO callback scheme (bug 42470087)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -560,6 +577,47 @@ SSO_STATE_COOKIE = "exe_sso_state"
 # locked out of SSO can always reach password / Login Token sign-in with it.
 SSO_OPT_OUT_PARAM = "sso"
 SSO_OPT_OUT_VALUES = frozenset(("0", "off", "false", "no", "local"))
+
+LOCAL_AUTH_WEB_PATHS = frozenset(("/signup", "/complete-signup", "/update-password"))
+LOCAL_AUTH_COMMANDS = frozenset(
+    (
+        "login",
+        "erpnext.exe_auth.api.gotrue_login",
+        "frappe.core.doctype.user.user.reset_password",
+        "frappe.core.doctype.user.user.update_password",
+        "frappe.core.doctype.user.user.sign_up",
+        "frappe.www.login.login_via_token",
+        "frappe.www.login.send_login_link",
+        "frappe.www.login.login_via_key",
+    )
+)
+
+
+def centralized_auth_request_decision(path, command, gotrue_configured):
+    """Classify legacy interactive auth routes on an SSO deployment.
+
+    Returns ``redirect`` for local HTML forms, ``reject`` for credential/reset
+    API calls, and ``allow`` otherwise. Standalone sites keep every upstream
+    route. The SSO start/callback and the separate machine admin-token endpoint
+    are intentionally outside these sets.
+    """
+    if not gotrue_configured:
+        return "allow"
+    normalized_path = str(path or "").rstrip("/") or "/"
+    if normalized_path in LOCAL_AUTH_WEB_PATHS:
+        return "redirect"
+    normalized_command = str(command or "").strip()
+    if normalized_command in LOCAL_AUTH_COMMANDS:
+        return "reject"
+    for prefix in ("/api/method/", "/api/v1/method/", "/api/v2/method/"):
+        if normalized_path.startswith(prefix):
+            path_command = normalized_path[len(prefix) :]
+            if path_command in LOCAL_AUTH_COMMANDS:
+                return "reject"
+            # v2 expands this shorthand only after before_request hooks run.
+            if path_command.lower() in ("user/reset_password", "user/update_password"):
+                return "reject"
+    return "allow"
 
 
 def sso_autoredirect_decision(session_user, cookies, query_args, gotrue_configured):

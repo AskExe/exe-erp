@@ -27,7 +27,7 @@ from frappe.website.utils import get_home_page
 from erpnext.exe_auth import exe_perms as _exe_perms
 
 
-def _assert_provisioning_allowed(email: str) -> None:
+def _assert_provisioning_allowed(email: str, app_metadata: dict | None = None) -> None:
 	"""Fail-closed tenant/domain gate for SSO auto-provisioning.
 
 	bug 7b4bbe12: ERP SSO must NOT auto-provision arbitrary valid GoTrue users.
@@ -35,14 +35,20 @@ def _assert_provisioning_allowed(email: str) -> None:
 	binding to this ERP tenant any GoTrue user (including cross-tenant ones) would
 	otherwise get a Frappe account here.
 
-	Provisioning is therefore REFUSED unless one of the following is configured in
-	site_config.json:
+	Provisioning is therefore REFUSED unless authoritative, subject-bound GoTrue
+	metadata positively grants ERP access for this site's explicitly configured
+	exe_org_id, or one of the legacy controls is configured in site_config.json:
 	  - allowed_email_domains: list of domains authorized for this tenant (preferred)
 	  - gotrue_allow_all_domains: true to explicitly opt into open provisioning
 	    (single-tenant deployments where every GoTrue user is trusted)
 
 	When allowed_email_domains is set, the email's domain must be on the list.
 	"""
+	if _exe_perms.managed_decision_allows_provisioning(
+		app_metadata, _configured_org_id()
+	):
+		return
+
 	raw_allowed = frappe.conf.get("allowed_email_domains") or []
 	# HARDENING (substring-match hole): allowed_email_domains MUST be a list for
 	# exact membership. entrypoint.sh writes a JSON list, but an operator editing
@@ -95,6 +101,35 @@ _MANAGED_DISABLED_PREFIX = "exe_managed_disabled::"
 _BOOTSTRAP_FLAG = "exe_bootstrap_admin_granted"
 # CSRF state cookie for the SSO callback (P1 login-CSRF).
 _OAUTH_STATE_COOKIE = "exe_sso_state"
+
+
+def enforce_central_auth_routes():
+	"""Remove Frappe's interactive local-auth surface on SSO deployments."""
+	request = getattr(frappe.local, "request", None)
+	decision = _exe_perms.centralized_auth_request_decision(
+		getattr(request, "path", None),
+		frappe.form_dict.get("cmd") if getattr(frappe, "form_dict", None) else None,
+		bool(frappe.conf.get("gotrue_url")),
+	)
+	if decision == "redirect":
+		from frappe.www.login import get_exe_auth_url
+
+		frappe.local.flags.redirect_location = get_exe_auth_url()
+		raise frappe.Redirect
+	if decision == "reject":
+		frappe.throw(
+			"Local sign-in and password recovery are disabled. Continue with Exe Auth.",
+			frappe.AuthenticationError,
+		)
+
+
+def reject_local_password_login(login_manager=None):
+	"""Fail before Frappe authenticates or creates a local password session."""
+	if frappe.conf.get("gotrue_url"):
+		frappe.throw(
+			"Local sign-in is disabled. Continue with Exe Auth.",
+			frappe.AuthenticationError,
+		)
 
 
 def _absolute_location(path: str) -> str:
@@ -461,7 +496,7 @@ def gotrue_login(
 	if not frappe.db.exists("User", email):
 		# SECURITY (bug 7b4bbe12): fail closed — require a tenant/domain allowlist
 		# (or an explicit allow-all opt-in) before auto-provisioning any user.
-		_assert_provisioning_allowed(email)
+		_assert_provisioning_allowed(email, app_metadata)
 		first_name = email.split("@")[0]
 		default_user_type = frappe.conf.get("default_gotrue_user_type", "Website User")
 		user_doc = frappe.get_doc(
@@ -658,7 +693,7 @@ def gotrue_login_callback():
 	if not frappe.db.exists("User", email):
 		# SECURITY (bug 7b4bbe12): fail closed — require a tenant/domain allowlist
 		# (or an explicit allow-all opt-in) before auto-provisioning any user.
-		_assert_provisioning_allowed(email)
+		_assert_provisioning_allowed(email, app_metadata)
 		first_name = email.split("@")[0]
 		default_user_type = frappe.conf.get("default_gotrue_user_type", "Website User")
 		user_doc = frappe.get_doc(

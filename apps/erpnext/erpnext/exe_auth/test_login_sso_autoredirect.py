@@ -51,6 +51,8 @@ import re
 import sys
 import types
 import unittest
+from html.parser import HTMLParser
+from typing import ClassVar
 from unittest import mock
 
 # .../apps/erpnext/erpnext/exe_auth/ -> up 4
@@ -323,6 +325,85 @@ class TestBaseTemplateGiveUpFail(unittest.TestCase):
         with open(BASE_HTML, encoding="utf-8") as handle:
             content = handle.read()
         self.assertIn("{% if frappe.session.user == 'Guest' and path != 'login' %}", content)
+
+
+class TestHostedLoginFallbackContract(unittest.TestCase):
+    class _BalancedHtml(HTMLParser):
+        VOID: ClassVar[set[str]] = {
+            "area", "base", "br", "col", "embed", "hr", "img", "input",
+            "link", "meta", "param", "source", "track", "wbr",
+        }
+
+        def __init__(self):
+            super().__init__()
+            self.stack = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag not in self.VOID:
+                self.stack.append(tag)
+
+        def handle_endtag(self, tag):
+            if not self.stack or self.stack.pop() != tag:
+                raise AssertionError(f"unbalanced closing tag: {tag}")
+
+    def _render_login(self, hosted):
+        login_html = os.path.join(_REPO_ROOT, "frappe", "www", "login.html")
+        with open(login_html, encoding="utf-8") as handle:
+            source = handle.read()
+        page = source.split("{% block page_content %}", 1)[1].split("{% endblock %}", 1)[0]
+        rendered = []
+        include = True
+        for line in page.splitlines():
+            stripped = line.strip()
+            if stripped == "{% if gotrue_login_enabled %}":
+                include = hosted
+            elif stripped == "{% if not gotrue_login_enabled %}":
+                include = not hosted
+            elif stripped == "{% else %}":
+                include = not include
+            elif stripped == "{% endif %}":
+                include = True
+            elif include:
+                rendered.append(line)
+        output = "\n".join(rendered)
+        output = re.sub(r"\{#.*?#\}", "", output, flags=re.DOTALL)
+        return re.sub(r"\{\{.*?\}\}", "", output, flags=re.DOTALL)
+
+    def testBothRenderedBranchesHaveBalancedMarkup(self):
+        for hosted in (True, False):
+            with self.subTest(hosted=hosted):
+                parser = self._BalancedHtml()
+                parser.feed(self._render_login(hosted))
+                self.assertEqual(parser.stack, [])
+
+    def testHostedBranchOffersOnlyCentralAuthAndRecovery(self):
+        login_html = os.path.join(_REPO_ROOT, "frappe", "www", "login.html")
+        with open(login_html, encoding="utf-8") as handle:
+            page = handle.read()
+        hosted = page.split("{% if gotrue_login_enabled %}", 1)[1].split("{% else %}", 1)[0]
+        self.assertIn("gotrue_login_start", hosted)
+        self.assertIn('id="exe-auth-recovery-link"', hosted)
+        self.assertIn("{{ exe_auth_url | e }}", hosted)
+        for forbidden in ("login_password", "login_token_input", "form-forgot", "form-signup"):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, hosted)
+
+    def testLocalFormsAndScriptsAreStandaloneOnly(self):
+        login_html = os.path.join(_REPO_ROOT, "frappe", "www", "login.html")
+        with open(login_html, encoding="utf-8") as handle:
+            page = handle.read()
+        self.assertIn("{% if not gotrue_login_enabled %}", page)
+        self.assertIn("login_password", page)
+        self.assertIn("login_token_input", page)
+
+    def testHostedRequestGuardsAreRegistered(self):
+        hooks_path = os.path.join(
+            _REPO_ROOT, "apps", "erpnext", "erpnext", "hooks.py"
+        )
+        with open(hooks_path, encoding="utf-8") as handle:
+            hooks = handle.read()
+        self.assertIn("erpnext.exe_auth.api.enforce_central_auth_routes", hooks)
+        self.assertIn("erpnext.exe_auth.api.reject_local_password_login", hooks)
 
 
 if __name__ == "__main__":

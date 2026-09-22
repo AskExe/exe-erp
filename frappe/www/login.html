@@ -70,7 +70,10 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 		<div class="text-center my-5">
 			<h4>{{ _("Javascript is disabled on your browser") }}</h4>
 			<p class="text-muted">
-				{{ _("You need to enable JavaScript for your app to work.") }}<br>{{ _("To enable it follow the instructions in the following link: {0}").format("<a href='https://enable-javascript.com/'>enable-javascript.com</a></p>") }}
+				{{ _("You need to enable JavaScript for your app to work.") }}<br>
+				{{ _("To enable it, follow the instructions at") }}
+				<a href="https://enable-javascript.com/">enable-javascript.com</a>
+			</p>
 		</div>
 	</noscript>
 
@@ -82,6 +85,19 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 				<span class="exe-logo-product">ERP</span>
 			</div>
 			<p class="exe-subtitle">Sign in to your workspace</p>
+			{% if gotrue_login_enabled %}
+			<p class="exe-subtitle" style="margin-bottom:1.25rem">
+				Sign-in and password recovery are managed by Exe Auth.
+			</p>
+			<a id="exe-sso-link"
+				href="/api/method/erpnext.exe_auth.api.gotrue_login_start"
+				class="exe-btn-signin"
+				style="display:flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box"
+			>CONTINUE TO EXE AUTH</a>
+			<a id="exe-auth-recovery-link" href="{{ exe_auth_url | e }}"
+				style="display:inline-block;margin-top:1rem;color:#A09CAF;font-size:12px;text-decoration:underline"
+			>Forgot your password? Recover it at Exe Auth</a>
+			{% else %}
 
 			<!-- Tab switcher -->
 			<div class="exe-tab-switcher">
@@ -147,9 +163,11 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 				onmouseover="this.style.backgroundColor='rgba(37,35,64,0.6)';this.style.borderColor='rgba(245,215,110,0.3)'"
 				onmouseout="this.style.backgroundColor='transparent';this.style.borderColor='rgba(240,237,232,0.1)'"
 			>Sign in via Exe SSO</a>
+			{% endif %}
 		</div>
 	</section>
 
+	{% if not gotrue_login_enabled %}
 	<!-- Hidden sections kept for Frappe JS routing compatibility -->
 	<section class="for-email-login" style="display:none;">
 		<div class="login-content page-card">
@@ -187,10 +205,12 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 			</form>
 		</div>
 	</section>
+	{% endif %}
 </div>
 {% endblock %}
 
 {% block script %}
+{% if not gotrue_login_enabled %}
 <script>{% include "templates/includes/login/login.js" %}</script>
 <script>
 // ── Exe ERP: Tab switcher + Token login ──
@@ -302,6 +322,7 @@ noscript{color:#F0EDE8}noscript .text-muted{color:#A09CAF!important}
 	});
 })();
 </script>
+{% endif %}
 {% endblock %}
 
 {% block sidebar %}{% endblock %}

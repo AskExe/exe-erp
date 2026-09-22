@@ -66,6 +66,12 @@ extend_doctype_class = {"Address": "erpnext.accounts.custom.address.ERPNextAddre
 
 override_whitelisted_methods = {"frappe.www.contact.send_message": "erpnext.templates.utils.send_message"}
 
+# Hosted SSO has one identity surface. Reject Frappe password/reset/signup API
+# calls and redirect their HTML forms to the configured central auth domain.
+# Standalone deployments (no gotrue_url) are unchanged.
+before_request = ["erpnext.exe_auth.api.enforce_central_auth_routes"]
+before_login = "erpnext.exe_auth.api.reject_local_password_login"
+
 welcome_email = "erpnext.setup.utils.welcome_email"
 
 # setup wizard
