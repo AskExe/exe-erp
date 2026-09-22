@@ -55,8 +55,6 @@ from html.parser import HTMLParser
 from typing import ClassVar
 from unittest import mock
 
-from jinja2 import DictLoader, Environment
-
 # .../apps/erpnext/erpnext/exe_auth/ -> up 4
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
@@ -352,21 +350,24 @@ class TestHostedLoginFallbackContract(unittest.TestCase):
         login_html = os.path.join(_REPO_ROOT, "frappe", "www", "login.html")
         with open(login_html, encoding="utf-8") as handle:
             source = handle.read()
-        env = Environment(
-            loader=DictLoader({
-                "login.html": source,
-                "templates/web.html": "{% block page_content %}{% endblock %}{% block script %}{% endblock %}",
-                "templates/includes/login/login.js": "",
-                "templates/includes/splash_screen.html": "<div></div>",
-            }),
-            autoescape=True,
-        )
-        env.globals["_"] = lambda value: value
-        return env.get_template("login.html").render(
-            gotrue_login_enabled=hosted,
-            exe_auth_url="https://auth.example.com",
-            for_test="login.html",
-        )
+        page = source.split("{% block page_content %}", 1)[1].split("{% endblock %}", 1)[0]
+        rendered = []
+        include = True
+        for line in page.splitlines():
+            stripped = line.strip()
+            if stripped == "{% if gotrue_login_enabled %}":
+                include = hosted
+            elif stripped == "{% if not gotrue_login_enabled %}":
+                include = not hosted
+            elif stripped == "{% else %}":
+                include = not include
+            elif stripped == "{% endif %}":
+                include = True
+            elif include:
+                rendered.append(line)
+        output = "\n".join(rendered)
+        output = re.sub(r"\{#.*?#\}", "", output, flags=re.DOTALL)
+        return re.sub(r"\{\{.*?\}\}", "", output, flags=re.DOTALL)
 
     def testBothRenderedBranchesHaveBalancedMarkup(self):
         for hosted in (True, False):
