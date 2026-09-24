@@ -4,12 +4,12 @@
   "repo": "AskExe/exe-erp",
   "service": "exe-erp",
   "packageName": "@askexenow/exe-erp",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "components": {
-    "erp": "ghcr.io/askexe/exe-erp:v0.3.17",
-    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.3.17",
-    "erp-queue": "ghcr.io/askexe/exe-erp:v0.3.17",
-    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.3.17"
+    "erp": "ghcr.io/askexe/exe-erp:v0.3.18",
+    "erp-websocket": "ghcr.io/askexe/exe-erp:v0.3.18",
+    "erp-queue": "ghcr.io/askexe/exe-erp:v0.3.18",
+    "erp-scheduler": "ghcr.io/askexe/exe-erp:v0.3.18"
   },
   "stackParticipation": {
     "required": false,
