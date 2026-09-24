@@ -39,6 +39,8 @@ import os
 import sys
 import types
 import unittest
+from unittest import mock
+from urllib.parse import parse_qs, urlencode, urlparse
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -58,11 +60,15 @@ class _StubValidationError(Exception):
 
 
 class _CookieManager:
+	def __init__(self):
+		self.set_calls = []
+		self.deleted = []
+
 	def set_cookie(self, name, value, **kwargs):
-		pass
+		self.set_calls.append((name, value, kwargs))
 
 	def delete_cookie(self, name):
-		pass
+		self.deleted.append(name)
 
 
 class _LoginManager:
@@ -266,6 +272,7 @@ class TestSsoCallbackRedirectTarget(unittest.TestCase):
 		self.assertEqual(frappe.local.response["type"], "redirect")
 		self.assertEqual(frappe.local.response["location"], "/desk")
 
+
 	def testAbsolutePathPassesThroughUnchanged(self):
 		_, frappe = _run_callback("/app")
 		self.assertEqual(frappe.local.response["location"], "/app")
@@ -284,6 +291,99 @@ class TestSsoCallbackRedirectTarget(unittest.TestCase):
 		_, frappe = _run_callback("desk")
 		self.assertEqual(frappe.local.login_manager.logged_in_as, SSO_EMAIL)
 		self.assertEqual(frappe.local.response["type"], "redirect")
+
+
+class TestSsoStateHandoff(unittest.TestCase):
+	"""Auth follows the encoded callback verbatim; it does not echo outer state."""
+
+	def _start(self, override=None):
+		api, frappe, requests = _load_api_module("desk")
+		frappe.conf = {"gotrue_url": "http://gotrue:9999"}
+		if override is not None:
+			frappe.conf["gotrue_auth_redirect_url"] = override
+		frappe.www = types.ModuleType("frappe.www")
+		frappe.www.login = types.ModuleType("frappe.www.login")
+		frappe.www.login.get_exe_auth_url = lambda: "https://auth.acme.test"
+		saved = {name: sys.modules.get(name) for name in ("frappe.www", "frappe.www.login")}
+		sys.modules["frappe.www"] = frappe.www
+		sys.modules["frappe.www.login"] = frappe.www.login
+		try:
+			with mock.patch("secrets.token_urlsafe", return_value="one-time-nonce"):
+				api.gotrue_login_start()
+		finally:
+			for name, module in saved.items():
+				if module is None:
+					sys.modules.pop(name, None)
+				else:
+					sys.modules[name] = module
+		return api, frappe, requests
+
+	def test_override_keeps_parameters_but_moves_state_inside_erp_callback(self):
+		callback = "https://erp.acme.test/api/method/erpnext.exe_auth.api.gotrue_login_callback"
+		override = "https://auth.acme.test/login?" + urlencode(
+			{"product": "ERP", "redirect": callback, "state": "stale-outer", "theme": "dark"}
+		)
+		_, frappe, _ = self._start(override)
+		query = parse_qs(urlparse(frappe.local.response["location"]).query)
+		self.assertEqual(query["redirect"], [callback + "?state=one-time-nonce"])
+		self.assertEqual(query["theme"], ["dark"])
+		self.assertNotIn("state", query)
+
+	def test_override_without_exact_erp_callback_rejected_before_cookie(self):
+		for override in (
+			"https://auth.acme.test/login?product=ERP",
+			"https://auth.acme.test/login?redirect=https%3A%2F%2Fevil.test%2Fcallback",
+			"https://auth.acme.test/login?redirect=https%3A%2F%2Ferp.acme.test%2Fapi%2Fmethod%2Ferpnext.exe_auth.api.gotrue_login_callback%3Faccess_token%3Dleak",
+		):
+			with self.subTest(override=override):
+				with self.assertRaises(_StubValidationError):
+					self._start(override)
+
+	def test_existing_and_new_login_follow_same_stateful_callback(self):
+		api, frappe, requests = self._start()
+		auth_url = urlparse(frappe.local.response["location"])
+		query = parse_qs(auth_url.query)
+		self.assertEqual(auth_url.netloc, "auth.acme.test")
+		self.assertEqual(query["product"], ["ERP"])
+		self.assertNotIn("state", query)
+		self.assertNotIn("access_token", query)
+		callback = query["redirect"][0]
+		self.assertEqual(
+			callback,
+			"https://erp.acme.test/api/method/erpnext.exe_auth.api.gotrue_login_callback?state=one-time-nonce",
+		)
+		self.assertEqual(
+			frappe.local.cookie_manager.set_calls,
+			[(STATE_COOKIE, "one-time-nonce", {"httponly": True, "samesite": "Lax", "max_age": 600})],
+		)
+
+		# Auth's existing-session and post-login branches both follow `redirect`
+		# exactly. The callback consumes its query state and HttpOnly credential.
+		for _flow in ("existing_session", "new_login"):
+			with self.subTest(flow=_flow):
+				frappe.form_dict = {"state": parse_qs(urlparse(callback).query)["state"][0]}
+				frappe.request = _Request({STATE_COOKIE: "one-time-nonce", CREDENTIAL_COOKIE: FAKE_JWT})
+				frappe.db = _Db([SSO_EMAIL])
+				frappe.local.login_manager = _LoginManager()
+				requests.get = lambda *a, **kw: _GoTrueResponse(200, {"email": SSO_EMAIL})
+				api.gotrue_login_callback()
+				self.assertEqual(frappe.local.login_manager.logged_in_as, SSO_EMAIL)
+				self.assertIn(STATE_COOKIE, frappe.local.cookie_manager.deleted)
+
+	def test_tampered_or_replayed_state_rejected_before_user_fetch(self):
+		api, frappe, requests = self._start()
+		requests.get = lambda *a, **kw: self.fail("tampered state reached GoTrue")
+		for received, cookies in (
+			("tampered", {STATE_COOKIE: "one-time-nonce", CREDENTIAL_COOKIE: FAKE_JWT}),
+			("one-time-nonce", {CREDENTIAL_COOKIE: FAKE_JWT}),
+		):
+			with self.subTest(received=received, cookies=cookies):
+				frappe.form_dict = {"state": received}
+				frappe.request = _Request(cookies)
+				frappe.local.login_manager = _LoginManager()
+				with self.assertRaises(_StubAuthenticationError):
+					api.gotrue_login_callback()
+				self.assertIsNone(frappe.local.login_manager.logged_in_as)
 
 
 if __name__ == "__main__":  # pragma: no cover
