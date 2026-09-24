@@ -543,9 +543,9 @@ def gotrue_login_start():
 	"""Begin the SSO login flow WITH CSRF protection.
 
 	Generates a random `state` nonce, stores it in an httpOnly SameSite=Lax
-	cookie, and redirects the browser to this customer's auth domain carrying
-	that `state`. The auth domain MUST echo `state` back to
-	gotrue_login_callback, which verifies it against this cookie (double-submit)
+	cookie, and includes the nonce in the encoded ERP callback URL. The auth
+	domain redirects to that URL unchanged, so gotrue_login_callback can verify
+	the nonce against the cookie (double-submit)
 	to defeat login-CSRF. This is the SUPPORTED entry point for the SSO flow —
 	the login page links HERE (never straight to the callback), so with the
 	secure default (gotrue_require_callback_state=True) the callback always has a
@@ -558,43 +558,51 @@ def gotrue_login_start():
 	the whole target for operators who front SSO with a custom URL.
 	"""
 	import secrets
-	from urllib.parse import quote
+	from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 	state = secrets.token_urlsafe(32)
+	# Build the only callback we accept for this handoff. The state lives INSIDE
+	# `redirect`, since central Auth follows that URL verbatim in both flows.
+	# Frappe may see plain HTTP behind nginx/cloudflared; force HTTPS for the
+	# public callback while allowing an explicit loopback/dev exception.
+	callback_url = _exe_perms.force_https_callback_url(
+		frappe.utils.get_url(
+			"/api/method/erpnext.exe_auth.api.gotrue_login_callback"
+		),
+		allow_insecure=bool(frappe.conf.get("gotrue_allow_insecure_callback")),
+	)
+	callback_parts = urlsplit(callback_url)
+	state_query = f"{callback_parts.query}&" if callback_parts.query else ""
+	stateful_callback = urlunsplit(
+		callback_parts._replace(query=f"{state_query}state={quote(state, safe='')}")
+	)
 
 	auth_redirect = frappe.conf.get("gotrue_auth_redirect_url")
 	if auth_redirect:
-		# Operator-provided full target (may already carry product/redirect params).
-		target = auth_redirect
+		# An override must still use Auth's exact-redirect contract. Do not trust
+		# an arbitrary callback or an outer state param that Auth discards.
+		parts = urlsplit(auth_redirect)
+		params = parse_qsl(parts.query, keep_blank_values=True)
+		redirects = [value for key, value in params if key == "redirect"]
+		if len(redirects) != 1 or urlsplit(redirects[0]) != callback_parts:
+			frappe.throw("SSO redirect override must target this ERP callback", frappe.ValidationError)
+		params = [(key, value) for key, value in params if key != "state"]
+		params = [(key, stateful_callback if key == "redirect" else value) for key, value in params]
+		target = urlunsplit(parts._replace(query=urlencode(params)))
 	else:
 		# Derive the customer auth domain + attach product tag and our callback.
 		from frappe.www.login import get_exe_auth_url
 
-		# SCHEME (bug 42470087): frappe.utils.get_url() derives the scheme from
-		# the request as the CONTAINER sees it. Behind exe-erp-nginx /
-		# cloudflared that request is plain HTTP, so this produced
-		# `redirect=http://erp.<apex>/...` on a deployment served exclusively
-		# over https — a downgrade that GoTrue's URI allow-list may reject
-		# outright, and that otherwise bounces the browser through a plaintext
-		# URL carrying the token and state. Refuse to emit a downgraded callback
-		# no matter what the proxy reports; loopback/dev hosts keep http.
-		callback_url = _exe_perms.force_https_callback_url(
-			frappe.utils.get_url(
-				"/api/method/erpnext.exe_auth.api.gotrue_login_callback"
-			),
-			allow_insecure=bool(frappe.conf.get("gotrue_allow_insecure_callback")),
-		)
 		target = (
 			f"{get_exe_auth_url().rstrip('/')}/login"
-			f"?product=ERP&redirect={quote(callback_url, safe='')}"
+			f"?product=ERP&redirect={quote(stateful_callback, safe='')}"
 		)
 
 	frappe.local.cookie_manager.set_cookie(
 		_OAUTH_STATE_COOKIE, state, httponly=True, samesite="Lax", max_age=600
 	)
-	sep = "&" if "?" in target else "?"
 	frappe.local.response["type"] = "redirect"
-	frappe.local.response["location"] = f"{target}{sep}state={state}"
+	frappe.local.response["location"] = target
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])

@@ -123,6 +123,7 @@ REQUIRED_TEST_CLASSES = (
 	# Bug 2e8744b0 — the callback's Location must be an absolute path/URL,
 	# never a bare page name a browser would resolve against /api/method/.
 	"TestSsoCallbackRedirectTarget",
+	"TestSsoStateHandoff",
 )
 
 
