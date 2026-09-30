@@ -168,21 +168,16 @@ class ExeServiceSwitcher extends HTMLElement {
       // ERP's logout RPC is behind the shared auth gate. End its native
       // session while that gate still admits the request, then revoke SSO.
       // A retry after a central outage must not repeat the native logout RPC.
-      if (!this._nativeSignedOut) {
-        await new Promise((resolve, reject) => {
-          window.frappe.call({
-            method: "logout",
-            callback: (response) => response.exc ? reject(new Error("logout_failed")) : resolve(),
-            error: reject,
-          });
+      await new Promise((resolve, reject) => {
+        window.frappe.call({
+          method: "logout",
+          callback: (response) => response.exc ? reject(new Error("logout_failed")) : resolve(),
+          error: reject,
         });
-        this._nativeSignedOut = true;
-      }
-      const response = await fetch(`https://api.${this._baseDomain}/v1/auth/logout`, {
-        method: "POST",
-        credentials: "include",
       });
-      if (!response.ok && response.status !== 401) throw new Error("central_logout_failed");
+      // The central Auth landing page POSTs its same-origin GoTrue logout and
+      // clears HttpOnly browser cookies. The product API can deny an expired
+      // or unlicensed account with 403; that must never prevent signing out.
       window.location.assign(`https://auth.${this._baseDomain}/logout`);
     } catch (_error) {
       this._signingOut = false;

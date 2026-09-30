@@ -131,7 +131,7 @@ function switcher(domain, call, revoke = async () => ({ ok: true })) {
   instance.connectedCallback();
   return { instance, button, status, redirects };
 }
-test("shared header ends native logout before shared revocation and redirect", async () => {
+test("shared header ends native logout before central Auth cookie cleanup", async () => {
   for (const domain of ["askexe.com", "customer.example"]) {
     let request;
     const centralRequests = [];
@@ -153,9 +153,7 @@ test("shared header ends native logout before shared revocation and redirect", a
     assert.deepEqual(redirects, []);
     request.callback({});
     await pending;
-    assert.equal(centralRequests[0].url, `https://api.${domain}/v1/auth/logout`);
-    assert.equal(centralRequests[0].options.credentials, "include");
-    assert.equal(centralRequests[0].options.method, "POST");
+    assert.equal(centralRequests.length, 0, "central Auth owns GoTrue logout, not the license-gated product API");
     assert.deepEqual(redirects, [`https://auth.${domain}/logout`]);
   }
 });
@@ -180,25 +178,21 @@ test("failed or premature sign-out shows an error without claiming success", asy
     assert.deepEqual(state.redirects, []);
   }
 });
-test("central revocation failure keeps logout retryable without a success redirect", async () => {
+test("an unavailable or license-denied product API cannot strand a signed-out ERP user", async () => {
   let nativeCalls = 0;
-  let centralCalls = 0;
+  let productCalls = 0;
   const state = switcher("askexe.com", (request) => {
     nativeCalls++;
     request.callback({});
   }, async () => {
-    centralCalls++;
-    return centralCalls === 1 ? { ok: false, status: 503 } : { ok: true };
+    productCalls++;
+    return { ok: false, status: 403 };
   });
   await state.instance._logout();
   assert.equal(nativeCalls, 1);
-  assert.equal(state.button.disabled, false);
-  assert.match(state.status.textContent, /Could not sign out/);
-  assert.deepEqual(state.redirects, []);
-  await state.instance._logout();
-  assert.equal(nativeCalls, 1, "retry must not repeat the authenticated native RPC");
-  assert.equal(centralCalls, 2);
+  assert.equal(productCalls, 0);
   assert.deepEqual(state.redirects, ["https://auth.askexe.com/logout"]);
+  assert.doesNotMatch(state.status.textContent, /Could not sign out/);
 });
 test("native logout uses the same shared-session path as the header", () => {
   let calls = 0;
