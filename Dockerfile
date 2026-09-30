@@ -13,6 +13,12 @@
 # Tag at pin time: python:3.14-slim-bookworm (resolved 2026-06-29)
 FROM python:3.14-slim-bookworm@sha256:4ff4b92a68355dbdb52584ab3391dff8d371a61d4e063468bfd0130e3189c6d9 AS base
 
+# Use HTTPS and bounded retries on the runner's flaky download path. Refuse an
+# incomplete package index instead of proceeding with missing dependencies.
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAPT::Update::Error-Mode "any";\n' \
+      > /etc/apt/apt.conf.d/80-exe-downloads \
+    && sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources
+
 # System deps for runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # PostgreSQL client
