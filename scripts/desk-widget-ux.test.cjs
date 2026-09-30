@@ -94,7 +94,7 @@ test("an empty desk route does not select section breaks as workspace links", ()
   sidebar.set_workspace_sidebar({});
   assert.deepEqual(calls, []);
 });
-function switcher(domain, call) {
+function switcher(domain, call, revoke = async () => ({ ok: true })) {
   let component;
   const button = { addEventListener() {}, disabled: false };
   const status = { textContent: "" };
@@ -111,6 +111,7 @@ function switcher(domain, call) {
     }
   }
   load("frappe/public/js/exe-service-switcher.js", {
+    fetch: revoke,
     HTMLElement,
     window: {
       frappe: call ? { call } : undefined,
@@ -130,17 +131,25 @@ function switcher(domain, call) {
   instance.connectedCallback();
   return { instance, button, status, redirects };
 }
-test("shared header signs out locally before clearing central cookies", async () => {
+test("shared header revokes the shared session before native logout and redirect", async () => {
   for (const domain of ["askexe.com", "customer.example"]) {
     let request;
+    const centralRequests = [];
     const { instance, button, redirects } = switcher(domain, (options) => {
       request = options;
+    }, async (url, options) => {
+      centralRequests.push({ url, options });
+      return { ok: true };
     });
     assert.match(
       instance._shadow.innerHTML,
       /<button[^>]+class="exe-ss-logout"/
     );
     const pending = instance._logout();
+    await new Promise(setImmediate);
+    assert.equal(centralRequests[0].url, `https://api.${domain}/v1/auth/logout`);
+    assert.equal(centralRequests[0].options.credentials, "include");
+    assert.equal(centralRequests[0].options.method, "POST");
     assert.equal(request.method, "logout");
     assert.equal(button.disabled, true);
     assert.deepEqual(redirects, []);
@@ -160,6 +169,7 @@ test("failed or premature sign-out shows an error without claiming success", asy
       request = options;
     });
     const pending = state.instance._logout();
+    await new Promise(setImmediate);
     failure === "callback"
       ? request.callback({ exc: "failure" })
       : request.error({ status: 503 });
@@ -168,6 +178,26 @@ test("failed or premature sign-out shows an error without claiming success", asy
     assert.equal(state.button.disabled, false);
     assert.deepEqual(state.redirects, []);
   }
+});
+test("central revocation failure keeps logout retryable without a success redirect", async () => {
+  let nativeCalls = 0;
+  const state = switcher("askexe.com", () => nativeCalls++, async () => ({ ok: false, status: 503 }));
+  await state.instance._logout();
+  assert.equal(nativeCalls, 0);
+  assert.equal(state.button.disabled, false);
+  assert.match(state.status.textContent, /Could not sign out/);
+  assert.deepEqual(state.redirects, []);
+});
+test("native logout uses the same shared-session path as the header", () => {
+  let calls = 0;
+  const switcher = { _logout: () => calls++ };
+  const context = load("frappe/public/js/frappe/utils/logout.js", {
+    frappe: { call: () => assert.fail("must use central logout") },
+    document: { querySelector: () => switcher },
+  });
+  context.frappe.logout();
+  assert.equal(calls, 1);
+  assert.match(read("frappe/public/js/frappe/desk.js"), /if \(switcher\) return switcher\._logout\(\)/);
 });
 test("permission/configuration failures have no retry, transient failures retain it", () => {
   const { widget_error_state } = policy();

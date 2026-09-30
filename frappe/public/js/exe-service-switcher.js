@@ -165,8 +165,13 @@ class ExeServiceSwitcher extends HTMLElement {
     button.disabled = true;
     status.textContent = "Signing out…";
     try {
-      // Clear the local Frappe session first. Its existing on_logout hook
-      // revokes central SSO; the Auth landing then clears browser SSO cookies.
+      // Revoke the shared edge session and expire its HttpOnly cookies before
+      // local logout. The Auth landing alone does not revoke the edge session.
+      const response = await fetch(`https://api.${this._baseDomain}/v1/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok && response.status !== 401) throw new Error("central_logout_failed");
       await new Promise((resolve, reject) => {
         window.frappe.call({
           method: "logout",
