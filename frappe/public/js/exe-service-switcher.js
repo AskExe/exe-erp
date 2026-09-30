@@ -165,20 +165,24 @@ class ExeServiceSwitcher extends HTMLElement {
     button.disabled = true;
     status.textContent = "Signing out…";
     try {
-      // Revoke the shared edge session and expire its HttpOnly cookies before
-      // local logout. The Auth landing alone does not revoke the edge session.
+      // ERP's logout RPC is behind the shared auth gate. End its native
+      // session while that gate still admits the request, then revoke SSO.
+      // A retry after a central outage must not repeat the native logout RPC.
+      if (!this._nativeSignedOut) {
+        await new Promise((resolve, reject) => {
+          window.frappe.call({
+            method: "logout",
+            callback: (response) => response.exc ? reject(new Error("logout_failed")) : resolve(),
+            error: reject,
+          });
+        });
+        this._nativeSignedOut = true;
+      }
       const response = await fetch(`https://api.${this._baseDomain}/v1/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
       if (!response.ok && response.status !== 401) throw new Error("central_logout_failed");
-      await new Promise((resolve, reject) => {
-        window.frappe.call({
-          method: "logout",
-          callback: (response) => response.exc ? reject(new Error("logout_failed")) : resolve(),
-          error: reject,
-        });
-      });
       window.location.assign(`https://auth.${this._baseDomain}/logout`);
     } catch (_error) {
       this._signingOut = false;
