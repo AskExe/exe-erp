@@ -188,6 +188,9 @@ def apply(spec, sites_dir, reviewed_digest):
         # common_site_config or currentsite.txt is changed.
         os.environ["SITES_PATH"] = str(sites_dir)
         os.chdir(sites_dir)
+        # Match the native bench new-site command before invoking its installer.
+        frappe.destroy()
+        frappe.init(site=spec["site"], sites_path=str(sites_dir), new_site=True)
         _new_site(db_name=spec["database"], db_user=spec["database"], site=spec["site"],
                   db_type="postgres", db_host=db_host, db_port=int(os.environ.get("DB_PORT", "5432")),
                   db_root_username=root_user, db_root_password=root_password,
