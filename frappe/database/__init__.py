@@ -9,8 +9,11 @@ from shutil import which
 from frappe.database.database import savepoint
 
 
-def setup_database(force, verbose=None, mariadb_user_host_login_scope=None):
+def setup_database(force, verbose=None, mariadb_user_host_login_scope=None, *, require_new_database=False):
 	import frappe
+
+	if require_new_database and frappe.conf.db_type != "postgres":
+		frappe.throw("Creation-only database setup is supported only for PostgreSQL")
 
 	if frappe.conf.db_type == "mariadb":
 		import frappe.database.mariadb.setup_db
@@ -23,7 +26,7 @@ def setup_database(force, verbose=None, mariadb_user_host_login_scope=None):
 	else:
 		import frappe.database.postgres.setup_db
 
-		return frappe.database.postgres.setup_db.setup_database()
+		return frappe.database.postgres.setup_db.setup_database(require_new_database=require_new_database)
 
 
 def bootstrap_database(verbose=None, source_sql=None):

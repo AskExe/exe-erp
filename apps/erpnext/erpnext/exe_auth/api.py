@@ -93,6 +93,7 @@ def _role_config():
 	return (
 		frappe.conf.get("exe_erp_admin_role"),
 		frappe.conf.get("exe_erp_write_roles"),
+		_exe_perms.DEFAULT_READ_ROLE if frappe.conf.get("exe_erp_readonly_desk") else None,
 	)
 
 # --- Managed-disable marker + one-shot bootstrap flag (P1) -------------------
@@ -274,12 +275,13 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 	`_apply_managed_roles(email, fetched_app_metadata)` directly. Hook it here.
 	We deliberately do NOT build that fan-out in this module.
 	"""
-	admin_role, write_roles = _role_config()
+	admin_role, write_roles, read_role = _role_config()
 	decision, status = _exe_perms.compute_decision(
 		app_metadata,
 		_configured_org_id(),
 		admin_role=admin_role,
 		write_roles=write_roles,
+		read_role=read_role,
 	)
 	if decision is None:
 		# Unmanaged: absent claim, multi-org-without-config, or no claim for
