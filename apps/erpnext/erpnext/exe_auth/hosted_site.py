@@ -188,7 +188,9 @@ def apply(spec, sites_dir, reviewed_digest):
         # common_site_config or currentsite.txt is changed.
         os.environ["SITES_PATH"] = str(sites_dir)
         os.chdir(sites_dir)
-        # Match the native bench new-site command before invoking its installer.
+        # Match the native bench new-site command: init must explicitly allow
+        # a missing site_config before _new_site creates it. A normal init
+        # raises IncorrectSitePath for every genuinely fresh target.
         frappe.destroy()
         frappe.init(site=spec["site"], sites_path=str(sites_dir), new_site=True)
         _new_site(db_name=spec["database"], db_user=spec["database"], site=spec["site"],
@@ -208,6 +210,11 @@ def apply(spec, sites_dir, reviewed_digest):
         frappe.connect()
         frappe.set_user("Administrator")
         try:
+            # The shared entrypoint initializes only the primary site's key.
+            # Provision this site's native key before any worker/request can
+            # generate a competing one on first encrypted-field access.
+            from frappe.utils.password import get_encryption_key
+            get_encryption_key()
             install_viewer_permissions()
             update_site_config("exe_erp_readonly_desk", True, site_config_path=frappe.get_site_path("site_config.json"))
         finally:

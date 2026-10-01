@@ -13,14 +13,22 @@ automatic roles and removes their control-record/file/communication access.
 Explicit owner/admin roles are preserved. This closes the inherited ToDo,
 upload and Desk-customization write grants; whitelisted RPCs, actual Desk
 loading, native APIs and file access still require live acceptance.
+Frappe's separate self-share still allows a user to access their own native
+profile; this is not a grant to read another user's profile or change roles.
+Native self-profile role elevation is a required negative acceptance check.
 
 Run the command only from the released, digest-pinned ERP image in a serialized
-operator window. It uses existing container environment DB operator credentials
+operator window, after deploying the reviewed host-bound ERP nginx site header
+configuration. A second site must not exist behind a proxy which still accepts
+caller-controlled site selectors. It uses existing container environment DB operator credentials
 in memory and native Frappe installation APIs. It defaults to a read-only plan.
 The apply argument is the plan SHA-256, which is not a credential. Applying
 rechecks the protected site's config digest, rejects any existing target site,
 database or database login, and never uses force or automatic cleanup. Diagnose
 a failed partial install; do not retry by dropping a database or removing files.
+The new site's native encryption key is initialized in the serialized creation
+step, before admission, because the shared entrypoint initializes only its
+primary configured site.
 
 Example nonsecret specification (replace with the actual approved org/site):
 
