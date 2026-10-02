@@ -692,3 +692,40 @@ def sso_autoredirect_decision(session_user, cookies, query_args, gotrue_configur
         return False
 
     return True
+
+
+def public_demo_viewer_allowed(user_data, site_config):
+    """Admission to an explicit synthetic public site, never a company grant.
+
+    Input identity is the fresh successful GoTrue /user response. Managed
+    identities retain their authoritative org decision, including all denials.
+    Public visitors receive only a native Viewer in this separate site's DB.
+    """
+    if not isinstance(site_config, dict) or not isinstance(user_data, dict):
+        return False
+    if (site_config.get("exe_hosted_site_mode") != "synthetic_demo"
+            or site_config.get("exe_erp_public_demo") is not True
+            or site_config.get("exe_erp_readonly_desk") is not True
+            or not site_config.get("exe_org_id")):
+        return False
+    metadata = user_data.get("app_metadata")
+    if metadata is not None and (not isinstance(metadata, dict) or "exe_perms" in metadata):
+        return False
+    import uuid
+    try:
+        uuid.UUID(user_data.get("id", ""))
+    except (ValueError, TypeError, AttributeError):
+        return False
+    if not user_data.get("email") or not user_data.get("email_confirmed_at"):
+        return False
+    if user_data.get("deleted_at") or user_data.get("is_anonymous"):
+        return False
+    if user_data.get("banned_until"):
+        from datetime import datetime, timezone
+        try:
+            banned_until = datetime.fromisoformat(user_data["banned_until"].replace("Z", "+00:00"))
+            if banned_until.tzinfo is None or banned_until > datetime.now(timezone.utc):
+                return False
+        except (ValueError, TypeError, AttributeError):
+            return False
+    return True

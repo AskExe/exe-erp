@@ -121,5 +121,69 @@ class TestHostedRouteAdapter(unittest.TestCase):
 		AdapterDriver({}).call("reject_local_password_login")
 
 
+
+class TestPublicSyntheticAdmission(unittest.TestCase):
+	def setUp(self):
+		self.policy = load_path("public_demo_perms", EXE_PERMS_PY)
+		self.conf = {"exe_hosted_site_mode": "synthetic_demo", "exe_org_id": "demo",
+			"exe_erp_public_demo": True, "exe_erp_readonly_desk": True}
+		self.user = {"id": "10000000-0000-4000-8000-000000000001", "email": "visitor@example.com",
+			"email_confirmed_at": "2026-01-01T00:00:00Z", "app_metadata": {}}
+
+	def testOnlyFreshConfirmedUnmanagedUserAdmitted(self):
+		self.assertTrue(self.policy.public_demo_viewer_allowed(self.user, self.conf))
+		for key in ("id", "email", "email_confirmed_at"):
+			with self.subTest(key=key):
+				u = dict(self.user); u.pop(key)
+				self.assertFalse(self.policy.public_demo_viewer_allowed(u, self.conf))
+
+	def testPrivateSitesAndPartialPublicConfigRefused(self):
+		for key in self.conf:
+			with self.subTest(key=key):
+				c = dict(self.conf); c.pop(key)
+				self.assertFalse(self.policy.public_demo_viewer_allowed(self.user, c))
+		self.assertFalse(self.policy.public_demo_viewer_allowed(self.user, {}))
+
+	def testNeverOverridesManagedDeniedOrOtherOrgClaims(self):
+		for claim in (None, {}, {"orgs": {"other": {"caps": ["erp:admin"]}}},
+			{"orgs": {"demo": {"role": "none", "caps": []}}}):
+			with self.subTest(claim=claim):
+				u = {**self.user, "app_metadata": {"exe_perms": claim}}
+				self.assertFalse(self.policy.public_demo_viewer_allowed(u, self.conf))
+
+	def testBannedDeletedAnonymousMalformedRefused(self):
+		for patch in ({"banned_until": "2999-01-01T00:00:00Z"}, {"banned_until": "invalid"},
+			{"deleted_at": "2026-01-01"}, {"is_anonymous": True}, {"id": "invalid"},
+			{"app_metadata": "invalid"}):
+			with self.subTest(patch=patch):
+				self.assertFalse(self.policy.public_demo_viewer_allowed({**self.user, **patch}, self.conf))
+
+
+class TestPublicViewerRoleAdapter(unittest.TestCase):
+	def make(self, roles, enabled=1):
+		driver = AdapterDriver()
+		doc = types.SimpleNamespace(enabled=enabled, flags=types.SimpleNamespace(), user_type="Website User")
+		doc.get = lambda field: [types.SimpleNamespace(role=r) for r in roles]
+		doc.append = mock.Mock()
+		doc.save = mock.Mock()
+		driver.frappe.get_doc = lambda *args: doc
+		return driver, doc
+
+	def testNewVisitorGetsOnlyViewerAndNoBootstrapPromotion(self):
+		driver, doc = self.make([])
+		driver.call("_apply_public_demo_viewer", "visitor@example.com")
+		self.assertEqual(doc.user_type, "System User")
+		doc.append.assert_called_once_with("roles", {"role": "Exe ERP Viewer"})
+		doc.save.assert_called_once_with(ignore_permissions=True)
+
+	def testDisabledAndPrivilegedExistingUsersAreNeverRewritten(self):
+		for roles, enabled in (([], 0), (["System Manager"], 1), (["Accounts User"], 1)):
+			with self.subTest(roles=roles, enabled=enabled):
+				driver, doc = self.make(roles, enabled)
+				with self.assertRaises(AuthenticationError):
+					driver.call("_apply_public_demo_viewer", "visitor@example.com")
+				doc.save.assert_not_called()
+				doc.append.assert_not_called()
+
 if __name__ == "__main__":
 	unittest.main()
