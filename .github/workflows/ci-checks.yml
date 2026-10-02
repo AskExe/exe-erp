@@ -285,6 +285,9 @@ jobs:
       - name: Entrypoint admin-password regression (bug 593fe59f)
         run: bash scripts/entrypoint-admin-password.test.sh
 
+      - name: Multi-site startup logging regression
+        run: bash scripts/entrypoint-multisite-logs.test.sh
+
       - name: Asset volume refresh regression (bug f6552d32 / 3938ac3d)
         run: bash scripts/asset-volume-refresh.test.sh
 
