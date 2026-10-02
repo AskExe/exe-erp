@@ -13,7 +13,8 @@ _spec.loader.exec_module(subject)
 class TestHostedSitePlan(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.sites = Path(self.tmp.name)
+        self.sites = Path(self.tmp.name) / "sites"
+        self.sites.mkdir()
         self.base = self.sites / "erp.example.com"
         self.base.mkdir()
         self.config = {"db_name": "private_erp", "db_user": "private_erp", "exe_org_id": "private", "db_password": "fixture-only-not-a-secret"}
@@ -22,6 +23,29 @@ class TestHostedSitePlan(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def testNewSiteLoggerWorksFromWebAndBenchWorkingDirectories(self):
+        from logging.handlers import RotatingFileHandler
+
+        site = self.sites / self.spec["site"]
+        site.mkdir()
+        (site / "site_config.json").write_text("{}")
+        before = (self.base / "site_config.json").read_bytes()
+        subject.prepare_site_log_directories(self.sites, self.spec["site"])
+        for root in (self.sites, self.sites.parent):
+            handler = RotatingFileHandler(root / self.spec["site"] / "logs" / "frappe.log")
+            handler.close()
+        subject.prepare_site_log_directories(self.sites, self.spec["site"])
+        self.assertEqual((self.base / "site_config.json").read_bytes(), before)
+        self.assertFalse((self.sites.parent / self.spec["base_site"]).exists())
+
+    def testMissingOrSymlinkSiteNeverCreatesRuntimeDirectories(self):
+        with self.assertRaises(ValueError):
+            subject.prepare_site_log_directories(self.sites, self.spec["site"])
+        (self.sites / self.spec["site"]).symlink_to(self.base, target_is_directory=True)
+        with self.assertRaises(ValueError):
+            subject.prepare_site_log_directories(self.sites, self.spec["site"])
+        self.assertFalse((self.sites.parent / self.spec["site"]).exists())
 
     def testDryPlanPreservesExistingSiteAndDoesNotEmitCredentials(self):
         before = (self.base / "site_config.json").read_bytes()

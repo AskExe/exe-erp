@@ -700,6 +700,19 @@ PY
 }
 
 # ── Main ─────────────────────────────────────────────────────
+# Gunicorn runs from the bench root while native bench commands run from
+# sites/. Prepare both logger roots for every actual site, including sites
+# added after the primary one. Ignore assets and other non-site directories.
+ensure_site_log_directories() {
+    local site_dir site_name
+    for site_dir in "${SITES_DIR}"/*/; do
+        [ -f "${site_dir}/site_config.json" ] || continue
+        [ ! -L "${site_dir%/}" ] || continue
+        site_name="$(basename "${site_dir%/}")"
+        mkdir -p "${site_dir}/logs" "${FRAPPE_BENCH}/${site_name}/logs"
+    done
+}
+
 main() {
     wait_for_db
 
@@ -847,11 +860,7 @@ except Exception as e:
     # 2. sites/<site>/logs (SITES_PATH-based)
     # 3. <bench>/<site>/logs (CWD-based — Frappe logging uses this)
     mkdir -p /home/frappe/logs
-    for site_dir in "${SITES_DIR}"/*/; do
-        [ -d "${site_dir}" ] && mkdir -p "${site_dir}/logs"
-    done
-    # Frappe's logging resolves log path relative to CWD, not SITES_PATH
-    [ -d "${SITES_DIR}/${SITE_NAME}" ] && mkdir -p "${FRAPPE_BENCH}/${SITE_NAME}/logs"
+    ensure_site_log_directories
 
     # Set SITES_PATH so Frappe finds sites at the absolute path.
     export SITES_PATH="${SITES_DIR}"

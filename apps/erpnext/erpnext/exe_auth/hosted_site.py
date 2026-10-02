@@ -157,6 +157,16 @@ def install_viewer_permissions():
     frappe.clear_cache()
 
 
+def prepare_site_log_directories(sites_dir, site):
+    """A site created on a running bench needs the web logger root immediately."""
+    sites_dir = Path(sites_dir).resolve()
+    site_dir = sites_dir / site
+    if site_dir.is_symlink() or not (site_dir / "site_config.json").is_file():
+        raise ValueError("Runtime directories require an installed, real site")
+    (site_dir / "logs").mkdir(exist_ok=True)
+    (sites_dir.parent / site / "logs").mkdir(parents=True, exist_ok=True)
+
+
 def apply(spec, sites_dir, reviewed_digest):
     # Same native lock on this operator command prevents concurrent creation.
     # The native installer retains its independent bench_new_site lock as well.
@@ -198,6 +208,7 @@ def apply(spec, sites_dir, reviewed_digest):
                   db_root_username=root_user, db_root_password=root_password,
                   db_password=secrets.token_hex(32), admin_password=secrets.token_urlsafe(48),
                   install_apps=["erpnext"], force=False, setup_db=True, require_new_database=True)
+        prepare_site_log_directories(sites_dir, spec["site"])
         config = {"exe_org_id": spec["org_id"], "exe_hosted_site_mode": "synthetic_demo",
                             "gotrue_url": os.environ.get("GOTRUE_URL", "http://gotrue:9999"),
                             "gotrue_external_url": spec["auth_url"].rstrip("/"),
