@@ -93,6 +93,7 @@ def _role_config():
 	return (
 		frappe.conf.get("exe_erp_admin_role"),
 		frappe.conf.get("exe_erp_write_roles"),
+		_exe_perms.DEFAULT_READ_ROLE if frappe.conf.get("exe_erp_readonly_desk") else None,
 	)
 
 # --- Managed-disable marker + one-shot bootstrap flag (P1) -------------------
@@ -274,12 +275,13 @@ def _apply_managed_roles(email: str, app_metadata: dict) -> bool:
 	`_apply_managed_roles(email, fetched_app_metadata)` directly. Hook it here.
 	We deliberately do NOT build that fan-out in this module.
 	"""
-	admin_role, write_roles = _role_config()
+	admin_role, write_roles, read_role = _role_config()
 	decision, status = _exe_perms.compute_decision(
 		app_metadata,
 		_configured_org_id(),
 		admin_role=admin_role,
 		write_roles=write_roles,
+		read_role=read_role,
 	)
 	if decision is None:
 		# Unmanaged: absent claim, multi-org-without-config, or no claim for
@@ -695,13 +697,15 @@ def gotrue_login_callback():
 
 	# P3: /user already returns app_metadata — read the exe_perms claim from it.
 	app_metadata = user_data.get("app_metadata")
+	public_demo = _exe_perms.public_demo_viewer_allowed(user_data, frappe.conf)
 	managed = _exe_perms.compute_decision(app_metadata, _configured_org_id(), *_role_config())[0] is not None
 
 	# Auto-provision Frappe User if needed (same logic as gotrue_login)
 	if not frappe.db.exists("User", email):
 		# SECURITY (bug 7b4bbe12): fail closed — require a tenant/domain allowlist
 		# (or an explicit allow-all opt-in) before auto-provisioning any user.
-		_assert_provisioning_allowed(email, app_metadata)
+		if not public_demo:
+			_assert_provisioning_allowed(email, app_metadata)
 		first_name = email.split("@")[0]
 		default_user_type = frappe.conf.get("default_gotrue_user_type", "Website User")
 		user_doc = frappe.get_doc(
@@ -718,13 +722,16 @@ def gotrue_login_callback():
 		user_doc.insert()
 
 		# Bootstrap heuristic runs ONLY for UNMANAGED users (no exe_perms claim).
-		if not managed:
+		if not managed and not public_demo:
 			# Atomic, single-use first-admin promotion (race-safe).
 			_try_bootstrap_first_admin(user_doc, email)
 
 	# P3: reconcile Frappe roles from the exe_perms claim (managed users only).
 	# Fails closed (throws) on managed-deny, so login below never runs.
-	_apply_managed_roles(email, app_metadata)
+	if public_demo:
+		_apply_public_demo_viewer(email)
+	else:
+		_apply_managed_roles(email, app_metadata)
 
 	# Login and redirect to desk. Location MUST be absolute-path (bug
 	# 2e8744b0): get_home_page() returns the page NAME ("desk") for this
@@ -764,6 +771,20 @@ def admin_token(token: str | None = None):
 		"home_page": get_home_page() or "/desk",
 		"isAdminToken": True,
 	}
+
+
+def _apply_public_demo_viewer(email):
+	"""Bind only the finite native role in the explicitly synthetic site's DB."""
+	user = frappe.get_doc("User", email)
+	current = {row.role for row in user.get("roles")}
+	allowed = {_exe_perms.DEFAULT_READ_ROLE, "All", "Guest", "Desk User"}
+	if not user.enabled or current - allowed:
+		frappe.throw("Public demo access cannot replace an existing account's permissions.", frappe.AuthenticationError)
+	user.flags.ignore_permissions = True
+	user.user_type = "System User"
+	if _exe_perms.DEFAULT_READ_ROLE not in current:
+		user.append("roles", {"role": _exe_perms.DEFAULT_READ_ROLE})
+	user.save(ignore_permissions=True)
 
 
 def revoke_central_gotrue_session(login_manager=None, **kwargs):

@@ -53,6 +53,7 @@ CAP_ORG_ADMIN = "org:admin"
 # Manager" is Frappe core; the write bundle are standard ERPNext desk roles.
 # All are overridable via site_config for white-label / tenant-specific setups.
 DEFAULT_ADMIN_ROLE = "System Manager"
+DEFAULT_READ_ROLE = "Exe ERP Viewer"
 DEFAULT_WRITE_ROLES = ("Sales User", "Purchase User", "Stock User", "Accounts User")
 
 SYSTEM_USER_TYPE = "System User"
@@ -165,7 +166,7 @@ def role_config(admin_role=None, write_roles=None):
     return admin, write
 
 
-def managed_roles(admin_role=None, write_roles=None):
+def managed_roles(admin_role=None, write_roles=None, read_role=None):
     """The FIXED allowlist of Frappe roles this system OWNS.
 
     Role REMOVAL during reconcile is scoped to exactly this set (design R5): we
@@ -173,7 +174,7 @@ def managed_roles(admin_role=None, write_roles=None):
     assigned by hand outside the caps model.
     """
     admin, write = role_config(admin_role, write_roles)
-    return set(write) | {admin}
+    return set(write) | {admin} | ({read_role} if read_role else set())
 
 
 def _norm_caps(caps):
@@ -203,7 +204,7 @@ def erp_level(caps):
     return LEVEL_NONE
 
 
-def map_erp_roles(caps, admin_role=None, write_roles=None):
+def map_erp_roles(caps, admin_role=None, write_roles=None, read_role=None):
     """Pure cap -> Frappe-role decision.
 
     Returns a dict:
@@ -215,6 +216,10 @@ def map_erp_roles(caps, admin_role=None, write_roles=None):
         "managed":   set[str],   # allowlist this system owns (removal scope)
       }
 
+    An explicitly configured read_role gives read-only desk access. The role
+    must be installed with read-only native permissions by the operator; no
+    permission rows are created at login. Without it, read stays portal-only.
+
     Monotonic role SETS (admin superset of write superset of read):
       read  -> {}                     (portal only)   user_type Website User
       write -> write_roles            desk            user_type System User
@@ -223,13 +228,16 @@ def map_erp_roles(caps, admin_role=None, write_roles=None):
     """
     admin, write = role_config(admin_role, write_roles)
     write_set = set(write)
-    managed = write_set | {admin}
+    read_set = {read_role} if read_role else set()
+    if read_set & (write_set | {admin}):
+        raise ValueError("Read-only desk role must be distinct from write/admin roles")
+    managed = write_set | {admin} | read_set
     level = erp_level(caps)
 
     if level == LEVEL_ADMIN:
         return {
             "level": level,
-            "roles": write_set | {admin},
+            "roles": write_set | {admin} | read_set,
             "user_type": SYSTEM_USER_TYPE,
             "deny": False,
             "managed": managed,
@@ -237,7 +245,7 @@ def map_erp_roles(caps, admin_role=None, write_roles=None):
     if level == LEVEL_WRITE:
         return {
             "level": level,
-            "roles": set(write_set),
+            "roles": write_set | read_set,
             "user_type": SYSTEM_USER_TYPE,
             "deny": False,
             "managed": managed,
@@ -245,8 +253,8 @@ def map_erp_roles(caps, admin_role=None, write_roles=None):
     if level == LEVEL_READ:
         return {
             "level": level,
-            "roles": set(),
-            "user_type": WEBSITE_USER_TYPE,
+            "roles": read_set,
+            "user_type": SYSTEM_USER_TYPE if read_role else WEBSITE_USER_TYPE,
             "deny": False,
             "managed": managed,
         }
@@ -330,7 +338,7 @@ def subject_binding_ok(gotrue_email, submitted_email):
     return bool(g) and g == s
 
 
-def deny_decision(admin_role=None, write_roles=None):
+def deny_decision(admin_role=None, write_roles=None, read_role=None):
     """A fail-closed decision: no roles, deny login, disable the Frappe user.
 
     Used when a claim EXISTS but cannot be safely bound to this tenant (org
@@ -344,7 +352,7 @@ def deny_decision(admin_role=None, write_roles=None):
         "roles": set(),
         "user_type": WEBSITE_USER_TYPE,
         "deny": True,
-        "managed": set(write) | {admin},
+        "managed": set(write) | {admin} | ({read_role} if read_role else set()),
         "org_id": None,
         "role_preset": None,
     }
@@ -428,7 +436,7 @@ def select_org_claim(app_metadata, org_id):
     return None
 
 
-def compute_decision(app_metadata, configured_org_id, admin_role=None, write_roles=None):
+def compute_decision(app_metadata, configured_org_id, admin_role=None, write_roles=None, read_role=None):
     """Top-level: from raw app_metadata to a role decision.
 
     Returns (decision_or_None, status).
@@ -454,14 +462,14 @@ def compute_decision(app_metadata, configured_org_id, admin_role=None, write_rol
         return None, status
     if status != ORG_RESOLVED:
         # Claim present but org unconfigured/unresolvable -> fail closed.
-        return deny_decision(admin_role, write_roles), status
+        return deny_decision(admin_role, write_roles, read_role), status
 
     claim = select_org_claim(app_metadata, org_id)
     if claim is None:
         # Org configured but this user has NO claim for it -> fail closed.
         # (Removing a user's org claim must be a DOWNGRADE, not a bypass to
         # stale legacy roles.)
-        d = deny_decision(admin_role, write_roles)
+        d = deny_decision(admin_role, write_roles, read_role)
         d["org_id"] = org_id
         return d, ORG_DENY_NO_CLAIM
 
@@ -471,7 +479,7 @@ def compute_decision(app_metadata, configured_org_id, admin_role=None, write_rol
     if isinstance(role, str) and role.strip().lower() == "none":
         caps = []
 
-    decision = map_erp_roles(caps, admin_role=admin_role, write_roles=write_roles)
+    decision = map_erp_roles(caps, admin_role=admin_role, write_roles=write_roles, read_role=read_role)
     decision["org_id"] = org_id
     decision["role_preset"] = role
     return decision, ORG_RESOLVED
@@ -683,4 +691,41 @@ def sso_autoredirect_decision(session_user, cookies, query_args, gotrue_configur
     if in_flight and str(in_flight).strip():
         return False
 
+    return True
+
+
+def public_demo_viewer_allowed(user_data, site_config):
+    """Admission to an explicit synthetic public site, never a company grant.
+
+    Input identity is the fresh successful GoTrue /user response. Managed
+    identities retain their authoritative org decision, including all denials.
+    Public visitors receive only a native Viewer in this separate site's DB.
+    """
+    if not isinstance(site_config, dict) or not isinstance(user_data, dict):
+        return False
+    if (site_config.get("exe_hosted_site_mode") != "synthetic_demo"
+            or site_config.get("exe_erp_public_demo") is not True
+            or site_config.get("exe_erp_readonly_desk") is not True
+            or not site_config.get("exe_org_id")):
+        return False
+    metadata = user_data.get("app_metadata")
+    if metadata is not None and (not isinstance(metadata, dict) or "exe_perms" in metadata):
+        return False
+    import uuid
+    try:
+        uuid.UUID(user_data.get("id", ""))
+    except (ValueError, TypeError, AttributeError):
+        return False
+    if not user_data.get("email") or not user_data.get("email_confirmed_at"):
+        return False
+    if user_data.get("deleted_at") or user_data.get("is_anonymous"):
+        return False
+    if user_data.get("banned_until"):
+        from datetime import datetime, timezone
+        try:
+            banned_until = datetime.fromisoformat(user_data["banned_until"].replace("Z", "+00:00"))
+            if banned_until.tzinfo is None or banned_until > datetime.now(timezone.utc):
+                return False
+        except (ValueError, TypeError, AttributeError):
+            return False
     return True

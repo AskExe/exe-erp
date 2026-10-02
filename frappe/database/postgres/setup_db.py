@@ -6,17 +6,33 @@ from frappe.database.db_manager import DbManager
 from frappe.utils import cint
 
 
-def setup_database():
+def setup_database(*, require_new_database=False):
 	root_conn = get_root_connection()
 	root_conn.commit()
 	root_conn.sql("end")
-	root_conn.sql(f'DROP DATABASE IF EXISTS "{frappe.conf.db_name}"')
-
-	# If user exists, just update password
-	if root_conn.sql(f"SELECT 1 FROM pg_roles WHERE rolname='{frappe.conf.db_user}'"):
-		root_conn.sql(f"ALTER USER \"{frappe.conf.db_user}\" WITH PASSWORD '{frappe.conf.db_password}'")
+	if require_new_database:
+		# The hosted operator must never replace an existing database or rotate
+		# an existing login, even if another creator races its dry-run check.
+		# CREATE (without IF NOT EXISTS/ALTER/DROP) also refuses collisions that
+		# appear after this read. Legacy install/repair keeps its old behavior.
+		existing = root_conn.sql(
+			"SELECT 1 FROM pg_database WHERE datname = %s UNION ALL "
+			"SELECT 1 FROM pg_roles WHERE rolname = %s",
+			(frappe.conf.db_name, frappe.conf.db_user),
+		)
+		if existing:
+			frappe.throw("Database or login exists; fresh-site replacement is forbidden")
+		root_conn.sql(
+			f'CREATE USER "{frappe.conf.db_user}" WITH PASSWORD %s',
+			(frappe.conf.db_password,),
+		)
 	else:
-		root_conn.sql(f"CREATE USER \"{frappe.conf.db_user}\" WITH PASSWORD '{frappe.conf.db_password}'")
+		root_conn.sql(f'DROP DATABASE IF EXISTS "{frappe.conf.db_name}"')
+		# Existing sites historically share an operator role; retain that path.
+		if root_conn.sql(f"SELECT 1 FROM pg_roles WHERE rolname='{frappe.conf.db_user}'"):
+			root_conn.sql(f"ALTER USER \"{frappe.conf.db_user}\" WITH PASSWORD '{frappe.conf.db_password}'")
+		else:
+			root_conn.sql(f"CREATE USER \"{frappe.conf.db_user}\" WITH PASSWORD '{frappe.conf.db_password}'")
 	root_conn.sql(f'CREATE DATABASE "{frappe.conf.db_name}"')
 	root_conn.sql(f'GRANT ALL PRIVILEGES ON DATABASE "{frappe.conf.db_name}" TO "{frappe.conf.db_user}"')
 	if psql_version := root_conn.sql("SHOW server_version_num", as_dict=True):

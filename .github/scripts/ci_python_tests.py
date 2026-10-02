@@ -63,6 +63,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 EXPECTED_MODULES = (
 	"apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py",
 	"apps/erpnext/erpnext/exe_auth/test_exe_perms.py",
+	"apps/erpnext/erpnext/exe_auth/test_hosted_site.py",
 	"apps/erpnext/erpnext/exe_auth/test_login_page_contract.py",
 	# Bug adf77179 / 83ba9546 — SSO callback token source. This module existed
 	# but had never been listed here, so it had never run in CI: exactly the

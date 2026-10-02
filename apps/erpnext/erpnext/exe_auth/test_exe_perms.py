@@ -97,6 +97,50 @@ class TestMapErpRoles(unittest.TestCase):
 		self.assertEqual(d["managed"], {"Exe Writer", "Exe Admin"})
 
 
+class TestReadOnlyDesk(unittest.TestCase):
+	def testReadRoleIsOptIn(self):
+		legacy = ep.map_erp_roles(["erp:read"])
+		self.assertEqual(legacy["user_type"], ep.WEBSITE_USER_TYPE)
+		self.assertEqual(legacy["roles"], set())
+		readonly = ep.map_erp_roles(["erp:read"], read_role=ep.DEFAULT_READ_ROLE)
+		self.assertEqual(readonly["user_type"], ep.SYSTEM_USER_TYPE)
+		self.assertEqual(readonly["roles"], {ep.DEFAULT_READ_ROLE})
+		self.assertFalse(readonly["deny"])
+		self.assertNotIn(ep.DEFAULT_ADMIN_ROLE, readonly["roles"])
+
+	def testRoleSetsRemainMonotonic(self):
+		read = ep.map_erp_roles(["erp:read"], read_role=ep.DEFAULT_READ_ROLE)
+		write = ep.map_erp_roles(["erp:write"], read_role=ep.DEFAULT_READ_ROLE)
+		admin = ep.map_erp_roles(["erp:admin"], read_role=ep.DEFAULT_READ_ROLE)
+		self.assertTrue(read["roles"] <= write["roles"] <= admin["roles"])
+		for decision in (read, write, admin):
+			self.assertTrue(decision["roles"] <= decision["managed"])
+
+	def testWrongOrgAndRevocationRemoveReadRole(self):
+		for meta in (
+			{"exe_perms": {"orgs": {"private": {"caps": ["erp:admin"]}}}},
+			{"exe_perms": {"orgs": {"demo": {"role": "none", "caps": ["erp:read"]}}}},
+			{"exe_perms": {"orgs": {"demo": {"caps": []}}}},
+		):
+			decision, _ = ep.compute_decision(meta, "demo", read_role=ep.DEFAULT_READ_ROLE)
+			self.assertTrue(decision["deny"])
+			self.assertEqual(decision["roles"], set())
+			self.assertIn(ep.DEFAULT_READ_ROLE, decision["managed"])
+
+	def testPositiveTenantBoundReadGrant(self):
+		meta = {"exe_perms": {"orgs": {"demo": {"role": "viewer", "caps": ["erp:read"]}}}}
+		decision, status = ep.compute_decision(meta, "demo", read_role=ep.DEFAULT_READ_ROLE)
+		self.assertEqual(status, ep.ORG_RESOLVED)
+		self.assertEqual(decision["roles"], {ep.DEFAULT_READ_ROLE})
+		self.assertTrue(ep.managed_decision_allows_provisioning(meta, "demo"))
+		self.assertFalse(ep.managed_decision_allows_provisioning(meta, "private"))
+
+	def testReadRoleCannotAliasElevatedRole(self):
+		for role in (ep.DEFAULT_ADMIN_ROLE, *ep.DEFAULT_WRITE_ROLES):
+			with self.assertRaises(ValueError):
+				ep.map_erp_roles(["erp:read"], read_role=role)
+
+
 class TestManagedRoles(unittest.TestCase):
 	def testDefaultManagedAllowlist(self):
 		m = ep.managed_roles()
