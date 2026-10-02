@@ -134,13 +134,15 @@ class TestPublicSyntheticAdmission(unittest.TestCase):
 		self.assertTrue(self.policy.public_demo_viewer_allowed(self.user, self.conf))
 		for key in ("id", "email", "email_confirmed_at"):
 			with self.subTest(key=key):
-				u = dict(self.user); u.pop(key)
+				u = dict(self.user)
+				u.pop(key)
 				self.assertFalse(self.policy.public_demo_viewer_allowed(u, self.conf))
 
 	def testPrivateSitesAndPartialPublicConfigRefused(self):
 		for key in self.conf:
 			with self.subTest(key=key):
-				c = dict(self.conf); c.pop(key)
+				c = dict(self.conf)
+				c.pop(key)
 				self.assertFalse(self.policy.public_demo_viewer_allowed(self.user, c))
 		self.assertFalse(self.policy.public_demo_viewer_allowed(self.user, {}))
 
@@ -184,6 +186,50 @@ class TestPublicViewerRoleAdapter(unittest.TestCase):
 					driver.call("_apply_public_demo_viewer", "visitor@example.com")
 				doc.save.assert_not_called()
 				doc.append.assert_not_called()
+
+
+class TestPublicCallbackAdapter(unittest.TestCase):
+	def make(self, user):
+		driver = AdapterDriver({"gotrue_url": "http://gotrue", "exe_org_id": "demo",
+			"exe_hosted_site_mode": "synthetic_demo", "exe_erp_public_demo": True,
+			"exe_erp_readonly_desk": True})
+		f = driver.frappe
+		f.form_dict = {"state": "initiating-state"}
+		f.request = types.SimpleNamespace(cookies={"exe_sso_state": "initiating-state", "exe_sess": "test-central-token"})
+		f.local.cookie_manager = types.SimpleNamespace(delete_cookie=mock.Mock())
+		f.local.response = {}
+		f.local.login_manager = types.SimpleNamespace(login_as=mock.Mock())
+		f.log_error = mock.Mock()
+		f.db = types.SimpleNamespace(exists=lambda *args: False)
+		doc = types.SimpleNamespace(flags=types.SimpleNamespace(), insert=mock.Mock())
+		f.get_doc = mock.Mock(return_value=doc)
+		api = driver.load_api()
+		api.requests = types.SimpleNamespace(get=mock.Mock(return_value=types.SimpleNamespace(
+			status_code=200, json=lambda: user)), RequestException=RuntimeError)
+		api._try_bootstrap_first_admin = mock.Mock()
+		api._apply_public_demo_viewer = mock.Mock()
+		api._apply_managed_roles = mock.Mock()
+		return driver, api, doc
+
+	def testFreshConfirmedPublicCallbackCreatesViewerWithoutAdminBootstrap(self):
+		driver, api, doc = self.make({"id": "10000000-0000-4000-8000-000000000001",
+			"email": "visitor@example.com", "email_confirmed_at": "2026-01-01T00:00:00Z", "app_metadata": {}})
+		api.gotrue_login_callback()
+		doc.insert.assert_called_once()
+		api._apply_public_demo_viewer.assert_called_once_with("visitor@example.com")
+		api._try_bootstrap_first_admin.assert_not_called()
+		api._apply_managed_roles.assert_not_called()
+		driver.frappe.local.login_manager.login_as.assert_called_once_with("visitor@example.com")
+		self.assertEqual(driver.frappe.local.response["location"], "/desk")
+
+	def testUnverifiedPublicCallbackCannotProvisionOrMintNativeSession(self):
+		driver, api, doc = self.make({"id": "10000000-0000-4000-8000-000000000001",
+			"email": "visitor@example.com", "app_metadata": {}})
+		with self.assertRaises(AuthenticationError):
+			api.gotrue_login_callback()
+		doc.insert.assert_not_called()
+		api._apply_public_demo_viewer.assert_not_called()
+		driver.frappe.local.login_manager.login_as.assert_not_called()
 
 if __name__ == "__main__":
 	unittest.main()

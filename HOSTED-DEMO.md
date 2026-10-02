@@ -64,8 +64,13 @@ until all of the following are complete:
    configuration and the signed SSO edge vhost. Central login/recovery stay at
    the existing auth host. Bind this site's `exe_org_id` to the actual DEMO org;
    a private-company grant is insufficient to enter it.
-3. Admit DEMO viewers through supported membership/grant controls. A verified
-   GoTrue subject must carry a positive `erp:read` grant for THIS org. Owners
+3. Managed DEMO viewers require a positive `erp:read` grant for THIS org.
+   An operator may enable `exe_erp_public_demo=true` only on this explicit
+   synthetic, read-only site to admit confirmed, non-anonymous GoTrue visitors
+   with no `exe_perms` claim. A present managed denial or other-org claim never
+   falls back to public admission. Public visitors receive only Exe ERP Viewer,
+   cannot bootstrap an administrator, and cannot replace an existing privileged
+   or disabled account. No GoTrue metadata or domain allowlist is changed. Owners
    retain their authoritative admin grants. The public role can read only the
    listed business doctypes; it receives no write/create/delete/submit/cancel,
    export/share/email or control-plane permissions. Never grant private-company
