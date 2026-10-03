@@ -79,8 +79,10 @@ def get_meta(doctype: "str | DocType", cached: bool = True) -> "_Meta":
 	Returns:
 	    Meta object for the given doctype.
 	"""
+	company = bool(frappe.flags.get("company_session"))
 	if (
 		cached
+		and not company
 		and isinstance(doctype, str)
 		and (meta := frappe.client_cache.get_value(f"doctype_meta::{doctype}"))
 	):
@@ -89,7 +91,8 @@ def get_meta(doctype: "str | DocType", cached: bool = True) -> "_Meta":
 	meta = Meta(doctype)
 
 	key = f"doctype_meta::{meta.name}"
-	frappe.client_cache.set_value(key, meta)
+	if not company:
+		frappe.client_cache.set_value(key, meta)
 	return meta
 
 
@@ -202,7 +205,7 @@ class Meta(Document):
 		if frappe.session.user == "Administrator":
 			return []
 		cache_key = f"masked_fields::{self.name}::{frappe.session.user}"
-		masked_fields = frappe.cache.get_value(cache_key)
+		masked_fields = None if frappe.flags.get("company_session") else frappe.cache.get_value(cache_key)
 
 		if masked_fields is None:
 			masked_fields = []
@@ -214,7 +217,8 @@ class Meta(Document):
 					df_copy = copy.deepcopy(df)
 					df_copy.mask_readonly = 1
 					masked_fields.append(df_copy)
-			frappe.cache.set_value(cache_key, masked_fields)
+			if not frappe.flags.get("company_session"):
+				frappe.cache.set_value(cache_key, masked_fields)
 
 		return masked_fields
 

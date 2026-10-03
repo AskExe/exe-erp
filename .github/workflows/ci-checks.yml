@@ -282,6 +282,13 @@ jobs:
             apps/erpnext/erpnext/exe_setup
 
 
+      - name: Default-off company read transport controlled regressions
+        # Source/transport tests only; native A/B PostgreSQL ACL proof remains
+        # a separate admission gate. No Docker or third-party calls here.
+        run: |
+          python3 scripts/company-session-read.test.py
+          python -m ruff check frappe/company_session.py scripts/company-session-read.test.py
+
       - name: Entrypoint admin-password regression (bug 593fe59f)
         run: bash scripts/entrypoint-admin-password.test.sh
 
