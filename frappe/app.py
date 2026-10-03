@@ -15,6 +15,7 @@ from werkzeug.wsgi import ClosingIterator
 
 import frappe
 import frappe.api
+import frappe.company_session
 import frappe.handler
 import frappe.monitor
 import frappe.rate_limiter
@@ -31,6 +32,7 @@ from frappe.utils.error import log_error, log_error_snapshot
 from frappe.website.page_renderers.error_page import ErrorPage
 from frappe.website.serve import get_response
 
+_company_config = frappe.company_session.load_config()
 _site = None
 _sites_path = os.environ.get("SITES_PATH", ".")
 
@@ -99,6 +101,8 @@ def after_response_wrapper(app):
 @after_response_wrapper
 @Request.application
 def application(request: Request):
+	if _company_config is not None:
+		return frappe.company_session.application(request, _company_config, _sites_path)
 	response = None
 
 	try:
@@ -512,6 +516,8 @@ def serve(
 	sites_path=".",
 	proxy=False,
 ):
+	if _company_config is not None:
+		raise RuntimeError("Company mode only admits the fixed gunicorn read entrypoint")
 	global application, _site, _sites_path
 	_site = site
 	_sites_path = sites_path
@@ -550,6 +556,8 @@ def serve(
 
 
 def application_with_statics():
+	if _company_config is not None:
+		raise RuntimeError("Company native statics are not admitted")
 	global application, _sites_path
 
 	application = SharedDataMiddleware(application, {"/assets": str(os.path.join(_sites_path, "assets"))})
