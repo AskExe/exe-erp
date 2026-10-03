@@ -6,8 +6,8 @@ credential lives here; no parent identity, issuer, signing or commerce secret.
 
 import base64
 import hashlib
-import http.client
 import hmac
+import http.client
 import ipaddress
 import json
 import os

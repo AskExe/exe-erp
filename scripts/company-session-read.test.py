@@ -1,11 +1,10 @@
 """Controlled source tests only, not native PostgreSQL/Frappe ACL admission."""
-import ipaddress
-
 import ast
 import base64
 import dataclasses
 import hashlib
 import importlib.util
+import ipaddress
 import json
 import os
 import pathlib
