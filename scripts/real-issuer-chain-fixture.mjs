@@ -42,7 +42,7 @@ function guard(){
  const disk=statfsSync(output);if(disk.bavail*disk.bsize<20*1024**3)throw Error('Fixture disk free floor20GiB')
  let bytes=1024**2+sourceBytes // Full retained output and complete readonly Source.
  for(const id of ids){
-  const inspected=JSON.parse(run(['inspect','--size',id]).text)[0]
+  const inspected=JSON.parse(run(['inspect','--size','--format','{"SizeRw":{{json .SizeRw}},"Mounts":{{json .Mounts}},"Config":{"User":{{json .Config.User}},"Env":{{json .Config.Env}}},"State":{"Running":{{json .State.Running}}}}',id]).text)
   bytes+=inspected.SizeRw??0
   for(const mount of inspected.Mounts??[])if(mount.Type==='volume'){
    if(!/^[0-9a-f]{64}$/.test(mount.Name))throw Error('Unexpected nonanonymous fixture volume')
