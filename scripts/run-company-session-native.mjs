@@ -9,6 +9,7 @@ import {join,resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
 if(process.env.ERP_NATIVE_EXECUTE!=='true')throw Error('Local fixture execution remains explicitly held')
+const httpMode=process.env.ERP_NATIVE_HTTP==='true'
 const source=resolve(fileURLToPath(new URL('..',import.meta.url)))
 const output=mkdtempSync(join(tmpdir(),'erp-native-acl-'))
 const suffix=randomBytes(16).toString('hex'),prefix='erp-native-acl-'+suffix,network=prefix+'-net'
@@ -62,6 +63,7 @@ async function ready(id,args){
  throw Error('Owned prerequisite not ready')
 }
 const sourcePaths=['frappe/app.py','frappe/company_session.py','frappe/core/doctype/system_settings/system_settings.py','frappe/core/doctype/user_permission/user_permission.py','frappe/model/document.py','frappe/model/meta.py','frappe/permissions.py','frappe/utils/background_jobs.py','frappe/utils/scheduler.py','frappe/utils/task_queue.py','apps/erpnext/erpnext/exe_auth/hosted_site.py','apps/erpnext/erpnext/exe_auth/test_hosted_site.py','scripts/company-session-native.integration.py','scripts/company-session-native-setup.py']
+if(httpMode)sourcePaths.push('scripts/company-session-wsgi.integration.py')
 const sourcePins=Object.fromEntries(sourcePaths.map(p=>[p,createHash('sha256').update(readFileSync(join(source,p))).digest('hex')]))
 try{
  guard();for(const image of [pgImage,redisImage,erpImage])run(['image','inspect',image])
@@ -81,8 +83,11 @@ try{
   erp,'/home/frappe/frappe-bench/env/bin/python','-B','/home/frappe/frappe-bench/apps/frappe/scripts/company-session-native-setup.py'],remaining)
  guard()
  phaseEnd=Date.now()+120000
- run(['exec','--workdir','/home/frappe/frappe-bench/sites',erp,'/home/frappe/frappe-bench/env/bin/python','-B','/home/frappe/frappe-bench/apps/frappe/scripts/company-session-native.integration.py',
-  '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix],120000)
+ for(const plane of httpMode?['a','b']:[null]){
+  run(['exec','--workdir','/home/frappe/frappe-bench/sites',erp,'/home/frappe/frappe-bench/env/bin/python','-B',
+   '/home/frappe/frappe-bench/apps/frappe/scripts/'+(httpMode?'company-session-wsgi.integration.py':'company-session-native.integration.py'),
+   '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,...(plane?['--plane',plane]:[])],120000)
+ }
  guard()
 }catch(error){primary={class:error.constructor.name,message:error.message};process.exitCode=1}
 finally{
@@ -95,6 +100,6 @@ finally{
  const postPins=Object.fromEntries(sourcePaths.map(p=>[p,createHash('sha256').update(readFileSync(join(source,p))).digest('hex')]))
  if(JSON.stringify(postPins)!==JSON.stringify(sourcePins)){secondary.push({stage:'source-stability'});process.exitCode=1}
  if(outputOverflow){secondary.push({stage:'complete-raw-budget'});process.exitCode=1}
- writeFileSync(join(output,'result.json'),JSON.stringify({scope:'actual native ERP ACL; controlled central envelopes',primary,secondary,ids,volumes:[...volumes],network,raw,sourceBytes,sourcePins,postPins,records},null,2))
+ writeFileSync(join(output,'result.json'),JSON.stringify({scope:httpMode?'actual ERP WSGI/private HTTP/native ACL; controlled central authority':'actual native ERP ACL; controlled central envelopes',primary,secondary,ids,volumes:[...volumes],network,raw,sourceBytes,sourcePins,postPins,records},null,2))
  console.log(JSON.stringify({passed:!primary&&!secondary.length,output,primary,secondary,containers:ids.length,raw}))
 }
