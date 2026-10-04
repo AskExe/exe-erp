@@ -4,8 +4,9 @@ One supplied absolute end, <=16 actual failures. Bounded waits are not proof of
 SQL cancellation: pending daemon cleanup is retained and the fixed private
 receiver must exit unsuccessfully; the owning parent still enforces lifetime.
 """
-import re
+
 import contextvars
+import re
 import threading
 import time
 

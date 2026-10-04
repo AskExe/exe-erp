@@ -2,13 +2,14 @@
 
 Held until Source review. These tests do not authenticate a Core dispatch pipe.
 """
+
 import importlib.util
 import json
-from pathlib import Path
 import sys
 import tempfile
 import types
 import unittest
+from pathlib import Path
 
 package = types.ModuleType("erp_private_source_subject")
 package.__path__ = [str(Path(__file__).parent)]
@@ -223,7 +224,7 @@ class TestActualCoreQueryBoundary(unittest.TestCase):
 
     def testReaderPreservesActualSqlFailureWithoutFallback(self):
         error = RuntimeError("controlled refusal")
-        reader, connection, calls = self.setup_reader(error=error)
+        reader, _connection, calls = self.setup_reader(error=error)
         with self.assertRaises(RuntimeError) as caught:
             reader(value())
         self.assertIs(caught.exception, error)
@@ -232,7 +233,7 @@ class TestActualCoreQueryBoundary(unittest.TestCase):
         reader.close()
 
     def testForeignInvalidTupleDoesNotReachDatabase(self):
-        reader, connection, calls = self.setup_reader()
+        reader, _connection, calls = self.setup_reader()
         with self.assertRaises(contract.Refused):
             reader({**value(), "product": "crm-workspace"})
         self.assertEqual(len(calls), 1)
@@ -402,7 +403,7 @@ class TestProtectedReceiver(unittest.TestCase):
     def testPipeFrameRequiresExactlyFiveKeysAndChargesReceivingInterval(self):
         from unittest.mock import patch
         with patch.object(receiver.os, "getuid", return_value=1000):
-            v, config, end = receiver.bind_frame(self.frame(), self.package(), 0, 5)
+            v, _config, end = receiver.bind_frame(self.frame(), self.package(), 0, 5)
             self.assertEqual(v, value())
             self.assertEqual(end, 230)
             with self.assertRaises(contract.Refused):

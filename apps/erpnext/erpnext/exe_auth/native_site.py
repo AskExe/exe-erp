@@ -5,17 +5,18 @@ consumer. There is intentionally no --action-file, JSON stdin allocation CLI,
 or owner-read-to-dispatch fallback. Parent/pipe process binding is a separate
 composition gate and is not qualified by this library's controlled tests.
 """
+
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import secrets
 import stat
 import time
+from pathlib import Path
 
-from .native_contract import CurrentOwner, Refused
 from .native_cleanup import Failures
+from .native_contract import CurrentOwner, Refused
 
 ROLE = "Exe Company ERP Viewer"
 DOCTYPES = ("Company", "Customer", "Supplier", "Item")
@@ -219,8 +220,8 @@ def allocate(consume_original_dispatch, read_owner, config, operator):
     no automatic retry/delete/repair, and no accepted/native-ready claim is made.
     """
     require_private_environment(os.environ)
-    from filelock import FileLock
     import frappe
+    from filelock import FileLock
     from frappe.installer import _new_site
     # Parent owns authenticity and single consumption; cannot recover from SQL.
     value, original_end = consume_original_dispatch()

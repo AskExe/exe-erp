@@ -6,6 +6,7 @@ branch starts/attaches stdin. A serialized frame alone authenticates nothing;
 parent process/container/pipe ownership is a separate required composition.
 No action file or read-after-uncertain-start fallback exists.
 """
+
 import contextlib
 import json
 import os
@@ -15,11 +16,11 @@ import stat
 import sys
 import time
 
+from .native_cleanup import CleanupFailure, Failures
 from .native_contract import Refused, exact, stamp, validate_tuple
 from .native_core import CoreReader
-from .native_cleanup import Failures, CleanupFailure
-from .native_site import allocate, stable_secret
 from .native_observer import observe_owned
+from .native_site import allocate, stable_secret
 
 PACKAGE = "/run/exe-native/erp-package.json"
 CORE_SECRET = "/run/exe-native/core-worker.dsn"

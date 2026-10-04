@@ -4,15 +4,16 @@ The trusted Core parent must supply its original successful first-start result.
 No file, HTTP request, historical action lookup or reconstructed tuple is accepted
 as a substitute. The separately reviewed parent owns that handoff capability.
 """
-from datetime import datetime
+
 import re
 import time
+from datetime import datetime
 
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 INPUT = ("job_id", "lease_token", "attempt", "worker_id", "company_id", "deployment_id", "product", "profile_sha256", "config_sha256", "initializer_sha256", "request_key", "intent_id", "action_id")
 BOUND = tuple(k for k in INPUT if k != "lease_token")
-OUTPUT = BOUND + ("owner_subject", "sql_time", "lease_expires_at")
+OUTPUT = (*BOUND, "owner_subject", "sql_time", "lease_expires_at")
 START = ("intent_id", "action_id", "started_attempt", "started_by", "started_at")
 
 

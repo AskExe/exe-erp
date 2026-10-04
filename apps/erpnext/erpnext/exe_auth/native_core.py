@@ -1,8 +1,10 @@
 """Actual private function-only Core reader; no HTTP/claim/start/retry path."""
+
+import time
+
+from .native_cleanup import Failures
 from .native_contract import validate_tuple
 from .native_site import stable_secret
-from .native_cleanup import Failures
-import time
 
 QUERY = """SELECT core.read_native_action_owner(
  %s::uuid,%s::uuid,%s::integer,%s::text,%s::uuid,%s::uuid,

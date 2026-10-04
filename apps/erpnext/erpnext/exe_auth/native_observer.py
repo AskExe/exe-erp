@@ -1,12 +1,13 @@
 """Independent private read-only observer; no allocation/replay implementation."""
+
 import hashlib
 import json
-from pathlib import Path
 import stat
+from pathlib import Path
 
-from .native_contract import CurrentOwner, Refused
-from .native_site import ROLE, DOCTYPES, AUTOMATIC, WRITE, CONTROL, stable_secret
 from .native_cleanup import Failures
+from .native_contract import CurrentOwner, Refused
+from .native_site import AUTOMATIC, CONTROL, DOCTYPES, ROLE, WRITE, stable_secret
 
 READ_SURFACE = {
     "__exe_native_binding": ("action_id", "intent_id", "company_id", "creator_subject", "native_user", "marker_sha256", "binding"),
