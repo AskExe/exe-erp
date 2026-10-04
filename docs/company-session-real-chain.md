@@ -1,8 +1,8 @@
 # Genuine Auth/Core to ERP native chain
 
-This new direct-HTTP/WSGI fixture is prepared for review; it has not run. It leaves the existing Auth eight groups, Wiki nine groups and ERP eight WSGI tests unchanged.
+This direct-HTTP/WSGI fixture passed the nine-group run described below. It leaves the existing Auth eight groups, Wiki nine groups and ERP eight WSGI tests unchanged.
 
-Run from the Auth fixture branch with `AUTH_COMPANY_CORE_ROOT` pointing to the reviewed Core checkout and `AUTH_COMPANY_ERP_ROOT` pointing to this ERP fixture checkout. The Auth entry is `scripts/test-erp-real-chain.mjs`; the ERP helper is `scripts/real-issuer-chain-fixture.mjs`. The prospective command is:
+Run from the Auth fixture branch with `AUTH_COMPANY_CORE_ROOT` pointing to the reviewed Core checkout and `AUTH_COMPANY_ERP_ROOT` pointing to this ERP fixture checkout. The Auth entry is `scripts/test-erp-real-chain.mjs`; the ERP helper is `scripts/real-issuer-chain-fixture.mjs`. The command is:
 
 ```sh
 AUTH_COMPANY_CORE_ROOT=/path/to/reviewed-core AUTH_COMPANY_ERP_ROOT=/path/to/erp-chain node --max-old-space-size=512 scripts/test-erp-real-chain.mjs
@@ -21,3 +21,11 @@ Auth/Core build and setup share a 120-second absolute end; ERP setup has a separ
 Cleanup independently removes/checks owned containers and anonymous volumes, detaches the exact Core-native network attachment, removes/checks the internal network, then cleans the original Core/Auth resources and successfully built image tags under the same absolute cleanup end. Failures remain separate from the first error. Source hashes, native roles and cleanup results are retained.
 
 Commercial responses are explicit synthetic responses bound separately to the actual A/B subscriptions and payment intents. Technical acceptance evidence remains synthetic. Direct HTTP/WSGI does not qualify browser Secure-cookie enforcement, native Desk, mid-read races, production capacity, self-service onboarding or live commercial providers.
+
+## Observed validation
+
+Run5 passed all nine groups and exited 0 with complete owned cleanup. The tested fixture heads were Auth `d49d2e5599a2b7fe17bdbe814fcb841c8c8e267e` and ERP `2f740e1aa83d6147eaa5501dde65d72458c70980`; later documentation-only commits do not change that tested runtime. Production Auth145 `a3bff84b9392c4bd2d2ef77fe7a13bd769abf4e4`, Core41 `d622048eab4083f62a000ed59b19b0422566222c`, and ERP134 `e04ff67ad2866e82352591b16ada1de3c44d3b4a` application sources were unchanged.
+
+All six fixture source hashes and identities matched before and after the invocation. The native receipt retained no primary, cleanup, publication or quota errors, with a complete 187-command private redacted ledger. Distinct native database roles were non-superuser and non-bypass. Cleanup verified the three native containers, two anonymous volumes, internal network and exact Core-native attachment absent; the Auth/Core cleanup also completed.
+
+Four earlier failures remain preserved: Core hosting identity refusal; a stock HTTP socket hang up whose cause was not measured; command diagnostic quota refusal; and run4, where all nine functional groups passed but the overall result failed because native terminal reporting was absent. The historical reporting cause was not measured. No assertion was skipped or weakened. Original Auth8, Wiki9 and ERP8 tests remain unchanged and were not repeated for this chain.
