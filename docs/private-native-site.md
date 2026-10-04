@@ -43,3 +43,101 @@ The authorized ordinary run used the fixed existing Python 3.14.7 interpreter: v
 The separate read-only post-packaging helper failed its whole-stat stability assertion. Its actual before/after values were not retained, so the changed field/cause is unknown. Original target output and partial original Tool prefix remain preserved; the post closure/current-resource outputs were not produced or reconstructed. This does not change the target parser/control result and is not a native product failure. Root's independent checks, if accepted, are separate evidence. No target or post helper retry occurred.
 
 Actual Core SQL/ERP PostgreSQL privilege enforcement, real Frappe installer and User/Contact hook behavior, native viewer ACLs, physical package/image/storage provenance, protected original-success parent/container/pipe handoff and independent real observer remain unqualified. No deployment, public route, live provider/bridge, customer-site mutation or readiness/activation claim follows from these local controls.
+
+
+## Separate observer composition (Source only)
+
+This descendant is rooted at the accepted ERP136 lint head `841b527ee681d8c2ffe9a7563b2bc6064eb19369` and changes the private receiver to allocation-only completion. It
+returns `pending_observation` and `native_readiness: unverified`. It never starts
+an observer, records a Core receipt, retries installation, adopts an existing
+site or clears the durable first-writer marker. The existing 35 local controls
+and ERP136's ordinary observations remain predecessor evidence; none of this
+new composition has been parsed, imported, tested or run yet.
+
+The trusted Core parent must retain its ORIGINAL successful first-start in
+memory across three separately bound owned children. A tuple, file, owner read
+or returned JSON cannot recreate that authority. Each child must have an actual
+inspected CREATED container, fixed entry/image/UID/quotas/protected mounts and
+exact company/job/intent/profile/config/initializer binding before dispatch.
+
+1. Allocation uses the fixed `native_receiver` entry and native operator file.
+   Actual Frappe installation and the immutable native User/action binding
+   commit may complete; response loss or post-commit owner/lease failure leaves
+   pending/quarantined state. No phase retries it or manufactures a new start.
+2. Operator setup uses `native_observer_setup`, never an allocator. It verifies
+   the actual current Core creator and persisted native binding/owned marker on
+   the EXACT newly created database. Under one transaction and an action-derived
+   role advisory lock, it refuses any existing observer role, suppresses
+   collection BEFORE password-bearing SQL and creates one unique LOGIN with no
+   elevated attributes or memberships, connection limit 1 and read-only finite
+   settings. It closes PUBLIC CREATE/TEMP only on this owned new database and
+   public-schema CREATE, grants CONNECT/USAGE and exactly the observer's eight
+   tables' approved columns. There are no defaults, table-wide SELECTs,
+   password-column grants, global role promotion or arbitrary definer repairs.
+   An executable PUBLIC non-system SECURITY DEFINER is a refusal. Current Core
+   checks precede each native grant/write and follow successful commit and cleanup.
+   Failure plus rollback exits quarantined without a guaranteed later Core read. A lost
+   setup commit acknowledgement, owner loss or teardown failure stays
+   quarantined; existing-role refusal prevents re-adoption on a later attempt.
+3. Read-only observation uses `native_observer_entry` with a protected mount
+   containing package, Core worker and native observer files ONLY. The operator
+   credential must be absent, not merely unused. Its complete local import path
+   has no `native_site`, allocator or native-write credential loader. It uses
+   the actual read-only native login/catalog ceiling, exact binding/marker/User/
+   permissions and fresh Core observations; returned metadata remains
+   unverified and cannot itself open an app or create a receipt.
+
+All three frames keep the original `initial_sql_time` and
+`original_lease_expires_at`. The parent's relative remaining work only shrinks.
+It retains one original hard monotonic container lifetime across all children,
+including the gaps and operator phase. Allocation v1 retains its original five fields and transit calculation. Setup
+and observation require the closed `core-first-writer-phase-v2` eight-field
+frame: the original five fields plus fixed `phase` (`setup` or `observe`),
+`handoff_sql_time` and `original_remaining_work_milliseconds`. The fresh
+handoff is from the parent's actual same-Core owner read. Original allowance,
+initial SQL time and expiry must remain bound to its retained first-success
+state; JSON cannot prove those anchors. Remaining work cannot exceed the
+original allowance less elapsed lineage time. Later children debit only
+handoff-to-first-current-read SQL transit, their full receive/query bracket
+and precision margin from the already-shrunk remaining work; every shortened current lease wins. The shared
+absolute 5-second pipe admission does not renew. Allocation admission retains
+181 seconds; setup retains 90 seconds and observation 60 seconds, including the
+same 30-second cleanup reserve. Neither a later child clock nor role commit
+renews work/SQL expiry. If setup/observer no longer fits, leave pending/quarantine.
+Finite SQL authorization observations do not establish distributed atomicity
+with native commits or OS teardown, and local abort is not cancellation proof.
+
+The phase package and physical staging are still unqualified. Host UID 501,
+container UID labels and an old stock image do not prove actual UID1000/0400
+protected file readability under a UID1000/0700 parent. The real image must
+contain the new modules and fixed entries. Owned-only staging, mounted stat/read
+checks, installer/package/hooks, actual role creation and column grants,
+independent catalog observation, post-commit failure/quarantine and exact
+returned-resource cleanup require the separately reviewed genuine fixture.
+No existing site's policy or shared PostgreSQL roles may be modified.
+
+Held ordinary validation proposal: retain the seven ERP136 parsers and all 35
+controls, add AST-only parsing of the five new Python files and run the nine
+phase controls. Use selected pinned Python/stdlib only, no Frappe, FileLock,
+psycopg or native service imports. Keep the original 70-second work/90-second
+absolute clock, per-parser 5 seconds, controls 30 seconds, sampled group RSS
+512 MiB, 64 KiB per stream and 1 MiB/80-file/8-directory evidence. Admission and
+cleanup must refuse or fail honestly when shared remaining time is insufficient;
+these are future recipes, not executed observations. Actual FileLock/native
+packages, parent dispatch, SQL grants, image and observer remain unqualified.
+
+## Private phase controlled validation
+
+Import05 passed the two changed-file AST parsers, all 49 controlled cases (the
+unchanged 35 allocation/contract controls plus 14 phase controls), and Ruff
+0.14.10 across all 12 Python paths. The five-command run finished in
+2.151308917 seconds; all child pipes reached EOF, leaders were reaped, owned
+process groups were checked absent and the owned temporary directory was
+removed. Source and selected runtime identities matched before and after.
+Clock04 remains a failed attempt: its 12 AST parsers and 49 controls passed,
+then Ruff refused two import-format blocks. Only those blocks were formatted
+for Import05; the ten other prior parser outcomes are separate reused evidence.
+No Frappe, psycopg, FileLock native runtime, database, installer, image, protected
+parent three-child transport or fresh-site observer qualification occurred.
+The physical package/UID/mount/socket and genuine three-phase gates above
+remain open. No readiness or paid/native activation follows these results.

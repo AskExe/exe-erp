@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .native_cleanup import Failures
 from .native_contract import CurrentOwner, Refused
-from .native_site import AUTOMATIC, CONTROL, DOCTYPES, ROLE, WRITE, stable_secret
+from .native_shared import AUTOMATIC, CONTROL, DOCTYPES, ROLE, WRITE, stable_secret
 
 READ_SURFACE = {
     "__exe_native_binding": ("action_id", "intent_id", "company_id", "creator_subject", "native_user", "marker_sha256", "binding"),
@@ -49,6 +49,27 @@ def assert_native_reader(cursor):
       FROM pg_roles r WHERE r.rolname=session_user""", (surface, sum(len(columns) for columns in READ_SURFACE.values())))
     if cursor.fetchall() != [(True,)]:
         raise Refused("invalid_native_reader_privileges")
+
+
+def read_native_binding(cursor, value, owner, config, original_end):
+    """Actual persisted tuple and owned marker; never initializer response JSON."""
+    cursor.execute("SELECT binding, marker_sha256, native_user, creator_subject::text FROM __exe_native_binding WHERE action_id=%s::uuid AND intent_id=%s::uuid AND company_id=%s::uuid", (value["action_id"], value["intent_id"], value["company_id"]))
+    rows = cursor.fetchmany(2)
+    if len(rows) != 1:
+        raise Refused("missing_or_ambiguous_native_binding")
+    binding, digest, user, creator = rows[0]
+    expected = {k: v for k, v in value.items() if k != "lease_token"}
+    expected.update(owner_subject=owner["owner_subject"], site=config["site"], database=config["database"], native_user=user, state="issued_or_quarantined")
+    if creator != owner["owner_subject"] or binding != expected:
+        raise Refused("changed_native_binding")
+    path = Path(config["sites_dir"]) / ".exe-native-first-writers" / (value["action_id"] + ".json")
+    s = path.lstat()
+    if not stat.S_ISREG(s.st_mode) or s.st_nlink != 1 or stat.S_IMODE(s.st_mode) != 0o600 or s.st_size > 8192:
+        raise Refused("invalid_native_marker")
+    raw = stable_secret(path, 8192, original_end).encode("utf-8")
+    if hashlib.sha256(raw).hexdigest() != digest or json.loads(raw) != binding:
+        raise Refused("changed_native_marker")
+    return user
 
 
 def observe_owned(value, read_owner, original_end, config, credential_file):
@@ -93,22 +114,7 @@ def observe(value, read_owner, original_end, config, connection):
         cursor.execute("SELECT 1 FROM pg_namespace WHERE nspname NOT IN ('pg_catalog','information_schema') AND nspname !~ '^pg_(toast|temp_)' AND has_schema_privilege(current_user,oid,'CREATE') LIMIT 1")
         if cursor.fetchone():
             raise Refused("native_reader_can_create")
-        cursor.execute("SELECT binding, marker_sha256, native_user, creator_subject::text FROM __exe_native_binding WHERE action_id=%s::uuid AND intent_id=%s::uuid AND company_id=%s::uuid", (value["action_id"], value["intent_id"], value["company_id"]))
-        rows = cursor.fetchmany(2)
-        if len(rows) != 1:
-            raise Refused("missing_or_ambiguous_native_binding")
-        binding, digest, user, creator = rows[0]
-        expected = {k: v for k, v in value.items() if k != "lease_token"}
-        expected.update(owner_subject=owner["owner_subject"], site=config["site"], database=config["database"], native_user=user, state="issued_or_quarantined")
-        if creator != owner["owner_subject"] or binding != expected:
-            raise Refused("changed_native_binding")
-        path = Path(config["sites_dir"]) / ".exe-native-first-writers" / (value["action_id"] + ".json")
-        s = path.lstat()
-        if not stat.S_ISREG(s.st_mode) or s.st_nlink != 1 or stat.S_IMODE(s.st_mode) != 0o600 or s.st_size > 8192:
-            raise Refused("invalid_native_marker")
-        raw = stable_secret(path, 8192, original_end).encode("utf-8")
-        if hashlib.sha256(raw).hexdigest() != digest or json.loads(raw) != binding:
-            raise Refused("changed_native_marker")
+        user = read_native_binding(cursor, value, owner, config, original_end)
         cursor.execute('SELECT enabled,user_type FROM "tabUser" WHERE name=%s', (user,))
         if cursor.fetchall() != [(1, "System User")]:
             raise Refused("invalid_native_user")
