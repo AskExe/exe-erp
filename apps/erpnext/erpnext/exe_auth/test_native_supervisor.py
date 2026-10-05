@@ -204,5 +204,40 @@ class StartupAdmissionTests(unittest.TestCase):
         self.assertEqual(state.deadline(), 105)
 
 
+class TerminationReserveTests(unittest.TestCase):
+    def test_expired_shrunk_work_still_has_original_reap_reserve(self):
+        original_end = 140
+        state = subject.AdmissionBudget(100, original_end)
+        state.event({"admitted_end": 130}, 104)
+        state.event({"budget_end": 108}, 107)
+        self.assertEqual(state.deadline(), 108)
+        cleanup_end = subject.termination_deadline(original_end, 108.1)
+        self.assertAlmostEqual(cleanup_end - 108.1, 3)
+        # Pure termination time cannot admit a write under the expired lease.
+        with self.assertRaises(ValueError):
+            state.event({"budget_end": 108}, 108.1)
+        self.assertEqual(state.deadline(), 108)
+
+    def test_startup_refusal_reserve_does_not_reset_receive_window(self):
+        state = subject.AdmissionBudget(100, 140)
+        self.assertEqual(subject.termination_deadline(140, 105), 108)
+        with self.assertRaises(ValueError):
+            state.event({"admitted_end": 130}, 105)
+        self.assertFalse(state.admitted)
+        self.assertEqual(state.deadline(), 105)
+
+    def test_original_overall_bound_caps_reap_and_never_renews(self):
+        self.assertEqual(subject.termination_deadline(140, 139), 140)
+        self.assertEqual(subject.termination_deadline(140, 141), 140)
+        # Renewal of a work event cannot rewrite the independently held bound.
+        original_end = 140
+        state = subject.AdmissionBudget(100, original_end)
+        state.event({"admitted_end": 130}, 104)
+        state.event({"budget_end": 110}, 105)
+        state.event({"budget_end": 130}, 106)
+        self.assertEqual(state.deadline(), 110)
+        self.assertEqual(subject.termination_deadline(original_end, 111), 114)
+
+
 if __name__ == "__main__":
     unittest.main()

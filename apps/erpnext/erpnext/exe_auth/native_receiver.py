@@ -119,9 +119,16 @@ def worker_binding(q, result_fd):
         raise ValueError("private_worker_not_live")
 
 
+def termination_deadline(original_end, observed):
+    """Termination only: never changes an admission/lease deadline."""
+    return min(original_end, observed + 3)
+
+
 def supervise():
     before = time.monotonic()
     end = before + 5
+    # Pre-frame startup plus at most three seconds of termination.
+    termination_end = before + 8
     if sys.platform != "linux" or os.getpid() != 1 or os.getuid() != 1000:
         raise ValueError("private_supervisor_identity")
     if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
@@ -166,10 +173,12 @@ def supervise():
         remaining = frame.get("remaining_work_milliseconds") if type(frame) is dict else None
         if type(remaining) is not int or not 1 <= remaining <= 270000:
             raise ValueError("private_frame_work")
-        end = before + remaining / 1000 + 30
-        admission = AdmissionBudget(before, end)
         if time.monotonic() >= before + 5:
             raise TimeoutError("private_startup_expired")
+        # Fixed once from the original frame; budget events only shrink end.
+        termination_end = before + remaining / 1000 + 30
+        end = termination_end
+        admission = AdmissionBudget(before, end)
         worker_binding(q, result_w)
         gate = {"start": before, "startup_end": before + 5, "work_end": end}
         pending = memoryview(b"RELEASE " + json.dumps(gate, separators=(",", ":")).encode() + b"\n" + raw)
@@ -229,7 +238,7 @@ def supervise():
     finally:
         # Never signal same-namespace PID1. A retained pidfd is non-recycled
         # ownership; exiting this supervisor closes all namespace descendants.
-        cleanup_end = min(end, time.monotonic() + 3)
+        cleanup_end = termination_deadline(termination_end, time.monotonic())
         if q is not None and q.poll() is None:
             if pidfd is None:
                 later(ValueError("private_worker_unbound"))
