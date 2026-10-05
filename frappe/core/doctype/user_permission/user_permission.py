@@ -101,7 +101,9 @@ def get_user_permissions(user: str | None = None):
 	if not user or user in ("Administrator", "Guest"):
 		return {}
 
-	cached_user_permissions = frappe.cache.hget("user_permissions", user)
+	cached_user_permissions = (
+		None if frappe.flags.get("company_session") else frappe.cache.hget("user_permissions", user)
+	)
 
 	if cached_user_permissions is not None:
 		return cached_user_permissions
@@ -141,8 +143,11 @@ def get_user_permissions(user: str | None = None):
 					add_doc_to_perm(perm, doc, False, False)
 
 		out = frappe._dict(out)
-		frappe.cache.hset("user_permissions", user, out)
+		if not frappe.flags.get("company_session"):
+			frappe.cache.hset("user_permissions", user, out)
 	except frappe.db.SQLError as e:
+		if frappe.flags.get("company_session"):
+			raise
 		if frappe.db.is_table_missing(e):
 			# called from patch
 			pass

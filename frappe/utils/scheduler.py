@@ -38,6 +38,8 @@ def cprint(*args, **kwargs):
 def start_scheduler() -> NoReturn:
 	"""Run enqueue_events_for_all_sites based on scheduler tick.
 	Specify scheduler_tick_interval in seconds in common_site_config.json"""
+	from frappe.company_session import refuse_background
+	refuse_background()
 
 	tick = get_scheduler_tick()
 	set_niceness()

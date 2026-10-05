@@ -1,3 +1,6 @@
+if (![undefined, "false", "true"].includes(process.env.ERP_COMPANY_MODE) || process.env.ERP_COMPANY_MODE === "true") {
+	throw new Error("Company realtime is not admitted");
+}
 const { Server } = require("socket.io");
 const http = require("node:http");
 

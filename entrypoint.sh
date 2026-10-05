@@ -1,6 +1,19 @@
 #!/bin/bash
 set -eo pipefail
 
+# Company read transport is operator-bootstrapped off mode first. Never run
+# migrations, creation, workers or scheduler with browser company authority.
+case "${ERP_COMPANY_MODE:-false}" in
+    false) ;;
+    true)
+        if [ "${1:-}" != "gunicorn" ] || [ -n "${ADMIN_PASSWORD:-}" ]; then
+            echo "Company mode requires existing native site and read-only gunicorn command." >&2
+            exit 1
+        fi
+        ;;
+    *) echo "ERP_COMPANY_MODE must be true or false" >&2; exit 1 ;;
+esac
+
 # ──────────────────────────────────────────────────────────────
 # Exe ERP — Container entrypoint
 # Handles first-boot site creation + subsequent-boot migrations
@@ -22,6 +35,19 @@ if [ -z "${SITE_NAME:-}" ]; then
 fi
 SITE_NAME="${SITE_NAME:-erp.localhost}"
 SITE_DIR="${SITES_DIR}/${SITE_NAME}"
+
+if [ "${ERP_COMPANY_MODE:-false}" = "true" ]; then
+    if ! [[ "$SITE_NAME" =~ ^erp\.[a-z0-9.-]+$ ]] || [ ! -f "$SITE_DIR/site_config.json" ] || [ -L "$SITE_DIR" ] || [ -L "$SITE_DIR/site_config.json" ]; then
+        echo "Company mode requires an existing fixed ERP site." >&2
+        exit 1
+    fi
+    # Operator provisioning/migration/asset preparation happens off mode. Do
+    # not alter site, encryption key, native admin password or Redis here.
+    export PATH="${FRAPPE_BENCH}/env/bin:${PATH}"
+    export SITES_PATH="${SITES_DIR}"
+    cd "${FRAPPE_BENCH}"
+    exec "$@"
+fi
 
 cd "${FRAPPE_BENCH}"
 

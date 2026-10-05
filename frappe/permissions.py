@@ -560,7 +560,7 @@ def get_roles(user=None, with_standard=True):
 				roles.append(SYSTEM_USER_ROLE)
 			return roles
 
-	roles = frappe.cache.hget("roles", user, get)
+	roles = get() if frappe.flags.get("company_session") else frappe.cache.hget("roles", user, get)
 
 	# filter standard if required
 	if not with_standard:
