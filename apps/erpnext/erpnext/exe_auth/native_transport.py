@@ -174,18 +174,18 @@ def bounded_phase_owner_read(reader, frame, receive_before, original_end, clock=
 
 
 
-def emit_main(runner):
+def emit_main(runner, *, output_fd=1):
     output_attempted = False
     def emit(payload):
         nonlocal output_attempted
         raw = (json.dumps(payload, sort_keys=True) + "\n").encode()
-        if len(raw) > 2048 or not stat.S_ISFIFO(os.fstat(1).st_mode):
+        if len(raw) > 2048 or not stat.S_ISFIFO(os.fstat(output_fd).st_mode):
             raise Refused("invalid_private_output")
-        os.set_blocking(1, False)
+        os.set_blocking(output_fd, False)
         output_attempted = True
         # <=PIPE_BUF atomic write on the required pipe. No buffering/flush,
         # second payload or guessed success if the response channel failed.
-        if os.write(1, raw) != len(raw):
+        if os.write(output_fd, raw) != len(raw):
             raise Refused("incomplete_private_output")
     try:
         result = runner()

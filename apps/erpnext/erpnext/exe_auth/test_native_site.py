@@ -32,7 +32,8 @@ subject = load("native_site")
 core_reader = load("native_core")
 cleanup = load("native_cleanup")
 observer = load("native_observer")
-receiver = load("native_receiver")
+receiver = load("native_allocate_worker")
+receiver.load_bindings()
 
 
 def value():
