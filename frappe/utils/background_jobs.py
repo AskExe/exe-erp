@@ -114,6 +114,8 @@ def enqueue(
 	:param at_front_when_starved: If the queue appears to be starved then new jobs are
 	automatically inserted in LIFO fashion.
 	"""
+	from frappe.company_session import refuse_background
+	refuse_background()
 	# To handle older implementations
 	is_async = kwargs.pop("async", is_async)
 
@@ -240,6 +242,8 @@ def run_doc_method(doctype, name, doc_method, **kwargs):
 
 def execute_job(site, method, event, job_name, kwargs, user=None, is_async=True, retry=0):
 	"""Executes job in a worker, performs commit/rollback and logs if there is any error"""
+	from frappe.company_session import refuse_background
+	refuse_background()
 	retval = None
 
 	if is_async:
@@ -328,6 +332,8 @@ def start_worker(
 	strategy: DequeueStrategy | None = DequeueStrategy.DEFAULT,
 ) -> NoReturn:  # pragma: no cover
 	"""Wrapper to start rq worker. Connects to redis and monitors these queues."""
+	from frappe.company_session import refuse_background
+	refuse_background()
 
 	if not strategy:
 		strategy = DequeueStrategy.DEFAULT
@@ -422,6 +428,8 @@ def start_worker_pool(
 
 	WARNING: This feature is considered "EXPERIMENTAL".
 	"""
+	from frappe.company_session import refuse_background
+	refuse_background()
 	_start_sentry()
 
 	# If gc.freeze is done then importing modules before forking allows us to share the memory

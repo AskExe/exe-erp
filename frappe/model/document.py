@@ -2575,6 +2575,8 @@ def new_doc(
 
 def get_cached_doc(*args: Any, **kwargs: Any) -> "Document":
 	"""Identical to `frappe.get_doc`, but return from cache if available."""
+	if frappe.flags.get("company_session"):
+		return get_doc(*args, **kwargs)
 	if (key := can_cache_doc(args)) and (doc := frappe.cache.get_value(key)):
 		return doc
 

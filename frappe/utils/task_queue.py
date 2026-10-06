@@ -33,6 +33,8 @@ def enqueue_task(
 	**kwargs,
 ) -> "BackgroundTask":
 	"""A wrapper around frappe.enqueue. Enqueue a background job with user-facing tracking"""
+	from frappe.company_session import refuse_background
+	refuse_background()
 	if isinstance(method, Callable):
 		method_name = f"{method.__module__}.{method.__qualname__}"
 	else:
@@ -131,6 +133,8 @@ def _execute_task(
 	**kwargs,
 ):
 	"""Internal wrapper run by the background worker"""
+	from frappe.company_session import refuse_background
+	refuse_background()
 	task_doc = frappe.get_doc("Background Task", {"task_id": task_id})
 	if task_doc.status == "Cancelled":
 		return
