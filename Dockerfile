@@ -67,8 +67,15 @@ RUN set -eux; \
         *) echo "Unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
     esac; \
     tarball="node-${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
-    curl --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 30 --max-time 300 \
-      -fsSLo "/tmp/${tarball}" "https://nodejs.org/dist/${NODE_VERSION}/${tarball}"; \
+    node_download_complete=0; \
+    for node_download_attempt in 1 2 3 4 5 6; do \
+        if curl --connect-timeout 30 --max-time 300 --continue-at - \
+          -fsSLo "/tmp/${tarball}" "https://nodejs.org/dist/${NODE_VERSION}/${tarball}"; then \
+            node_download_complete=1; break; \
+        fi; \
+        if [ "$node_download_attempt" -lt 6 ]; then sleep 2; fi; \
+    done; \
+    test "$node_download_complete" = 1; \
     echo "${node_sha}  /tmp/${tarball}" | sha256sum -c -; \
     tar -xJf "/tmp/${tarball}" -C /usr/local --strip-components=1 --no-same-owner; \
     rm -f "/tmp/${tarball}"; \
