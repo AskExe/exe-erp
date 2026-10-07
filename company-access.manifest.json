@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "contract": "company-access-v1",
+  "version": 1,
+  "policySha256": "790e6bc8d9b78c31d33fa4fce3b57717c952d225b078eef442726daf6c9ec85c",
+  "source": "exe-db/src/company-contract/access.ts",
+  "fixturesSha256": "8ab405ddbe874e5bc90da3e489014449467bb09272ecd9dd36384dbe632b5f67",
+  "artifacts": {
+    "exe-auth": {
+      "file": "company-contract.njs.js",
+      "sha256": "0fcdc3b4ed75ae4fba59d5e306f4b5ed5f1eb74673c82d9e30dfe8e851f80e18"
+    },
+    "exe-dashboard": {
+      "file": "company-contract.njs.js",
+      "sha256": "0fcdc3b4ed75ae4fba59d5e306f4b5ed5f1eb74673c82d9e30dfe8e851f80e18",
+      "browser": {
+        "file": "company-contract.browser.js",
+        "sha256": "85e2619d9f3ca5893713703b8c3f37765b67965478529d54bb8487ca1da0c5ac"
+      }
+    },
+    "exe-crm": {
+      "file": "packages/twenty-server/src/engine/core-modules/company-auth/company-access.contract.ts",
+      "sha256": "b541f01ae7f514ab75c973fb61667e503b9a210ec03f5e0f99ebfacbad793455"
+    },
+    "exe-wiki": {
+      "file": "server/utils/companySession/company-access.contract.cjs",
+      "sha256": "009c1d9f9073b78610237424a81250ab0f6d2d6807f49b733baea67c88a9c711"
+    },
+    "exe-erp": {
+      "file": "frappe/company_session.py",
+      "sha256": "e9e19f1f50a5b5ca1947fadc731bda11b7eb3fcbeeb7a87640b2a1c827b7ce59"
+    }
+  }
+}
