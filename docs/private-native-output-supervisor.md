@@ -79,3 +79,27 @@ the bench database log before a database connection. Stream logging allowed
 construction; fixed logging disable produced zero synthetic DDL output. It
 used no SQL or credentials and verified owned cleanup. These constructor and
 controlled restoration checks do not qualify a complete native allocation.
+
+## Private budget publication
+
+Every fresh Core owner read still runs. The private worker omits a regular
+budget frame only when its deadline exactly equals the last completely
+published deadline. Initial admission is published once; every strict decrease
+is published immediately. There is no rounding, queue, debounce or renewal.
+The existing 1,024-byte budget-channel limit, 2,048-byte supervisor result limit,
+watchdog and original work/cleanup clocks are unchanged. Invalid publication,
+cap exhaustion and raised or partial writes permanently refuse further
+publication in that worker, including an old duplicate deadline.
+
+Private failure JSON may include `cleanup.refusal_code` for one of fourteen
+fixed allocation/owner/channel literals only. The exception must be exactly
+`Refused` with one exact string argument, or the exact `CleanupFailure` primary
+must satisfy that condition. Unknown codes, subclasses and arbitrary text are
+omitted; existing primary classes and cleanup counters remain intact. This is
+finite error evidence, never action or readiness authority.
+
+Controlled actual-pipe tests preserve 1,000 synthetic fresh reads while omitting
+equal deadline frames, retain strict decreases and cap refusal, and verify the
+terminal failure latch and literal-only diagnostics. The normal local native
+attempt returned `Refused`; its particular code was not retained. These tests
+prove the duplicate-publication mechanism, not that attempt's exact cause.
