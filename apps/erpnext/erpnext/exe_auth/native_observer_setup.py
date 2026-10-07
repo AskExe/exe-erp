@@ -55,7 +55,10 @@ def suppress_collection(cursor):
 def observer_credentials(raw, operator, config, value, parse_dsn):
     """No caller-selected role/database/host or ambient DSN option fallback."""
     fields = parse_dsn(raw)
-    expected_user = 'exe_erp_observer_' + value['action_id'].replace('-', '')
+    # The protected DSN is sealed before start generates action_id. Use the
+    # existing immutable Core intent; setup still fences the actual action and
+    # reads its exact native binding before creating this create-only role.
+    expected_user = 'exe_erp_observer_' + value['intent_id'].replace('-', '')
     if set(fields) != {'host', 'port', 'dbname', 'user', 'password'}:
         raise Refused("invalid_observer_credentials")
     if fields['host'] != operator['host'] or fields['port'] != str(operator['port']) or fields['dbname'] != config['database'] or fields['user'] != expected_user:
@@ -69,7 +72,7 @@ def observer_credentials(raw, operator, config, value, parse_dsn):
 def setup(value, read_owner, original_end, config, connection, role, password):
     """Fresh admin socket owns one transaction on ONLY the exact bound DB.
 
-    PostgreSQL roles are cluster-wide: use a unique action-derived create-only
+    PostgreSQL roles are cluster-wide: use a unique intent-derived create-only
     name under an advisory transaction lock, never alter/adopt an existing role.
     Only this new DB's PUBLIC TEMP and public-schema CREATE are closed. No
     default privileges, global role membership or wildcard table grants exist.

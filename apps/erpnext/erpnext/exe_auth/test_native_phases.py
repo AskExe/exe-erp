@@ -72,14 +72,33 @@ class Connection:
 
 
 class TestPrivatePhases(unittest.TestCase):
+    def testObserverCredentialCanBePreparedBeforeUnpredictableStartAction(self):
+        # Core creates action_id only at start, after the protected DSN was
+        # admitted. The already reserved immutable intent is known beforehand.
+        before = value()
+        fields = {'host': 'owned-db', 'port': '5432', 'dbname': 'exe_fixture',
+                  'user': 'exe_erp_observer_' + before['intent_id'].replace('-', ''),
+                  'password': 'x' * 32}
+        after = {**before, 'action_id': '99999999-9999-4999-8999-999999999999'}
+        for current in (before, after):
+            self.assertEqual(setup_module.observer_credentials(
+                'controlled-not-a-dsn', {'host': 'owned-db', 'port': 5432},
+                {'database': 'exe_fixture'}, current, lambda _: fields),
+                (fields['user'], fields['password']))
+        foreign = {**after, 'intent_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}
+        with self.assertRaises(contract.Refused):
+            setup_module.observer_credentials(
+                'controlled-not-a-dsn', {'host': 'owned-db', 'port': 5432},
+                {'database': 'exe_fixture'}, foreign, lambda _: fields)
+
     def credentials(self, **changes):
-        fields = {'host': 'owned-db', 'port': '5432', 'dbname': 'exe_fixture', 'user': 'exe_erp_observer_' + value()['action_id'].replace('-', ''), 'password': 'x' * 32}
+        fields = {'host': 'owned-db', 'port': '5432', 'dbname': 'exe_fixture', 'user': 'exe_erp_observer_' + value()['intent_id'].replace('-', ''), 'password': 'x' * 32}
         fields.update(changes)
         return setup_module.observer_credentials('controlled-not-a-dsn', {'host': 'owned-db', 'port': 5432}, {'database': 'exe_fixture'}, value(), lambda _: fields)
 
-    def testObserverCredentialIsExactActionDatabaseAndEndpoint(self):
+    def testObserverCredentialIsExactIntentDatabaseAndEndpoint(self):
         role, password = self.credentials()
-        self.assertEqual(role, 'exe_erp_observer_' + value()['action_id'].replace('-', ''))
+        self.assertEqual(role, 'exe_erp_observer_' + value()['intent_id'].replace('-', ''))
         self.assertEqual(len(password), 32)
         for change in ({'user': 'existing_owner'}, {'dbname': 'foreign'}, {'host': 'foreign'}, {'port': '5433'}, {'options': '-c role=admin'}, {'password': 'bad password'}):
             with self.assertRaises(contract.Refused):
@@ -97,7 +116,7 @@ class TestPrivatePhases(unittest.TestCase):
         fake = types.ModuleType('psycopg2')
         fake.sql = types.SimpleNamespace(SQL=SQL, Identifier=SQL)
         with patch.dict(sys.modules, {'psycopg2': fake}), patch.object(setup_module, 'read_native_binding', return_value='opaque-user'):
-            return setup_module.setup(value(), read or (lambda _: row(value())), contract.time.monotonic() + 250, {'database': 'exe_fixture'}, connection, 'exe_erp_observer_' + value()['action_id'].replace('-', ''), 'x' * 32)
+            return setup_module.setup(value(), read or (lambda _: row(value())), contract.time.monotonic() + 250, {'database': 'exe_fixture'}, connection, 'exe_erp_observer_' + value()['intent_id'].replace('-', ''), 'x' * 32)
 
     def testExistingRoleCannotBeAdoptedOrAltered(self):
         events = []
