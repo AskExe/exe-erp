@@ -66,7 +66,7 @@ exact company/job/intent/profile/config/initializer binding before dispatch.
    pending/quarantined state. No phase retries it or manufactures a new start.
 2. Operator setup uses `native_observer_setup`, never an allocator. It verifies
    the actual current Core creator and persisted native binding/owned marker on
-   the EXACT newly created database. Under one transaction and an action-derived
+   the EXACT newly created database. Under one transaction and an intent-derived
    role advisory lock, it refuses any existing observer role, suppresses
    collection BEFORE password-bearing SQL and creates one unique LOGIN with no
    elevated attributes or memberships, connection limit 1 and read-only finite
@@ -141,3 +141,5 @@ No Frappe, psycopg, FileLock native runtime, database, installer, image, protect
 parent three-child transport or fresh-site observer qualification occurred.
 The physical package/UID/mount/socket and genuine three-phase gates above
 remain open. No readiness or paid/native activation follows these results.
+
+The observer login is derived from the existing immutable Core intent UUID, obtained by a fresh restricted function read before protected phase files are sealed. The start action UUID remains SQL-generated later. This change permits a presealed observer DSN without predicting the action; current action/owner/job/lease and exact native marker checks are unchanged. SQL permits only one start per intent; observer setup still refuses an existing role and issues only its finite read surface. Added regression checks are controlled Python tests, not actual native phase qualification.
