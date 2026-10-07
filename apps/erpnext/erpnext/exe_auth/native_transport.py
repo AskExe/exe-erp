@@ -20,6 +20,20 @@ OBSERVER_SECRET = "/run/exe-native/native-observer.dsn"
 SITES = "/home/frappe/frappe-bench/sites"
 FRAME_KEYS = ("version", "tuple", "initial_sql_time", "original_lease_expires_at", "remaining_work_milliseconds")
 PACKAGE_KEYS = ("version", "enabled", "uid", "image_id", "job_id", "intent_id", "company_id", "deployment_id", "profile_sha256", "config_sha256", "initializer_sha256", "site", "database")
+REFUSAL_CODES = frozenset({
+    "private_budget_channel", "role_exists_or_nonoperator", "invalid_viewer_doctype",
+    "native_user_exists", "unexpected_native_authority", "insufficient_lease",
+    "changed_action", "expired_action", "changed_creator", "expired_current_lease",
+    "expired_original_work", "backwards_sql_clock", "late_private_observation", "invalid_core_read",
+})
+
+
+def closed_refusal_code(error):
+    """Only reviewed literal private refusals, never arbitrary error text."""
+    primary = error.primary if type(error) is CleanupFailure else error
+    if type(primary) is Refused and len(primary.args) == 1 and type(primary.args[0]) is str and primary.args[0] in REFUSAL_CODES:
+        return primary.args[0]
+    return None
 
 
 def closed_json(raw):
@@ -198,6 +212,9 @@ def emit_main(runner, *, output_fd=1):
         detail = {"primary_class": safe_class(error), "secondary_count": 0, "pending_count": 0, "overflow_count": 0}
         if isinstance(error, CleanupFailure):
             detail.update(primary_class=safe_class(error.primary) if error.primary else None, secondary_count=len(error.secondary), pending_count=len(error.pending), overflow_count=sum(error.overflow.values()))
+        refusal_code = closed_refusal_code(error)
+        if refusal_code is not None:
+            detail["refusal_code"] = refusal_code
         if not output_attempted:
             try:
                 emit({"ok": False, "code": "private_native_failed", "cleanup": detail})

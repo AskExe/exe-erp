@@ -109,13 +109,34 @@ def run(before=None, original_end=None):
 
 RESULT_FD = None
 _budget_bytes = 0
+_published_end = None
+_budget_failed = False
 
 def publish_budget(absolute_end, *, initial=False):
-    global _budget_bytes
-    raw = (json.dumps({"admitted_end" if initial else "budget_end": absolute_end}, separators=(",", ":")) + "\n").encode()
-    _budget_bytes += len(raw)
-    if _budget_bytes > 1024 or os.write(RESULT_FD, raw) != len(raw):
+    global _budget_bytes, _published_end, _budget_failed
+    if _budget_failed:
         raise Refused("private_budget_channel")
+    try:
+        if type(absolute_end) not in (int, float) or not math.isfinite(absolute_end) or absolute_end <= 0 or type(initial) is not bool:
+            raise Refused("private_budget_channel")
+        if initial:
+            if _published_end is not None:
+                raise Refused("private_budget_channel")
+        else:
+            if _published_end is None or absolute_end > _published_end:
+                raise Refused("private_budget_channel")
+            if absolute_end == _published_end:
+                return
+        raw = (json.dumps({"admitted_end" if initial else "budget_end": absolute_end}, separators=(",", ":")) + "\n").encode()
+        _budget_bytes += len(raw)
+        if _budget_bytes > 1024 or os.write(RESULT_FD, raw) != len(raw):
+            raise Refused("private_budget_channel")
+        # Equal fresh-read results carry no new deadline information. Cache
+        # only a complete successful write; failed publication is terminal.
+        _published_end = absolute_end
+    except BaseException:
+        _budget_failed = True
+        raise
 
 
 def admit_gate(raw, admitted, now):
