@@ -49,6 +49,28 @@ def row(v):
 
 
 class TestPrivateNativeContract(unittest.TestCase):
+    def testPrivateProgressSuppressionRestoresOnSuccessAndInstallerError(self):
+        from unittest.mock import patch
+        calls = []
+        def original(*args, **kwargs):
+            calls.append((args, kwargs))
+        sync = types.SimpleNamespace(update_progress_bar=original)
+        model = types.ModuleType("frappe.model")
+        model.sync = sync
+        error = RuntimeError("controlled installer failure")
+        with patch.dict(sys.modules, {"frappe.model": model}):
+            with subject.private_install_progress():
+                sync.update_progress_bar("Updating DocTypes for erpnext", 0, 895)
+            self.assertIs(sync.update_progress_bar, original)
+            with self.assertRaises(RuntimeError) as caught:
+                with subject.private_install_progress():
+                    sync.update_progress_bar("Updating DocTypes for frappe", 0, 351)
+                    raise error
+            self.assertIs(caught.exception, error)
+            self.assertIs(sync.update_progress_bar, original)
+            sync.update_progress_bar("ordinary progress", 0, 1)
+        self.assertEqual(calls, [(("ordinary progress", 0, 1), {})])
+
     def testInheritedWritableBridgeRefusesBeforeNativeAdmission(self):
         from unittest.mock import patch
         subject.require_private_environment({})

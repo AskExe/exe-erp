@@ -13,6 +13,7 @@ import re
 import secrets
 import stat
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from .native_cleanup import Failures
@@ -181,6 +182,18 @@ def require_private_environment(environment):
         raise Refused("outbound_bridge_configured")
 
 
+@contextmanager
+def private_install_progress():
+    """Suppress only schema-sync display in this private installer process."""
+    from frappe.model import sync
+    original = sync.update_progress_bar
+    sync.update_progress_bar = lambda *args, **kwargs: None
+    try:
+        yield
+    finally:
+        sync.update_progress_bar = original
+
+
 def allocate(consume_original_dispatch, read_owner, config, operator):
     """Private parent-only operation. operator is an already private DB recipe.
 
@@ -215,7 +228,8 @@ def allocate(consume_original_dispatch, read_owner, config, operator):
             os.chdir(root)
             frappe.destroy()
             frappe.init(site=config["site"], sites_path=str(root), new_site=True)
-            _new_site(db_name=config["database"], db_user=config["database"], site=config["site"], db_type="postgres", db_host=operator["host"], db_port=operator["port"], db_root_username=operator["user"], db_root_password=operator["password"], db_password=secrets.token_hex(32), admin_password=secrets.token_urlsafe(48), install_apps=["erpnext"], force=False, setup_db=True, require_new_database=True)
+            with private_install_progress():
+                _new_site(db_name=config["database"], db_user=config["database"], site=config["site"], db_type="postgres", db_host=operator["host"], db_port=operator["port"], db_root_username=operator["user"], db_root_password=operator["password"], db_password=secrets.token_hex(32), admin_password=secrets.token_urlsafe(48), install_apps=["erpnext"], force=False, setup_db=True, require_new_database=True)
             current.observe(30)
             frappe.destroy()
             frappe.init(site=config["site"], sites_path=str(root))

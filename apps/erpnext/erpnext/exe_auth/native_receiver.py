@@ -159,7 +159,9 @@ def supervise():
             [sys.executable, "-B", "-I", WORKER, "--standby-result", str(result_w)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             close_fds=True, pass_fds=(result_w,),
-            env={"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8"},
+            # Private read-only workers must not open bench-wide log files.
+            env={"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8",
+                 "FRAPPE_STREAM_LOGGING": "1"},
         )
         pidfd = os.pidfd_open(q.pid, 0)
         worker_binding(q, result_w)
