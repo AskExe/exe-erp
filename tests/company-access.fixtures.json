@@ -1,0 +1,3751 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "crm accepted",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    },
+    {
+      "name": "crm owner",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "owner",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    },
+    {
+      "name": "crm invalid 0",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000001",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "crm invalid 1",
+      "value": {
+        "version": 1,
+        "subject_id": [
+          "00000000-0000-4000-8000-000000000001"
+        ],
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 2",
+      "value": {
+        "version": 1,
+        "subject_id": "AAAAAAAA-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 3",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000001",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "crm invalid 4",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000001",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "crm invalid 5",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "other-client",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "crm invalid 6",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "dashboard",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 7",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 8",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:write"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 9",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read",
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 10",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "0",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 11",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": 1,
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 12",
+      "value": {
+        "version": true,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 13",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "unverified",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 14",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": 1
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 15",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "admin",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 16",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "OTHER",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm invalid 17",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true,
+        "extra": "private"
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing version",
+      "value": {
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing subject_id",
+      "value": {
+        "version": 1,
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing company_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing product",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing resource_kind",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing binding_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing native_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing generation_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing authz_epoch",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing audience",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing scopes",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing current_role",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing technical_status",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm missing subscription_entitled",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted"
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki accepted",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    },
+    {
+      "name": "wiki owner",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "owner",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    },
+    {
+      "name": "wiki invalid 0",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000001",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "wiki invalid 1",
+      "value": {
+        "version": 1,
+        "subject_id": [
+          "00000000-0000-4000-8000-000000000001"
+        ],
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 2",
+      "value": {
+        "version": 1,
+        "subject_id": "AAAAAAAA-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 3",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000001",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "wiki invalid 4",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000001",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "wiki invalid 5",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "other-client",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "wiki invalid 6",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "dashboard",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 7",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 8",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:write"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 9",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read",
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 10",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "0",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 11",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": 1,
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 12",
+      "value": {
+        "version": true,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 13",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "unverified",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 14",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": 1
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 15",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "admin",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 16",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "OTHER",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki invalid 17",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true,
+        "extra": "private"
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing version",
+      "value": {
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing subject_id",
+      "value": {
+        "version": 1,
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing company_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing product",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing resource_kind",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing binding_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing native_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing generation_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing authz_epoch",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing audience",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing scopes",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing current_role",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing technical_status",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki missing subscription_entitled",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted"
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp accepted",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    },
+    {
+      "name": "erp owner",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "owner",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    },
+    {
+      "name": "erp invalid 0",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000001",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "erp invalid 1",
+      "value": {
+        "version": 1,
+        "subject_id": [
+          "00000000-0000-4000-8000-000000000001"
+        ],
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 2",
+      "value": {
+        "version": 1,
+        "subject_id": "AAAAAAAA-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 3",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000001",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "erp invalid 4",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000001",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "erp invalid 5",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "other-client",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": true
+    },
+    {
+      "name": "erp invalid 6",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "dashboard",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 7",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 8",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:write"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 9",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read",
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 10",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "0",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 11",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": 1,
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 12",
+      "value": {
+        "version": true,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 13",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "unverified",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 14",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": 1
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 15",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "admin",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 16",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "OTHER",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp invalid 17",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true,
+        "extra": "private"
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing version",
+      "value": {
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing subject_id",
+      "value": {
+        "version": 1,
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing company_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing product",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing resource_kind",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing binding_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing native_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing generation_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing authz_epoch",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing audience",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing scopes",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing current_role",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing technical_status",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp missing subscription_entitled",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted"
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm accepted nil subject_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-0000-0000-000000000000",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm accepted nil company_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-0000-0000-000000000000",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm accepted nil binding_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-0000-0000-000000000000",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm accepted nil generation_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-0000-0000-000000000000",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki accepted nil subject_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-0000-0000-000000000000",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki accepted nil company_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-0000-0000-000000000000",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki accepted nil binding_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-0000-0000-000000000000",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "wiki accepted nil generation_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-0000-0000-000000000000",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp accepted nil subject_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-0000-0000-000000000000",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp accepted nil company_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-0000-0000-000000000000",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp accepted nil binding_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-0000-0000-000000000000",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp accepted nil generation_id",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-0000-0000-000000000000",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp malformed native erp.127.0.0.1",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.127.0.0.1",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp malformed native erp.example.x",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.example.x",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp malformed native erp.example.123",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.example.123",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp malformed native erp.example.test.",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.example.test.",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "erp malformed native erp.-bad.example.test",
+      "value": {
+        "version": 1,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.-bad.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": false,
+      "unboundAccepted": false
+    },
+    {
+      "name": "crm accepted numeric version",
+      "value": {
+        "version": 1.0,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "resource_kind": "crm-workspace",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "crm-alpha",
+        "scopes": [
+          "crm:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "crm",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "00000000-0000-4000-8000-000000000005",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "crm-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    },
+    {
+      "name": "wiki accepted numeric version",
+      "value": {
+        "version": 1.0,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "resource_kind": "wiki-instance",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "wiki-alpha",
+        "scopes": [
+          "wiki:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "wiki",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "wiki-alpha",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "wiki-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    },
+    {
+      "name": "erp accepted numeric version",
+      "value": {
+        "version": 1.0,
+        "subject_id": "00000000-0000-4000-8000-000000000001",
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "resource_kind": "erp-site",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "authz_epoch": "1",
+        "audience": "erp-alpha",
+        "scopes": [
+          "erp:read"
+        ],
+        "current_role": "member",
+        "technical_status": "accepted",
+        "subscription_entitled": true
+      },
+      "binding": {
+        "company_id": "00000000-0000-4000-8000-000000000002",
+        "product": "erp",
+        "binding_id": "00000000-0000-4000-8000-000000000003",
+        "native_id": "erp.alpha.example.test",
+        "generation_id": "00000000-0000-4000-8000-000000000004",
+        "audience": "erp-alpha"
+      },
+      "accepted": true,
+      "unboundAccepted": true
+    }
+  ]
+}

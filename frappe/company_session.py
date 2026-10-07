@@ -29,24 +29,7 @@ COOKIE = "__Host-exe_erp_session"
 FLOW_COOKIE = "__Host-exe_erp_flow"
 CODE = re.compile(r"exc_[A-Za-z0-9_-]{43}\Z")
 FLOW_VALUE = re.compile(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}\Z")
-FIELDS = frozenset(
-	(
-		"version",
-		"subject_id",
-		"company_id",
-		"product",
-		"resource_kind",
-		"binding_id",
-		"native_id",
-		"generation_id",
-		"authz_epoch",
-		"audience",
-		"scopes",
-		"current_role",
-		"technical_status",
-		"subscription_entitled",
-	)
-)
+
 READ_FIELDS = {
 	"Customer": ("name", "customer_name", "customer_type", "customer_group", "territory"),
 	"Item": ("name", "item_name", "item_group", "stock_uom", "disabled"),
@@ -302,39 +285,51 @@ def load_config():
 	)
 
 
+# BEGIN GENERATED COMPANY ACCESS V1
+# policy-sha256:c646ce2b8ac4a92705dfee5f0c693f22ee93ccca3c57dfbc4022e586a3037561
+# Generated into Frappe from the central company contract, never edited there.
+def company_access(value, binding=None):
+	fields = {"version", "subject_id", "company_id", "product", "resource_kind", "binding_id", "native_id", "generation_id", "authz_epoch", "audience", "scopes", "current_role", "technical_status", "subscription_entitled"}
+	uuid = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+	if type(value) is not dict or set(value) != fields or type(value["version"]) not in (int, float) or value["version"] != 1:
+		return None
+	if any(type(value[key]) is not str or not re.fullmatch(uuid, value[key]) or value[key] == "00000000-0000-0000-0000-000000000000" for key in ("subject_id", "company_id", "binding_id", "generation_id")):
+		return None
+	product = value["product"]
+	kinds = {"crm": "crm-workspace", "erp": "erp-site", "wiki": "wiki-instance"}
+	if type(product) is not str or product not in kinds or value["resource_kind"] != kinds[product]:
+		return None
+	native = value["native_id"]
+	if type(native) is not str:
+		return None
+	if product == "crm" and (not re.fullmatch(uuid, native) or native == "00000000-0000-0000-0000-000000000000") or product == "wiki" and not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,79}", native):
+		return None
+	if product == "erp" and (len(native) > 252 or not native.startswith("erp.") or not re.fullmatch(r"[a-z]{2,63}", native.split(".")[-1]) or len(native[4:].split(".")) < 2 or any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) for label in native[4:].split("."))):
+		return None
+	if type(value["authz_epoch"]) is not str or not re.fullmatch(r"[1-9][0-9]{0,18}", value["authz_epoch"]) or type(value["audience"]) is not str or not re.fullmatch(r"[a-z][a-z0-9_-]{2,63}", value["audience"]):
+		return None
+	if value["current_role"] not in ("owner", "member") or value["technical_status"] != "accepted" or value["subscription_entitled"] is not True or type(value["scopes"]) is not list or value["scopes"] != [product + ":read"]:
+		return None
+	if binding is not None and any(value[key] != binding[key] for key in ("company_id", "product", "binding_id", "native_id", "generation_id", "audience")):
+		return None
+	return {**value, "scopes": [product + ":read"]}
+# END GENERATED COMPANY ACCESS V1
+
 def envelope(value, config):
-	if (
-		not isinstance(value, dict)
-		or set(value) != FIELDS
-		or type(value["version"]) is not int
-		or value["version"] != 1
-	):
-		raise Denied(503)
-	fixed = {
+	authority = company_access(value, {
 		"company_id": config.company_id,
 		"product": "erp",
-		"resource_kind": "erp-site",
 		"binding_id": config.binding_id,
 		"native_id": config.site,
 		"generation_id": config.generation_id,
 		"audience": config.audience,
-		"scopes": ["erp:read"],
-		"technical_status": "accepted",
-		"subscription_entitled": True,
-	}
-	if any(type(value[key]) is not type(want) or value[key] != want for key, want in fixed.items()):
+	})
+	if authority is None:
 		raise Denied(503)
-	if (
-		not isinstance(value["subject_id"], str)
-		or not UUID.fullmatch(value["subject_id"])
-		or value["subject_id"] not in config.subjects
-		or type(value["current_role"]) is not str
-		or value["current_role"] not in ("owner", "member")
-		or not isinstance(value["authz_epoch"], str)
-		or not re.fullmatch(r"[1-9][0-9]{0,18}", value["authz_epoch"])
-	):
+	# A central envelope cannot invent a native Frappe user or native role.
+	if authority["subject_id"] not in config.subjects:
 		raise Denied()
-	return config.subjects[value["subject_id"]]
+	return config.subjects[authority["subject_id"]]
 
 
 def resolved_endpoint(host):

@@ -160,6 +160,18 @@ class Tests(unittest.TestCase):
 				self.assertEqual(actual.subjects[IDS[3]], "reader@example.test")
 				self.assertRaises(ValueError, adapter.load_config)
 
+	def test_central_company_contract_conformance(self):
+		manifest = json.loads((ROOT / "company-access.manifest.json").read_text())
+		data = (ROOT / "tests/company-access.fixtures.json").read_bytes()
+		self.assertEqual(hashlib.sha256(data).hexdigest(), manifest["fixturesSha256"])
+		code = (ROOT / "frappe/company_session.py").read_text()
+		generated = code[code.index("# BEGIN GENERATED COMPANY ACCESS V1"):code.index("# END GENERATED COMPANY ACCESS V1") + len("# END GENERATED COMPANY ACCESS V1")]
+		self.assertEqual(hashlib.sha256(generated.encode()).hexdigest(), manifest["artifacts"]["exe-erp"]["sha256"])
+		for case in json.loads(data)["cases"]:
+			with self.subTest(case=case["name"]):
+				self.assertEqual(adapter.company_access(case["value"], case["binding"]) is not None, case["accepted"])
+				self.assertEqual(adapter.company_access(case["value"]) is not None, case["unboundAccepted"])
+
 	def test_exact_envelope_not_role_entitlement(self):
 		self.assertEqual(adapter.envelope(envelope(), config()), "reader@example.test")
 		bad = {
