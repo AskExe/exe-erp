@@ -57,6 +57,19 @@ class SupervisorCarrierTests(unittest.TestCase):
                 subject.supervise()
             launch.assert_not_called()
 
+    def test_private_worker_environment_is_fixed_before_launch(self):
+        with patch.object(subject.sys, "platform", "linux"), \
+             patch.object(subject.os, "getpid", return_value=1), \
+             patch.object(subject.os, "getuid", return_value=1000), \
+             patch.object(subject.os, "pidfd_open", create=True), \
+             patch.object(subject.signal, "pidfd_send_signal", create=True), \
+             patch.dict(os.environ, {"FRAPPE_STREAM_LOGGING": "caller-value", "PRIVATE_TEST_SECRET": "not-forwarded"}), \
+             patch.object(subject.subprocess, "Popen", side_effect=RuntimeError) as launch:
+            result = subject.supervise()
+        self.assertEqual(result[1], "RuntimeError")
+        self.assertEqual(launch.call_args.kwargs["env"], {
+            "PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8", "FRAPPE_STREAM_LOGGING": "1"})
+
 
 class InternalDeadlineTests(unittest.TestCase):
     def worker(self):
@@ -68,6 +81,41 @@ class InternalDeadlineTests(unittest.TestCase):
     def gate(self, start=100, startup=105, end=280):
         import json
         return b"RELEASE " + json.dumps({"start": start, "startup_end": startup, "work_end": end}).encode() + b"\n"
+
+    def run_worker_header(self, raw, load):
+        import logging
+        import stat
+        import types
+        worker = self.worker()
+        old_disable = logging.root.manager.disable
+        selector = types.SimpleNamespace(register=lambda *args: None, select=lambda *args: True, close=lambda: None)
+        try:
+            with patch.object(worker.sys, "platform", "linux"), \
+                 patch.object(worker.sys, "argv", ["worker", "--standby-result", "3"]), \
+                 patch.object(worker.os, "getpid", return_value=2), \
+                 patch.object(worker.os, "getppid", return_value=1), \
+                 patch.object(worker.os, "getuid", return_value=1000), \
+                 patch.object(worker.os, "fstat", return_value=types.SimpleNamespace(st_mode=stat.S_IFIFO)), \
+                 patch.object(worker.os, "set_blocking"), \
+                 patch.object(worker.os, "read", side_effect=[bytes([b]) for b in raw]), \
+                 patch.object(worker.time, "monotonic", return_value=101), \
+                 patch.object(worker.selectors, "DefaultSelector", return_value=selector), \
+                 patch.object(worker, "load_bindings", side_effect=load) as bindings, \
+                 patch.object(worker, "emit_main"):
+                worker.main()
+                return bindings.call_count
+        finally:
+            logging.disable(old_disable)
+
+    def test_logging_disabled_after_release_before_native_imports(self):
+        import logging
+        seen = []
+        self.assertEqual(self.run_worker_header(self.gate(), lambda: seen.append(logging.root.manager.disable)), 1)
+        self.assertEqual(seen, [logging.CRITICAL])
+
+    def test_invalid_release_does_not_load_native_bindings(self):
+        with self.assertRaises(ValueError):
+            self.run_worker_header(b"RELEASE {}\n", lambda: self.fail("native bindings loaded"))
 
     def test_delayed_worker_retains_original_start(self):
         self.assertEqual(self.worker().admit_gate(self.gate(), 101, 104.9), (100, 280))

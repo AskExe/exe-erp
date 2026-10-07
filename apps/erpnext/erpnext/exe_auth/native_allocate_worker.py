@@ -8,6 +8,7 @@ No action file or read-after-uncertain-start fallback exists.
 """
 
 import json
+import logging
 import math
 import os
 import selectors
@@ -169,6 +170,10 @@ def main():
     finally:
         selector.close()
     before, original_end = admit_gate(bytes(header), admitted, time.monotonic())
+    # DDL warnings contain SQL and can exhaust the supervisor's fixed cap.
+    # This fixed private process setting precedes all Frappe imports; native
+    # stdout/stderr still have the unchanged supervisor bounds and discard.
+    logging.disable(logging.CRITICAL)
     load_bindings()
     # Imports cannot renew either startup or work allowance.
     if time.monotonic() >= min(before + 5, original_end):

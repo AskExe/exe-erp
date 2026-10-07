@@ -289,10 +289,10 @@ jobs:
           python3 scripts/company-session-read.test.py
           python -m ruff check frappe/company_session.py scripts/company-session-read.test.py
 
-      - name: Private native observer controlled regressions
+      - name: Private native controlled regressions
         # Closed credential/order tests; no Frappe installation, Core SQL,
         # native role creation, original-start pipe or readiness evidence.
-        run: python3 apps/erpnext/erpnext/exe_auth/test_native_phases.py
+        run: python3 -m unittest discover -s apps/erpnext/erpnext/exe_auth -p 'test_native_*.py'
 
       - name: Entrypoint admin-password regression (bug 593fe59f)
         run: bash scripts/entrypoint-admin-password.test.sh

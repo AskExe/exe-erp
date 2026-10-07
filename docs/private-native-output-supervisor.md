@@ -63,3 +63,19 @@ Subsequent SQL events only shrink the admitted end. No startup window resets.
 The cached-image three-case fixture observed original startup refusal, 65,537-byte combined log refusal and a detached setsid grandchild under UID1000. In the detached case the shrinking work budget expired before Source wait, so the supervisor retained a TimeoutError secondary and returned no worker status; the controlled harness subsequently reaped the killed worker. This is not complete supervisor cleanup, native allocation proof or individual descendant absence after PID1 exit. All forced-close EOFfalse observations and earlier failed metadata admissions remain retained.
 
 This Source-only successor keeps a separate original start-based termination bound: before a valid frame it is startup5s plus termination3s; after the one timely original frame it is original remaining work plus the existing30s reserve. Later admitted/lease budget events shrink only startup/work authority. Fatal pidfd kill/wait uses at most3s within that fixed original termination bound, never a renewed work/lease origin. Primary TimeoutError and distinct cleanup errors remain preserved; success still requires actual EOF and worker wait. No external PostgreSQL backend cancellation/rollback or Core73 fixed-script composition is qualified. The pinned ordinary run passed all76 named controlled cases, fourteen syntax checks and Ruff. The same three cached-image Linux cases then passed: startup refusal at5.027s, combined log refusal after65,537 bytes, and the original8s detached-grandchild work refusal. Each recorded Source worker return status-9 before harness polling/wait, with no cleanup secondary. All inner fatal EOFflags remainedfalse at forcedclose; external CLI EOF/reap and exact three-container cleanup were separately complete. The prior incomplete Source reap remains historical evidence, superseded only for these controlled cases. No individual descendant post-PID1-exit absence, external PostgreSQL cancellation/rollback, real native imports/allocation, protected secret staging or Core fixed-script composition is qualified.
+
+## Private installer output
+
+The fixed supervisor supplies `FRAPPE_STREAM_LOGGING=1` only to its private
+allocation worker. After the validated internal RELEASE gate, that worker
+disables Python logging before loading Frappe bindings. This avoids read-only
+bench log-file creation and password-bearing DDL warnings; ordinary Frappe
+logging is unchanged. Schema-sync progress display is suppressed only around
+the private `_new_site` call and restored on success or error. No `CI` setting,
+request state, additional writable mount or output-cap increase is used.
+
+The retained ARM64 supplier constructor probe reproduced `OSError` errno30 at
+the bench database log before a database connection. Stream logging allowed
+construction; fixed logging disable produced zero synthetic DDL output. It
+used no SQL or credentials and verified owned cleanup. These constructor and
+controlled restoration checks do not qualify a complete native allocation.
