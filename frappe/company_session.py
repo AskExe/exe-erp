@@ -286,7 +286,7 @@ def load_config():
 
 
 # BEGIN GENERATED COMPANY ACCESS V1
-# policy-sha256:c646ce2b8ac4a92705dfee5f0c693f22ee93ccca3c57dfbc4022e586a3037561
+# policy-sha256:790e6bc8d9b78c31d33fa4fce3b57717c952d225b078eef442726daf6c9ec85c
 # Generated into Frappe from the central company contract, never edited there.
 def company_access(value, binding=None):
 	fields = {"version", "subject_id", "company_id", "product", "resource_kind", "binding_id", "native_id", "generation_id", "authz_epoch", "audience", "scopes", "current_role", "technical_status", "subscription_entitled"}
@@ -302,7 +302,7 @@ def company_access(value, binding=None):
 	native = value["native_id"]
 	if type(native) is not str:
 		return None
-	if product == "crm" and (not re.fullmatch(uuid, native) or native == "00000000-0000-0000-0000-000000000000") or product == "wiki" and not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,79}", native):
+	if (product == "crm" and (not re.fullmatch(uuid, native) or native == "00000000-0000-0000-0000-000000000000")) or (product == "wiki" and not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,79}", native)):
 		return None
 	if product == "erp" and (len(native) > 252 or not native.startswith("erp.") or not re.fullmatch(r"[a-z]{2,63}", native.split(".")[-1]) or len(native[4:].split(".")) < 2 or any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) for label in native[4:].split("."))):
 		return None
