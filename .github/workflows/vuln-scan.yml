@@ -28,7 +28,7 @@ name: Vulnerability Scan
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/askexe-public-beta]
   pull_request:
   schedule:
     - cron: '0 3 * * 1'   # Weekly Monday 03:00 UTC
@@ -162,7 +162,7 @@ jobs:
   # ── 3. Container — Trivy filesystem + Dockerfile config ───────
   container-vuln-scan:
     name: Container vulnerability scan (Trivy)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/askexe-public-beta')
     runs-on: [self-hosted, linux, x64, mac-local]
     # BOUNDED (bug 3136f36b): self-hosted job, no platform default; observed
     # 1.6-19.8 min over the last 15 runs -> 30 min caps a wedged scan at ~1.5x worst.
