@@ -24,6 +24,10 @@ apply_on_table = {"Item Code": "items", "Item Group": "item_groups", "Brand": "b
 
 
 def get_pricing_rules(args, doc=None):
+	if frappe.flags.get("company_editor") is not None:
+		from frappe.company_editor import rule_free_admission
+		if rule_free_admission():
+			return []
 	pricing_rules = []
 	values = {}
 

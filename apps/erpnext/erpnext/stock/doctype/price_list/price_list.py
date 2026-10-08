@@ -73,6 +73,18 @@ class PriceList(Document):
 
 
 def get_price_list_details(price_list):
+	if frappe.flags.get("company_editor"):
+		from frappe.company_editor import Context, Denied, calculator_currency, current
+		context = frappe.flags.company_editor
+		if isinstance(context, Context) and context.operation == "calculate":
+			current(context)
+			document = frappe.get_doc("Price List", price_list)
+			document.check_permission("read")
+			if document.currency != calculator_currency():
+				raise Denied(403)
+			if not document.enabled:
+				throw(_("Price List {0} is disabled or does not exist").format(price_list))
+			return frappe._dict({key: document.get(key) for key in ("currency", "price_not_uom_dependent", "enabled")})
 	price_list_details = frappe.cache().hget("price_list_details", price_list)
 
 	if not price_list_details:

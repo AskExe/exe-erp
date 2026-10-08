@@ -126,12 +126,31 @@ class Browser:
 		# Remove query values from retained URL (callback state is never evidence).
 		value['url'] = value['url'].split('?')[0]
 		(OUTPUT / (name + '.json')).write_text(json.dumps(value, indent=2))
-		picture = await self.send('Page.captureScreenshot', {'format': 'jpeg', 'quality': 55, 'captureBeyondViewport': False}, session)
-		(OUTPUT / (name + '.jpg')).write_bytes(base64.b64decode(picture['data']))
+		if 'edited-reloaded' in name or name == 'failure':
+			picture = await self.send('Page.captureScreenshot', {'format': 'jpeg', 'quality': 55, 'captureBeyondViewport': False}, session)
+			(OUTPUT / (name + '.jpg')).write_bytes(base64.b64decode(picture['data']))
 		if sum(path.stat().st_size for path in OUTPUT.iterdir() if path.is_file()) > OUTPUT_LIMIT:
 			raise RuntimeError('Owned browser evidence output cap')
 
 	async def flow(self):
+		records=[]
+		for entry in CONFIG['sites'].values():
+			records.append(await self.flow_site(entry))
+		for current,other in ((records[0],records[1]),(records[1],records[0])):
+			for kind,name in (('Customer',other['customer']),('Sales Invoice',other['invoice'])):
+				path='/api/method/frappe.desk.form.load.getdoc?'+urlencode({'doctype':kind,'name':name})
+				status=await self.evaluate('fetch('+json.dumps(path)+',{credentials:"same-origin"}).then(r=>r.status)',current['session'])
+				if status not in (401,403,404):
+					raise RuntimeError('Foreign native record read was not denied')
+			# Visible mounted native switcher reaches the configured central landing.
+			await self.evaluate("(()=>{const button=document.querySelector('exe-service-switcher')?.shadowRoot?.querySelector('.exe-ss-logout');if(!button)throw Error('Mounted native logout missing');button.click();})()",current['session'])
+			await self.wait("location.origin==='https://auth.platform.example.test' && location.pathname==='/logout'",current['session'])
+			await self.snapshot('native-logout-'+current['plane'],current['session'])
+
+
+	async def flow_site(self,entry):
+		plane = 'a' if entry['client'] == 'erp-a' else 'b'
+		label = plane.upper()
 		target = await self.send('Target.createTarget', {'url': 'about:blank'})
 		session = (await self.send('Target.attachToTarget', {'targetId': target['targetId'], 'flatten': True}))['sessionId']
 		self.session = session
@@ -139,18 +158,63 @@ class Browser:
 		await self.send('Runtime.enable', session=session)
 		await self.send('Network.enable', session=session)
 		await self.send('Fetch.enable', {'patterns': [{'urlPattern': '*', 'requestStage': 'Request'}]}, session)
-		entry = next(iter(CONFIG['sites'].values()))
 		await self.send('Page.navigate', {'url': entry['origin'] + '/company-session/start'}, session)
 		await self.wait("location.pathname.startsWith('/desk') && Boolean(window.frappe?.app)", session, 25)
-		await self.snapshot('desk', session)
+		await self.snapshot('desk-'+plane, session)
 		await self.evaluate("frappe.set_route('List','Customer')", session)
 		await self.wait("window.cur_list?.doctype === 'Customer' && Boolean(document.querySelector('.primary-action')) && document.body.innerText.includes('Customer')", session)
-		await self.snapshot('customer-list', session)
+		await self.snapshot('customer-list-'+plane, session)
 		# Execute only the observed native New button. Missing RPCs are recorded
 		# before admitting any additional server capability.
 		await self.evaluate("document.querySelector('.primary-action').click()", session)
+		await self.wait("Boolean(window.cur_frm?.doctype === 'Customer') || [...document.querySelectorAll('.modal.show button')].some(b=>b.innerText==='Edit Full Form')", session)
+		await self.evaluate("[...document.querySelectorAll('.modal.show button')].find(b=>b.innerText==='Edit Full Form')?.click()", session)
 		await self.wait("Boolean(window.cur_frm?.doctype === 'Customer' && document.querySelector('[data-fieldname=customer_name] input'))", session)
-		await self.snapshot('customer-new', session)
+		await self.snapshot('customer-new-'+plane, session)
+		# Drive actual visible native controls and their input/change/blur handlers.
+		await self.evaluate("(()=>{for(const [field,value] of Object.entries("+json.dumps({'customer_name':'Browser Editor '+label,'customer_group':'ACL '+plane,'territory':'ACL '+plane})+")){const input=cur_frm.fields_dict[field].$input[0];input.focus();input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();}})()", session)
+		await self.wait("cur_frm.doc.customer_name==="+json.dumps('Browser Editor '+label)+" && cur_frm.doc.customer_group==="+json.dumps('ACL '+plane)+" && cur_frm.doc.territory==="+json.dumps('ACL '+plane),session)
+		await self.evaluate("cur_frm.page.btn_primary[0].click()", session)
+		await self.wait("cur_frm.doc.doctype==='Customer' && !cur_frm.doc.__islocal && !cur_frm.doc.__unsaved && cur_frm.doc.customer_name==="+json.dumps('Browser Editor '+label),session)
+		name = await self.evaluate('cur_frm.doc.name', session)
+		await self.snapshot('customer-created-'+plane, session)
+		await self.evaluate("(()=>{const input=cur_frm.fields_dict.customer_name.$input[0];input.focus();input.value="+json.dumps("Browser Edited "+label)+";input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();})()", session)
+		await self.wait("cur_frm.doc.customer_name==="+json.dumps('Browser Edited '+label)+" && cur_frm.doc.__unsaved", session)
+		await self.evaluate("cur_frm.page.btn_primary[0].click()", session)
+		await self.wait("!cur_frm.doc.__unsaved && cur_frm.doc.customer_name==="+json.dumps('Browser Edited '+label), session)
+		await self.send('Page.reload', session=session)
+		await self.wait("window.cur_frm?.doc.name===" + json.dumps(name) + " && cur_frm.doc.customer_name==="+json.dumps('Browser Edited '+label)+" && !cur_frm.doc.__unsaved", session, 20)
+		await self.snapshot('customer-edited-reloaded-'+plane, session)
+		await self.evaluate("frappe.set_route('List','Sales Invoice')",session)
+		await self.wait("window.cur_list?.doctype==='Sales Invoice' && Boolean(cur_list.page.btn_primary?.[0])",session)
+		await self.evaluate("cur_list.page.btn_primary[0].click()",session)
+		await self.wait("window.cur_frm?.doctype==='Sales Invoice' && Boolean(cur_frm.fields_dict.customer.$input?.[0])",session)
+		await self.snapshot('invoice-new-'+plane,session)
+		await self.evaluate("(()=>{const input=cur_frm.fields_dict.customer.$input[0];input.focus();input.value="+json.dumps(name)+";input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();})()",session)
+		await self.wait("cur_frm.doc.customer==="+json.dumps(name)+" && cur_frm.doc.company==="+json.dumps('Editor '+plane)+" && cur_frm.doc.debit_to && cur_frm.doc.currency==='USD'",session)
+		await self.evaluate("(()=>{const grid=cur_frm.fields_dict.items.grid;if(!grid.grid_rows.length)grid.wrapper.find('.grid-add-row')[0].click();const cell=grid.grid_rows[0].row.find('[data-fieldname=item_code]')[0];if(!cell)throw Error('Missing visible item cell');cell.click();})()",session)
+		await self.wait("Boolean(cur_frm.fields_dict.items.grid.grid_rows[0].columns.item_code?.field?.$input?.[0])",session)
+		await self.evaluate("(()=>{const input=cur_frm.fields_dict.items.grid.grid_rows[0].columns.item_code.field.$input[0];if(!input.offsetParent)throw Error('Item input not visible');input.focus();input.value="+json.dumps('Editor-Service-'+plane)+";input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();})()",session)
+		await self.wait("cur_frm.doc.items[0].item_code==="+json.dumps('Editor-Service-'+plane)+" && cur_frm.doc.items[0].rate===100 && cur_frm.doc.items[0].income_account && cur_frm.doc.items[0].cost_center && !frappe.request.ajax_count",session)
+		await self.evaluate("cur_frm.page.btn_primary[0].click()",session)
+		await self.wait("cur_frm.doc.doctype==='Sales Invoice' && !cur_frm.doc.__islocal && !cur_frm.doc.__unsaved && cur_frm.doc.docstatus===0",session)
+		invoice=await self.evaluate('cur_frm.doc.name',session)
+		await self.snapshot('invoice-created-'+plane,session)
+		await self.evaluate("(()=>{const input=cur_frm.fields_dict.po_no.$input[0];if(!input.offsetParent)cur_frm.fields_dict.po_no.$wrapper.closest('.form-section').find('.section-head')[0]?.click();})()",session)
+		await self.evaluate("(()=>{const input=cur_frm.fields_dict.po_no.$input[0];if(!input.offsetParent)throw Error('PO input not visible');input.focus();input.value="+json.dumps('Browser Edited '+label)+";input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();})()",session)
+		await self.wait("cur_frm.doc.po_no==="+json.dumps('Browser Edited '+label)+" && cur_frm.doc.__unsaved",session)
+		await self.evaluate("(()=>{const row=cur_frm.fields_dict.items.grid.grid_rows[0];const cell=row.row.find('[data-fieldname=qty]')[0];if(!cell)throw Error('Missing visible quantity cell');cell.click();})()",session)
+		await self.wait("Boolean(cur_frm.fields_dict.items.grid.grid_rows[0].columns.qty?.field?.$input?.[0])",session)
+		await self.evaluate("(()=>{const input=cur_frm.fields_dict.items.grid.grid_rows[0].columns.qty.field.$input[0];if(!input.offsetParent)throw Error('Quantity input not visible');input.focus();input.value='2';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();})()",session)
+		await self.wait("cur_frm.doc.items[0].qty===2 && cur_frm.doc.items[0].rate===100 && !frappe.request.ajax_count && cur_frm.doc.__unsaved",session)
+		await self.evaluate("cur_frm.page.btn_primary[0].click()",session)
+		await self.wait("!cur_frm.doc.__unsaved && cur_frm.doc.items[0].qty===2 && cur_frm.doc.po_no==="+json.dumps('Browser Edited '+label),session)
+		await self.send('Page.reload',session=session)
+		await self.wait("window.cur_frm?.doc.name==="+json.dumps(invoice)+" && cur_frm.doc.po_no==="+json.dumps('Browser Edited '+label)+" && cur_frm.doc.docstatus===0 && cur_frm.doc.items[0].qty===2 && cur_frm.doc.items[0].item_code==="+json.dumps('Editor-Service-'+plane)+" && !cur_frm.doc.__unsaved",session,20)
+		await self.snapshot('invoice-edited-reloaded-'+plane,session)
+		return {'plane':plane,'session':session,'customer':name,'invoice':invoice}
+
+
 
 
 def group_rows(pgid):
@@ -182,7 +246,7 @@ async def main():
 			receiver = asyncio.create_task(browser.receive())
 			try:
 				await browser.flow()
-				outcome = {'passed': True, 'scope': 'actual native Desk/List/New UI; controlled authority; no genuine parent proof'}
+				outcome = {'passed': True, 'scope': 'actual native A/B Customer and draft Sales Invoice UI create/edit/reload, foreign record read denial and native logout central landing; controlled authority; no genuine parent proof'}
 			except Exception:
 				if browser.session:
 					await browser.snapshot('failure', browser.session)

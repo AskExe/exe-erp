@@ -79,6 +79,9 @@ class FormMeta(Meta):
 		# add masked fields (per-user, per-meta)
 		d["masked_fields"] = [df.fieldname for df in self.get_masked_fields()]
 
+		if frappe.flags.get("company_editor"):
+			from frappe.company_editor import form_meta_ceiling
+			return form_meta_ceiling(d)
 		return d
 
 	def add_code(self):
