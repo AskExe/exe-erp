@@ -287,7 +287,10 @@ jobs:
         # a separate admission gate. No Docker or third-party calls here.
         run: |
           python3 scripts/company-session-read.test.py
-          python -m ruff check frappe/company_session.py scripts/company-session-read.test.py
+          python3 scripts/company-session-browser.test.py
+          python3 scripts/company-editor.test.py
+          node scripts/company-editor-ui.test.cjs
+          python -m ruff check frappe/company_session.py frappe/company_editor.py scripts/company-session-read.test.py scripts/company-editor.test.py
 
       - name: Private native controlled regressions
         # Closed credential/order tests; no Frappe installation, Core SQL,

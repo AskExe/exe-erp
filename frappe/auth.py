@@ -143,6 +143,26 @@ class LoginManager:
 				self.make_session()
 				self.set_user_info()
 
+	@classmethod
+	def for_company(cls, user, binding, *, start=False):
+		"""Trusted company boundary only; never local-password/auth-hook login."""
+		manager = cls.__new__(cls)
+		manager.user, manager.info = user, None
+		manager.full_name, manager.user_type, manager.user_lang = None, None, None
+		manager.resume = not start
+		frappe.local.cookie_manager = CookieManager()
+		if start:
+			manager.get_user_info()
+			manager.make_session(company_binding=binding)
+		else:
+			manager.make_session(resume=True)
+			if manager.user != user or frappe.session.data.get("company_binding") != binding:
+				from frappe.company_session import Denied
+				raise Denied(401)
+			manager.get_user_info()
+		manager.set_user_info(resume=True)
+		return manager
+
 	def login(self):
 		self.run_trigger("before_login")
 
@@ -225,7 +245,7 @@ class LoginManager:
 		frappe.local.cookie_manager.delete_cookie("preferred_language")
 
 	def make_session(
-		self, resume: bool = False, session_end: str | None = None, audit_user: str | None = None
+		self, resume: bool = False, session_end: str | None = None, audit_user: str | None = None, company_binding: dict | None = None
 	):
 		# start session
 		frappe.local.session_obj = Session(
@@ -235,13 +255,15 @@ class LoginManager:
 			user_type=self.user_type,
 			session_end=session_end,
 			audit_user=audit_user,
+			company_binding=company_binding,
 		)
 
 		# reset user if changed to Guest
 		self.user = frappe.local.session_obj.user
 		frappe.local.session = frappe.local.session_obj.data
-		self.clear_active_sessions()
-		if not resume:
+		if not frappe.session.data.get("company_binding"):
+			self.clear_active_sessions()
+		if not resume and company_binding is None:
 			self.run_trigger("on_session_creation")
 
 	def clear_active_sessions(self):
@@ -411,6 +433,8 @@ class CookieManager:
 		max_age=None,
 		deduplicate=False,
 	):
+		if frappe.session and frappe.session.data.get("company_binding"):
+			secure = True
 		if not secure and hasattr(frappe.local, "request"):
 			secure = frappe.local.request.scheme == "https"
 		if (

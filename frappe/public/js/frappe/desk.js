@@ -379,6 +379,7 @@ frappe.Application = class Application {
 	logout() {
 		var me = this;
 		frappe.confirm(__("Are you sure you want to log out?"), function () {
+			if (frappe.boot?.company_editor?.version === 2) return frappe.company_editor_logout();
 			const switcher = document.querySelector("exe-service-switcher");
 			if (switcher) return switcher._logout();
 			me.logged_out = true;

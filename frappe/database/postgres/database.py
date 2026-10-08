@@ -21,7 +21,7 @@ from psycopg2.errors import (
 	SequenceGeneratorLimitExceeded,
 	SyntaxError,
 )
-from psycopg2.extensions import ISOLATION_LEVEL_REPEATABLE_READ
+from psycopg2.extensions import ISOLATION_LEVEL_READ_COMMITTED, ISOLATION_LEVEL_REPEATABLE_READ
 
 import frappe
 from frappe.database.database import Database
@@ -193,7 +193,16 @@ class PostgresDatabase(PostgresExceptionUtil, Database):
 			conn_settings["port"] = self.port
 
 		conn = psycopg2.connect(**conn_settings)
-		conn.set_isolation_level(ISOLATION_LEVEL_REPEATABLE_READ)
+		isolation = ISOLATION_LEVEL_REPEATABLE_READ
+		if context := frappe.flags.get("company_editor"):
+			from frappe.company_editor import Context
+
+			if isinstance(context, Context):
+				# Hosted editor final ACL checks must see committed revocations.
+				# Native row locks/modified checks and one rollbackable business
+				# transaction remain; this is not cross-database atomicity.
+				isolation = ISOLATION_LEVEL_READ_COMMITTED
+		conn.set_isolation_level(isolation)
 
 		return conn
 
