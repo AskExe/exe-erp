@@ -783,6 +783,9 @@ class NativeEditor(unittest.TestCase):
 				self.assertIn(fetched.get_json()['message']['grant_commission'],(0,1))
 
 		STATE['reader']=True
+		# Issue a read-scoped SID: changing an existing writer binding correctly returns 401.
+		self.cookies, self.csrf = {}, None
+		self.login()
 		try:
 			self.assertEqual(self.call('/api/method/'+editor.RULE_CALCULATOR,'POST',rules_args).status_code,403)
 			self.assertEqual(self.call('/api/method/'+editor.TAX_TEMPLATE,'POST',tax_args).status_code,403)
@@ -790,6 +793,8 @@ class NativeEditor(unittest.TestCase):
 			self.assertEqual(self.call('/api/method/'+editor.SALES_SETTINGS+'?'+urlencode(settings)).status_code,403)
 		finally:
 			STATE['reader']=False
+			self.cookies, self.csrf = {}, None
+			self.login()
 		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Custom DocPerm',{'parent':'Item','role':WRITER},'read',0))
 		try:
 			self.assertIn(self.call('/api/method/'+editor.PRICE_CALCULATOR,'POST',price_args).status_code,(403,404))
