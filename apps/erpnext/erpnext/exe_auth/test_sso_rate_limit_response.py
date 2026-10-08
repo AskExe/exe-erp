@@ -76,6 +76,7 @@ import sys
 import types
 import unittest
 
+from werkzeug.exceptions import HTTPException
 from werkzeug.test import Client
 from werkzeug.wrappers import Request, Response
 
@@ -308,36 +309,45 @@ class TestHandleExceptionNeverReturnsNone(unittest.TestCase):
 		)
 
 	def test_application_returns_handle_exception_result_to_werkzeug(self):
-		"""Pins the assumption TestWerkzeugBoundaryGetsAWsgiCallable relies on.
+		"""Execute the shipped dispatcher and native error boundary via Werkzeug."""
+		dispatcher = _function_def(_APP_PY, "application")
+		native = _function_def(_APP_PY, "native_application")
+		dispatcher.decorator_list = []
+		native.decorator_list = []
+		error = RuntimeError("controlled native endpoint refusal")
+		response = Response("rate limited", status=429)
+		calls = []
 
-		If `application()` ever stops handing the exception response straight
-		back to the `@Request.application` decorator, the boundary test above is
-		no longer modelling production and must be revisited.
-		"""
-		func = _function_def(_APP_PY, "application")
+		def fail_request(request, company_context=None):
+			raise error
 
-		assigns_from_handle_exception = any(
-			isinstance(node, ast.Call)
-			and isinstance(node.func, ast.Name)
-			and node.func.id == "handle_exception"
-			for node in ast.walk(func)
-		)
-		self.assertTrue(
-			assigns_from_handle_exception,
-			"application() no longer routes exceptions through handle_exception()",
-		)
+		def handle_exception(exc):
+			self.assertIs(exc, error)
+			calls.append("native exception response")
+			return response
 
-		returns_bare_response = any(
-			isinstance(node, ast.Return)
-			and isinstance(node.value, ast.Name)
-			and node.value.id == "response"
-			for node in func.body
-		)
-		self.assertTrue(
-			returns_bare_response,
-			"application() must return `response` — whatever value it holds is "
-			"what Werkzeug calls as a WSGI callable",
-		)
+		frappe_stub = types.SimpleNamespace(local=types.SimpleNamespace())
+		namespace = {
+			"frappe": frappe_stub, "_company_config": None, "_sites_path": ".",
+			"Request": Request, "HTTPException": HTTPException,
+			"init_request": fail_request, "handle_exception": handle_exception,
+			"run_after_request_hooks": lambda *args: None,
+			"log_request": lambda *args: None, "process_response": lambda *args: None,
+		}
+		tree = ast.Module(body=[dispatcher, native], type_ignores=[])
+		exec(compile(ast.fix_missing_locations(tree), _APP_PY, "exec"), namespace)
+		client = Client(Request.application(namespace["application"]))
+		actual = client.get("/api/method/erpnext.exe_auth.api.gotrue_login_start", headers={"Accept": BROWSER_ACCEPT})
+		self.assertEqual(actual.status_code, 429)
+		self.assertEqual(actual.data, b"rate limited")
+		self.assertEqual(calls, ["native exception response"])
+
+		# Editor errors must be propagated to its deny/rollback boundary, never
+		# converted to a successful native response or standalone exception page.
+		with self.assertRaises(RuntimeError) as raised:
+			namespace["native_application"](Request.from_values(), object())
+		self.assertIs(raised.exception, error)
+		self.assertEqual(calls, ["native exception response"])
 
 
 @contextlib.contextmanager

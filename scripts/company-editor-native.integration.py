@@ -9,6 +9,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -209,6 +210,26 @@ def write_setup(site, plane):
 		frappe.db.commit()
 	finally:
 		fixture.close()
+
+
+def verify_prepared_sites():
+	# Post-setup gate: the original verify_sites intentionally requires absent
+	# fixture users and is used only before operator preparation.
+	if not re.fullmatch(r'[a-f0-9]{32}', ARGS.fixture_id):
+		raise ValueError('Random owned fixture ID required')
+	databases = set()
+	for site, plane in ((ARGS.site_a, 'a'), (ARGS.site_b, 'b')):
+		if site != 'erp.acl-' + plane + '-' + ARGS.fixture_id[:12] + '.example.test':
+			raise ValueError('Exact prepared site namespace required')
+		path = ARGS.sites_path / site / 'site_config.json'
+		if path.resolve() != path:
+			raise ValueError('Canonical owned config required')
+		data = json.loads(path.read_text())
+		if data.get('allow_tests') is not True or data.get('company_acl_fixture') != ARGS.fixture_id or data.get('company_editor_fixture_prepared') != ARGS.fixture_id or data.get('db_type') != 'postgres' or not isinstance(data.get('db_name'), str) or not data['db_name']:
+			raise ValueError('Owned native preparation receipt absent')
+		databases.add(data['db_name'])
+	if len(databases) != 2:
+		raise ValueError('Distinct prepared native databases required')
 
 
 class NativeEditor(unittest.TestCase):
@@ -574,6 +595,8 @@ if __name__ == '__main__':
 	parser.add_argument('--diagnostic', action='store_true')
 	parser.add_argument('--browser-serve', action='store_true')
 	parser.add_argument('--calculator-probe', action='store_true')
+	parser.add_argument('--prepare-only', action='store_true')
+	parser.add_argument('--prepared', action='store_true')
 	ARGS = parser.parse_args()
 	if ARGS.browser_serve:
 		def startup_error(_kind, error, _traceback):
@@ -594,7 +617,22 @@ if __name__ == '__main__':
 		sys.excepthook = startup_error
 	ARGS.sites_path = Path(ARGS.sites_path).resolve(strict=True)
 	fixture.ARGS = ARGS
-	if ARGS.plane == 'a':
+	if ARGS.prepare_only:
+		if ARGS.prepared or ARGS.browser_serve or ARGS.calculator_probe:
+			raise ValueError('Closed native preparation only')
+		fixture.verify_sites()
+		for site, plane in ((ARGS.site_a, 'a'), (ARGS.site_b, 'b')):
+			fixture.setup(site, plane)
+			write_setup(site, plane)
+			path = ARGS.sites_path / site / 'site_config.json'
+			data = json.loads(path.read_text())
+			data['company_editor_fixture_prepared'] = ARGS.fixture_id
+			path.write_text(json.dumps(data))
+		print('Owned supported native operator setup completed for both sites')
+		sys.exit(0)
+	if ARGS.prepared:
+		verify_prepared_sites()
+	elif ARGS.plane == 'a':
 		fixture.verify_sites()
 		for site, plane in ((ARGS.site_a, 'a'), (ARGS.site_b, 'b')):
 			fixture.setup(site, plane)

@@ -95,6 +95,7 @@ try{
  run(['exec','-e','NATIVE_ACL_FIXTURE_ID='+suffix,'-e','NATIVE_ACL_SITE_A='+a,'-e','NATIVE_ACL_SITE_B='+b,'-e','NATIVE_ACL_DB_PASSWORD='+dbPassword,'-e','NATIVE_ACL_ADMIN_PASSWORD='+adminPassword,
   erp,'/home/frappe/frappe-bench/env/bin/python','-B','/home/frappe/frappe-bench/apps/frappe/scripts/company-session-native-setup.py'],remaining)
  if(assets)run(['exec',erp,'/home/frappe/frappe-bench/env/bin/python','-B','-c',"from pathlib import Path; Path('/home/frappe/frappe-bench/sites/assets').symlink_to('/opt/company-native-assets')"])
+ if(editorMode)run(['exec','--workdir','/home/frappe/frappe-bench/sites',erp,'/home/frappe/frappe-bench/env/bin/python','-B','/home/frappe/frappe-bench/apps/frappe/scripts/company-editor-native.integration.py','--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,'--plane','a','--prepare-only'],Math.max(1,setupEnd-Date.now()))
  guard()
  phaseEnd=Date.now()+120000
  if(browserMode){
@@ -103,7 +104,7 @@ try{
    run(['exec','-d','--workdir','/home/frappe/frappe-bench/sites',erp,'/bin/sh','-c',
     'exec "$@" > /tmp/owned-browser-'+plane+'.stdout 2>/tmp/owned-browser-'+plane+'.stderr','owned-native-browser',
     '/home/frappe/frappe-bench/env/bin/python','-B','/home/frappe/frappe-bench/apps/frappe/scripts/company-editor-native.integration.py',
-    '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,'--plane',plane,'--browser-serve'])
+    '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,'--plane',plane,'--browser-serve','--prepared'])
    let ready=false
    for(let count=0;count<75;count++){
     const receipt=run(['exec',erp,'cat','/tmp/owned-browser-'+plane+'.json'],5000,true)
@@ -135,7 +136,7 @@ try{
  for(const plane of process.env.ERP_NATIVE_DIAGNOSE==='true'||calculatorProbe?['a']:httpMode?['a','b']:[null]){
   run(['exec','--workdir','/home/frappe/frappe-bench/sites',erp,'/home/frappe/frappe-bench/env/bin/python','-B',
    '/home/frappe/frappe-bench/apps/frappe/scripts/'+(editorMode?'company-editor-native.integration.py':httpMode?'company-session-wsgi.integration.py':'company-session-native.integration.py'),
-   '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,...(plane?['--plane',plane]:[]),...(editorMode&&process.env.ERP_NATIVE_DIAGNOSE==='true'?['--diagnostic']:[]),...(calculatorProbe?['--calculator-probe']:[])],120000)
+   '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,...(plane?['--plane',plane]:[]),...(editorMode&&process.env.ERP_NATIVE_DIAGNOSE==='true'?['--diagnostic']:[]),...(calculatorProbe?['--calculator-probe']:[]),...(editorMode?['--prepared']:[])],120000)
  }
  }
  guard()

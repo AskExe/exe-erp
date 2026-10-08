@@ -4,7 +4,9 @@ import dataclasses
 import hashlib
 import json
 import pathlib
+import re
 import sys
+import tempfile
 import time
 import types
 import unittest
@@ -76,6 +78,35 @@ class EditorControls(unittest.TestCase):
 			for rows in ([], complete[:1], [complete[0], complete[0]], [complete[0], {'app_name': 'erpnext', 'is_setup_complete': 0}], [complete[0], {'app_name': 'erpnext', 'is_setup_complete': True}]):
 				query.return_value = rows
 				self.denied(editor.assert_site_configuration, 503)
+
+	def test_actual_owned_post_setup_gate_accepts_only_prepared_distinct_sites(self):
+		module = ast.parse((ROOT / 'scripts/company-editor-native.integration.py').read_text())
+		function = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'verify_prepared_sites')
+		with tempfile.TemporaryDirectory() as directory:
+			base = pathlib.Path(directory).resolve()
+			marker = 'a' * 32
+			sites = ['erp.acl-' + plane + '-' + marker[:12] + '.example.test' for plane in ('a', 'b')]
+			args = types.SimpleNamespace(fixture_id=marker, sites_path=base, site_a=sites[0], site_b=sites[1])
+			configs = []
+			for index, site in enumerate(sites):
+				path = base / site / 'site_config.json'
+				path.parent.mkdir()
+				data = {'allow_tests': True, 'company_acl_fixture': marker, 'company_editor_fixture_prepared': marker, 'db_type': 'postgres', 'db_name': 'owned_' + str(index)}
+				path.write_text(json.dumps(data))
+				configs.append((path, data))
+			namespace = {'ARGS': args, 're': re, 'json': json}
+			exec(compile(ast.Module(body=[function], type_ignores=[]), '<actual-owned-fixture-gate>', 'exec'), namespace)
+			check = namespace['verify_prepared_sites']
+			check()
+			path, data = configs[1]
+			for key, value in [('allow_tests', False), ('company_acl_fixture', 'b' * 32), ('company_editor_fixture_prepared', None), ('db_type', 'mariadb'), ('db_name', configs[0][1]['db_name'])]:
+				path.write_text(json.dumps({**data, key: value}))
+				with self.assertRaises(ValueError):
+					check()
+			path.write_text(json.dumps(data))
+			args.site_b = 'erp.acl-b-foreign.example.test'
+			with self.assertRaises(ValueError):
+				check()
 
 	def test_default_off_and_v1_never_promote(self):
 		self.denied(lambda: editor.editor_envelope(self.value, dataclasses.replace(self.c, editor_enabled=False)), 401)
