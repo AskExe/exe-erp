@@ -36,7 +36,7 @@ name: CI checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/askexe-public-beta]
   workflow_call:
     inputs:
       ref:
