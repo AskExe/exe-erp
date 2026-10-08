@@ -41,6 +41,14 @@ RULE_CALCULATOR = "erpnext.accounts.doctype.pricing_rule.pricing_rule.apply_pric
 SALES_SETTINGS = "frappe.client.get_single_value"
 TAX_TEMPLATE = "erpnext.stock.get_item_details.get_item_tax_template"
 INVOICE_LINK_QUERIES = frozenset(("erpnext.controllers.queries.item_query", "erpnext.controllers.queries.get_item_uom_query", "erpnext.controllers.queries.get_income_account"))
+ROUND_OFF = "erpnext.controllers.taxes_and_totals.get_round_off_applicable_accounts"
+ROUNDING_SETTING = "erpnext.controllers.taxes_and_totals.get_rounding_tax_settings"
+DIMENSIONS = "erpnext.accounts.doctype.accounting_dimension.accounting_dimension.get_dimensions"
+DEFAULT_TAXES = "erpnext.controllers.accounts_controller.get_default_taxes_and_charges"
+COMPANY_ADDRESS = "erpnext.setup.doctype.company.company.get_default_company_address"
+PARTY_ACCOUNT = "erpnext.accounts.party.get_party_account"
+LOYALTY_PROGRAMS = "erpnext.accounts.doctype.sales_invoice.sales_invoice.get_loyalty_programs"
+INVOICE_INITIALIZERS = frozenset((ROUND_OFF, ROUNDING_SETTING, DIMENSIONS, DEFAULT_TAXES, COMPANY_ADDRESS, PARTY_ACCOUNT, LOYALTY_PROGRAMS))
 CALCULATORS = frozenset((PARTY_CALCULATOR, ITEM_CALCULATOR, PRICE_CALCULATOR, RULE_CALCULATOR))
 PARTY_ARGUMENTS = frozenset(("party", "party_type", "company", "posting_date", "price_list", "currency", "doctype", "fetch_payment_terms_template", "company_address"))
 ITEM_ARGUMENTS = frozenset(("item_code", "barcode", "serial_no", "batch_no", "set_warehouse", "warehouse", "customer", "quotation_to", "supplier", "currency", "is_internal_supplier", "is_internal_customer", "update_stock", "conversion_rate", "price_list", "price_list_currency", "plc_conversion_rate", "company", "order_type", "is_pos", "is_return", "is_subcontracted", "ignore_pricing_rule", "doctype", "name", "project", "qty", "net_rate", "base_net_rate", "stock_qty", "conversion_factor", "weight_per_unit", "uom", "weight_uom", "manufacturer", "stock_uom", "pos_profile", "cost_center", "tax_category", "item_tax_template", "child_doctype", "child_docname", "use_serial_batch_fields", "serial_and_batch_bundle"))
@@ -153,6 +161,8 @@ def ingress(request, config):
 		method = request.path[len("/api/method/"):]
 		if method == SAVE_METHOD and request.method in ("POST", "PUT"):
 			operation = "save"
+		elif method in INVOICE_INITIALIZERS and request.method == "POST":
+			operation = "invoice-initialize"
 		elif method == TAX_TEMPLATE and request.method == "POST":
 			operation = "tax-calculate"
 		elif method in CALCULATORS and request.method == "POST":
@@ -229,7 +239,7 @@ def initialize_native_request(context):
 		provided = frappe.request.headers.get("X-Frappe-CSRF-Token")
 		if not isinstance(provided, str) or not hmac.compare_digest(provided, csrf):
 			raise Denied(403)
-	if context.operation in ("save", "calculate", "tax-calculate") and context.value["scopes"] != ["erp:read", "erp:write"]:
+	if context.operation in ("save", "calculate", "tax-calculate", "invoice-initialize") and context.value["scopes"] != ["erp:read", "erp:write"]:
 		raise Denied(403)
 	current(context)
 
@@ -259,9 +269,11 @@ def method_guard(method):
 	current(context)
 	if frappe.override_whitelisted_method(method) != method:
 		raise Denied(403)
-	if method not in READ_METHODS | DESK_METHODS | {SAVE_METHOD, LIST_SETTINGS, SALES_SETTINGS, TAX_TEMPLATE} | CALCULATORS | LINK_METHODS:
+	if method not in READ_METHODS | DESK_METHODS | {SAVE_METHOD, LIST_SETTINGS, SALES_SETTINGS, TAX_TEMPLATE} | CALCULATORS | LINK_METHODS | INVOICE_INITIALIZERS:
 		raise Denied(404)
-	if method in LINK_METHODS:
+	if method in INVOICE_INITIALIZERS:
+		invoice_initialization_guard(method)
+	elif method in LINK_METHODS:
 		link_guard(method)
 	elif method == TAX_TEMPLATE:
 		tax_template_guard()
@@ -272,7 +284,7 @@ def method_guard(method):
 	elif method == SAVE_METHOD:
 		if context.operation != "save" or frappe.form_dict.get("action") != "Save":
 			raise Denied(403)
-		validate_save(frappe.form_dict.get("doc"))
+		frappe.form_dict["doc"] = validate_save(frappe.form_dict.get("doc"))
 	elif method in READ_METHODS:
 		doctype = frappe.form_dict.get("doctype")
 		if not isinstance(doctype, str) or len(doctype) > 140 or not frappe.has_permission(doctype, "read") or frappe.get_meta(doctype).is_virtual:
@@ -285,7 +297,7 @@ def validate_save(raw):
 	import frappe
 	context = frappe.flags.get("company_editor")
 	if context is None:
-		return
+		return raw
 	if context.value["scopes"] != ["erp:read", "erp:write"] or not isinstance(raw, str) or len(raw.encode()) > 1024**2:
 		raise Denied(403)
 	doc = transport.exact_json(raw)
@@ -304,6 +316,7 @@ def validate_save(raw):
 	canonical_document(doc)
 	# Native save performs create/write, field-level and User Permission checks.
 	# Do not use ignore_permissions or reproduce business validation in this bridge.
+	return json.dumps(doc, ensure_ascii=False, separators=(",", ":"))
 
 
 def canonical_document(payload):
@@ -339,15 +352,20 @@ def canonical_document(payload):
 				if not isinstance(child_name, str) or len(child_name) > 140 or child_name in seen:
 					raise Denied(400)
 				seen.add(child_name)
-			if row.get("__islocal") or not child_name:
+			actual = original.get(child_name)
+			if actual is not None:
+				if row.get("owner") != actual.owner:
+					raise Denied(403)
+				# A stored child marker cannot turn a proven update into insert.
+				if row.get("__islocal"):
+					row["__islocal"] = 0
+			elif row.get("__islocal") or not child_name:
 				if "owner" in row and row["owner"] != frappe.session.user:
 					raise Denied(403)
 				if child_name and not child_name.startswith("new-" + field.options.lower().replace(" ", "-") + "-"):
 					raise Denied(403)
 			else:
-				actual = original.get(child_name)
-				if actual is None or row.get("owner") != actual.owner:
-					raise Denied(403)
+				raise Denied(403)
 	return stored
 
 
@@ -385,6 +403,9 @@ def boot_ceiling(boot):
 	for key in ("can_delete", "can_submit", "can_cancel", "can_import", "can_export", "can_print", "can_email"):
 		boot["user"][key] = []
 	boot.setdefault("sysdefaults", {})["use_legacy_js_reactivity"] = 1
+	# Stock TransactionController otherwise sets the new row serial/batch flag
+	# from user defaults. This hosted draft slice admits no stock/serial work.
+	boot["user"].setdefault("defaults", {})["use_serial_batch_fields"] = 0
 	boot["company_editor"] = {"version": 2, "writable_doctypes": writable, "auth_origin": context.config.auth_origin}
 
 
@@ -393,9 +414,17 @@ def form_meta_ceiling(value):
 	"""Hosted draft editors use the supported native full-form Save path."""
 	import frappe
 	context = frappe.flags.get("company_editor")
-	if isinstance(context, Context) and value.get("name") in WRITE_TYPES:
+	if isinstance(context, Context) and value.get("name") in WRITE_TYPES | {"Sales Invoice Item"}:
 		current(context)
-		value["quick_entry"] = 0
+		if value["name"] in WRITE_TYPES:
+			value["quick_entry"] = 0
+		# Only response dictionaries change. Native target User Permissions stay
+		# mandatory; null stock flags must not serialize as bypass selectors.
+		for field in value.get("fields", []):
+			if field.get("fieldtype") == "Link" and INVOICE_LINK_FIELDS.get((value["name"],field.get("fieldname"))) is not None and INVOICE_LINK_FIELDS.get((value["name"],field.get("fieldname"))) == field.get("options"):
+				field["ignore_user_permissions"] = 0
+				if field["options"] in ("Territory", "Customer Group"):
+					field["filters"] = {"is_group":0}
 	return value
 
 
@@ -481,7 +510,8 @@ def calculator_guard(method, supplied=None):
 	else:
 		if set(args) != {"doc", "ctx"} or not all(isinstance(args[key], str) for key in args):
 			raise Denied(400)
-		validate_save(args["doc"])
+		args["doc"] = validate_save(args["doc"])
+		frappe.form_dict["doc"] = args["doc"]
 		payload, ctx = transport.exact_json(args["doc"]), transport.exact_json(args["ctx"])
 		if payload.get("doctype") != "Sales Invoice" or not isinstance(ctx, dict) or set(ctx) - ITEM_ARGUMENTS:
 			raise Denied(400)
@@ -735,11 +765,16 @@ def link_guard(method):
 			if len(fields.encode()) > 1024:
 				raise Denied(400)
 			fields = transport.exact_json(fields)
-		allowed_fetch = CUSTOMER_FETCH_FIELDS if (parent,field,kind) == ("Sales Invoice","customer","Customer") else ITEM_FETCH_FIELDS if (parent,field,kind) == ("Sales Invoice Item","item_code","Item") else frozenset()
+		allowed_fetch = CUSTOMER_FETCH_FIELDS if (parent,field,kind) == ("Sales Invoice","customer","Customer") else ITEM_FETCH_FIELDS if (parent,field,kind) == ("Sales Invoice Item","item_code","Item") else COMPANY_FETCH_FIELDS if (parent,field,kind) == ("Sales Invoice","company","Company") else frozenset()
 		if not isinstance(fields,list) or len(fields)>len(allowed_fetch) or any(not isinstance(name,str) or name not in allowed_fetch for name in fields) or len(set(fields)) != len(fields):
 			raise Denied(400)
-		if any(name not in get_permitted_fields(parent,parenttype=owner if parent != owner else None,permission_type="read") for name in fields):
-			raise Denied(403)
+		# Native fetch_from names the target field; its parent destination can have
+		# a different name (Company.tax_id -> Sales Invoice.company_tax_id).
+		permitted_parent = get_permitted_fields(parent,parenttype=owner if parent != owner else None,permission_type="read")
+		for name in fields:
+			destinations = [df.fieldname for df in frappe.get_meta(parent).fields if df.get("fetch_from") == field + "." + name]
+			if not destinations or any(destination not in permitted_parent for destination in destinations):
+				raise Denied(403)
 		args["fields_to_fetch"] = fields
 	return args
 
@@ -781,6 +816,9 @@ def link_projection(result, method, args):
 					raise Denied(503)
 			elif args["doctype"] == "Item" and key == "image" and df.fieldtype == "Attach Image":
 				if value not in (None,""):
+					raise Denied(403)
+			elif args["doctype"] == "Customer" and key == "is_internal_customer" and df.fieldtype == "Check":
+				if type(value) is not int or value != 0:
 					raise Denied(403)
 			elif df.fieldtype not in ("Data","Link"):
 				raise Denied(403)
@@ -835,7 +873,8 @@ def price_list_guard(parameter="ctx"):
 	args = {key:value for key,value in frappe.form_dict.items() if key != "cmd"}
 	if parameter not in ("ctx","args") or set(args) != {parameter, "doc"} or not all(isinstance(value,str) and len(value.encode()) <= 1024**2 for value in args.values()):
 		raise Denied(400)
-	validate_save(args["doc"])
+	args["doc"] = validate_save(args["doc"])
+	frappe.form_dict["doc"] = args["doc"]
 	payload, ctx = transport.exact_json(args["doc"]), transport.exact_json(args[parameter])
 	if payload.get("doctype") != "Sales Invoice" or not isinstance(ctx,dict) or set(ctx) - PRICE_PARENT_FIELDS:
 		raise Denied(400)
@@ -857,22 +896,31 @@ def price_list_guard(parameter="ctx"):
 			raise Denied(400)
 		if key in empty and value not in (None,""):
 			raise Denied(403)
+	# The stock new-form callback prices an empty item list before a Customer
+	# exists. Permit only that native draft initialization, never an item or an
+	# existing invoice without its current Customer authority.
+	initial = parameter == "ctx" and bool(payload.get("__islocal")) and ctx.get("customer") in (None,"") and payload.get("customer") in (None,"") and not rows
+	if initial and (len(payload.get("items",[])) > 100 or any(row.get("item_code") for row in payload.get("items",[]))):
+		raise Denied(403)
 	for key,other in (("doctype","doctype"),("name","name"),("company","company"),("customer","customer"),("currency","currency"),("price_list","selling_price_list"),("transaction_date","posting_date")):
+		if key == "customer" and initial:
+			continue
 		if not isinstance(ctx.get(key),str) or not ctx[key] or ctx[key] != payload.get(other):
 			raise Denied(403)
 	bounded_calculator_scalars({"posting_date":ctx["transaction_date"]},form=True)
 	company = frappe.get_doc("Company",ctx["company"])
 	company.check_permission("read")
-	customer = frappe.get_doc("Customer",ctx["customer"])
-	customer.check_permission("read")
-	if customer.default_currency and customer.default_currency != company.default_currency:
-		raise Denied(403)
+	customer = None if initial else frappe.get_doc("Customer",ctx["customer"])
+	if customer:
+		customer.check_permission("read")
+		if customer.default_currency and customer.default_currency != company.default_currency:
+			raise Denied(403)
 	if any(payload.get(key,0) != 0 for key in ("is_pos","is_return","update_stock","ignore_pricing_rule","is_internal_customer","is_internal_supplier")):
 		raise Denied(403)
 	if ctx["currency"] != company.default_currency or ctx.get("price_list_currency") not in (None,"",company.default_currency) or type(payload.get("conversion_rate")) not in (int,float) or payload["conversion_rate"] != 1:
 		raise Denied(403)
 	for key,target in (("customer_group","Customer Group"),("territory","Territory")):
-		if ctx.get(key) not in (None,"",customer.get(key)):
+		if ctx.get(key) not in ((None,"") if initial else (None,"",customer.get(key))):
 			raise Denied(403)
 		if ctx.get(key):
 			frappe.get_doc(target,ctx[key]).check_permission("read")
@@ -974,7 +1022,7 @@ def sales_settings_guard():
 	context = frappe.flags.company_editor
 	current(context)
 	args = {key:value for key,value in frappe.form_dict.items() if key != "cmd"}
-	if context.operation != "sales-settings" or args != {"doctype":"Accounts Settings","field":"fetch_valuation_rate_for_internal_transaction"}:
+	if context.operation != "sales-settings" or set(args) != {"doctype","field"} or args.get("doctype") != "Accounts Settings" or args.get("field") not in ("fetch_valuation_rate_for_internal_transaction","confirm_before_resetting_posting_date"):
 		raise Denied(400)
 	if context.value["scopes"] != ["erp:read","erp:write"] or not frappe.has_permission("Sales Invoice","read") or not frappe.has_permission("Sales Invoice","create") or not native_table_read("Sales Invoice","items","Sales Invoice Item") or "item_code" not in get_permitted_fields("Sales Invoice Item",parenttype="Sales Invoice",permission_type="read"):
 		raise Denied(403)
@@ -988,7 +1036,11 @@ def read_sales_setting():
 	native_budget(context.deadline)
 	try:
 		sales_settings_guard()
-		value = frappe.db.get_single_value("Accounts Settings","fetch_valuation_rate_for_internal_transaction")
+		field = frappe.form_dict["field"]
+		df = frappe.get_meta("Accounts Settings").get_field(field)
+		if not df or df.fieldtype != "Check":
+			raise Denied(503)
+		value = frappe.db.get_single_value("Accounts Settings",field)
 		if type(value) is not int or value not in (0,1):
 			raise Denied(503)
 	finally:
@@ -1000,10 +1052,12 @@ def read_sales_setting():
 
 
 ITEM_FETCH_FIELDS = frozenset(("image","grant_commission"))
-CUSTOMER_FETCH_FIELDS = frozenset(("tax_id","language","represents_company","loyalty_program"))
+CUSTOMER_FETCH_FIELDS = frozenset(("customer_name","is_internal_customer","tax_id","language","represents_company","loyalty_program"))
+COMPANY_FETCH_FIELDS = frozenset(("tax_id",))
 INVOICE_LINK_FIELDS = {
 	("Customer","customer_group"):"Customer Group", ("Customer","territory"):"Territory",
 	("Sales Invoice","customer"):"Customer", ("Sales Invoice","company"):"Company",
+	("Sales Invoice","territory"):"Territory", ("Sales Invoice","customer_group"):"Customer Group",
 	("Sales Invoice","currency"):"Currency", ("Sales Invoice","price_list_currency"):"Currency",
 	("Sales Invoice","selling_price_list"):"Price List", ("Sales Invoice","debit_to"):"Account",
 	("Sales Invoice Item","item_code"):"Item", ("Sales Invoice Item","uom"):"UOM",
@@ -1280,3 +1334,282 @@ def native_table_read(kind, field, child):
 	metadata=frappe.get_meta(kind)
 	df=metadata.get_field(field)
 	return bool(df and df.fieldtype == "Table" and df.options == child and df.permlevel in metadata.get_permlevel_access("read"))
+
+
+def invoice_initialization_guard(method):
+	"""Closed stock new-Sales-Invoice callbacks; no generic settings or queries."""
+	import frappe
+	from frappe.model import get_permitted_fields
+	context = frappe.flags.company_editor
+	current(context)
+	if context.operation != "invoice-initialize" or frappe.request.method != "POST" or context.value["scopes"] != ["erp:read", "erp:write"]:
+		raise Denied(403)
+	if not frappe.has_permission("Sales Invoice", "read") or not frappe.has_permission("Sales Invoice", "create"):
+		raise Denied(403)
+	fields = get_permitted_fields("Sales Invoice", permission_type="read")
+	args = {key:value for key,value in frappe.form_dict.items() if key != "cmd"}
+	company = None
+	if method == ROUND_OFF:
+		if set(args) != {"company", "account_list"}:
+			raise Denied(400)
+		accounts = args["account_list"]
+		if isinstance(accounts, str):
+			if len(accounts.encode()) > 16:
+				raise Denied(400)
+			accounts = transport.exact_json(accounts)
+		if accounts != []:
+			raise Denied(400)
+		company = args["company"]
+	elif method == DEFAULT_TAXES:
+		if set(args) != {"master_doctype", "tax_template", "company"} or args["master_doctype"] != "Sales Taxes and Charges Template" or not isinstance(args["tax_template"],str) or len(args["tax_template"].encode())>140:
+			raise Denied(400)
+		df = frappe.get_meta("Sales Invoice").get_field("taxes_and_charges")
+		if not df or df.fieldtype != "Link" or df.options != args["master_doctype"] or "taxes_and_charges" not in fields or not native_table_read("Sales Invoice", "taxes", "Sales Taxes and Charges"):
+			raise Denied(403)
+		company = args["company"]
+	elif method == COMPANY_ADDRESS:
+		if set(args) != {"name", "existing_address"} or args["existing_address"] != "":
+			raise Denied(400)
+		df = frappe.get_meta("Sales Invoice").get_field("company_address")
+		if not df or df.fieldtype != "Link" or df.options != "Address" or "company_address" not in fields:
+			raise Denied(403)
+		company = args["name"]
+	elif method in (PARTY_ACCOUNT, LOYALTY_PROGRAMS):
+		expected = {"company", "party_type", "party"} if method == PARTY_ACCOUNT else {"customer"}
+		if set(args) != expected or (method == PARTY_ACCOUNT and args["party_type"] != "Customer"):
+			raise Denied(400)
+		customer = args["party"] if method == PARTY_ACCOUNT else args["customer"]
+		if not isinstance(customer, str) or not 1 <= len(customer.encode()) <= 140 or any(ord(c) < 32 for c in customer):
+			raise Denied(400)
+		for field, target in (("customer", "Customer"), ("debit_to", "Account")) if method == PARTY_ACCOUNT else (("customer", "Customer"),):
+			df = frappe.get_meta("Sales Invoice").get_field(field)
+			if not df or df.fieldtype != "Link" or df.options != target or field not in fields:
+				raise Denied(403)
+		frappe.get_doc("Customer", customer).check_permission("read")
+		if method == PARTY_ACCOUNT:
+			company = args["company"]
+	elif method in (DIMENSIONS, ROUNDING_SETTING):
+		if method == DIMENSIONS and args:
+			if set(args) != {"with_cost_center_and_project"} or not (native_zero(args["with_cost_center_and_project"]) or (type(args["with_cost_center_and_project"]) is bool and args["with_cost_center_and_project"] is True) or args["with_cost_center_and_project"] == "true"):
+				raise Denied(400)
+			if not native_zero(args["with_cost_center_and_project"]):
+				for field, target in (("cost_center","Cost Center"),("project","Project")):
+					df=frappe.get_meta("Sales Invoice").get_field(field)
+					if not df or df.fieldtype != "Link" or df.options != target or field not in fields or not frappe.has_permission(target,"read"):
+						raise Denied(403)
+		elif args:
+			raise Denied(400)
+		if not native_table_read("Sales Invoice", "items", "Sales Invoice Item") or not native_table_read("Sales Invoice", "taxes", "Sales Taxes and Charges"):
+			raise Denied(403)
+	else:
+		raise Denied(404)
+	if company is not None:
+		if not isinstance(company, str) or not 1 <= len(company.encode()) <= 140 or any(ord(char) < 32 for char in company):
+			raise Denied(400)
+		if "company" not in fields:
+			raise Denied(403)
+		frappe.get_doc("Company", company).check_permission("read")
+	native_budget(context.deadline)
+	return args
+
+
+def invoice_initialization_value(method, args):
+	"""Fresh bounded empty-configuration admission precedes the stock functions.
+
+	Configured dimensions, advanced sales-tax templates, company addresses and
+	regional round-off overrides are outside this initial adopted-site subset.
+	No row identifiers or dynamic hooks are projected by these checks.
+	"""
+	import frappe
+	context = frappe.flags.company_editor
+	current(context)
+	native_budget(context.deadline)
+	if method in (PARTY_ACCOUNT, LOYALTY_PROGRAMS):
+		return invoice_party_value(method, args)
+	if method == DIMENSIONS:
+		if frappe.get_all("Accounting Dimension", fields=["name"], limit_page_length=1) or frappe.get_all("Accounting Dimension Detail", fields=["name"], limit_page_length=1):
+			raise Denied(403)
+		if args and not native_zero(args["with_cost_center_and_project"]):
+			from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import get_dimensions
+			value=get_dimensions(True)
+			if value != ([{"fieldname":"cost_center","document_type":"Cost Center"},{"fieldname":"project","document_type":"Project"}],{}):
+				raise Denied(503)
+			return list(value)
+		return [[], {}]
+	if method == ROUNDING_SETTING:
+		df = frappe.get_meta("Accounts Settings").get_field("round_row_wise_tax")
+		value = frappe.db.get_single_value("Accounts Settings", "round_row_wise_tax")
+		if not df or df.fieldtype != "Check" or type(value) is not int or value not in (0,1):
+			raise Denied(503)
+		return value
+	if method == DEFAULT_TAXES:
+		return default_native_taxes(args)
+	if method == COMPANY_ADDRESS:
+		# Exact company relationship, enabled native Address only, bounded to one
+		# existence row. Do not call the stock unbounded Dynamic Link lookup.
+		rows = frappe.db.sql('SELECT 1 FROM "tabAddress" a JOIN "tabDynamic Link" d ON d.parent=a.name WHERE d.link_doctype=\'Company\' AND d.link_name=%s AND coalesce(a.disabled,0)=0 LIMIT 1', (args["name"],))
+		if rows:
+			raise Denied(403)
+		return None
+	if method == ROUND_OFF:
+		path = "erpnext.controllers.taxes_and_totals.get_regional_round_off_accounts"
+		hooks = frappe.get_hooks("regional_overrides", {})
+		if not isinstance(hooks, dict) or any(not isinstance(overrides,dict) or path in overrides for overrides in hooks.values()):
+			raise Denied(403)
+		from erpnext.controllers.taxes_and_totals import get_regional_round_off_accounts
+		# Invoke the shipped empty base only; no region/cache-selected override.
+		value = get_regional_round_off_accounts.__wrapped__(args["company"], [])
+		if value is not None:
+			raise Denied(503)
+		return value
+	raise Denied(404)
+
+
+
+def invoice_party_value(method, args):
+	"""Closed native Customer callbacks; no loyalty adoption or posted-ledger fallback."""
+	import frappe
+	from frappe.model import get_permitted_fields
+	customer = frappe.get_doc("Customer", args["party"] if method == PARTY_ACCOUNT else args["customer"])
+	customer.check_permission("read")
+	if method == LOYALTY_PROGRAMS:
+		if "loyalty_program" not in get_permitted_fields("Customer", permission_type="read") or customer.loyalty_program or frappe.get_all("Loyalty Program", fields=["name"], limit_page_length=1):
+			raise Denied(403)
+		from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_loyalty_programs
+		value = get_loyalty_programs(customer.name)
+		if value != []:
+			raise Denied(503)
+		return value
+	company = frappe.get_doc("Company", args["company"])
+	company.check_permission("read")
+	if not {"default_currency", "default_receivable_account"} <= set(get_permitted_fields("Company", permission_type="read")) or "customer_group" not in get_permitted_fields("Customer", permission_type="read"):
+		raise Denied(403)
+	group = frappe.get_doc("Customer Group", customer.customer_group)
+	group.check_permission("read")
+	# Stock Party Account lookups are single-row. Refuse ambiguous matching
+	# children and enforce each actual parent Table and child field permission.
+	candidate = None
+	for parent in (customer, group):
+		if not native_table_read(parent.doctype, "accounts", "Party Account") or not {"company", "account"} <= set(get_permitted_fields("Party Account", parenttype=parent.doctype, permission_type="read")):
+			raise Denied(403)
+		rows = frappe.get_all("Party Account", filters={"parenttype":parent.doctype,"parent":parent.name,"company":company.name}, fields=["account", "parentfield"], limit_page_length=2)
+		if len(rows) > 1 or any(row["parentfield"] != "accounts" for row in rows):
+			raise Denied(403)
+		if candidate is None and rows:
+			candidate = rows[0]["account"]
+	candidate = candidate or company.default_receivable_account
+	if not isinstance(candidate, str) or not 1 <= len(candidate.encode()) <= 140:
+		raise Denied(403)
+	# No posted ledger selection or alternative party-type fallback in beta.
+	if frappe.db.sql('SELECT 1 FROM "tabGL Entry" WHERE docstatus=1 AND company=%s AND party_type=\'Customer\' AND party=%s LIMIT 1',(company.name,customer.name)):
+		raise Denied(403)
+	account = frappe.get_doc("Account", candidate)
+	account.check_permission("read")
+	if not {"company", "is_group", "disabled", "account_type", "account_currency"} <= set(get_permitted_fields("Account", permission_type="read")) or account.company != company.name or account.is_group or account.disabled or account.account_type != "Receivable" or (account.account_currency or company.default_currency) != company.default_currency:
+		raise Denied(403)
+	native_budget(frappe.flags.company_editor.deadline)
+	from erpnext.accounts.party import get_party_account
+	value = get_party_account("Customer", customer.name, company.name)
+	if value != candidate:
+		raise Denied(403)
+	return value
+
+
+def default_native_taxes(args):
+	"""Stock default template, bounded simple noninclusive net-total tax rows."""
+	import math
+
+	from erpnext.controllers.accounts_controller import get_default_taxes_and_charges
+
+	import frappe
+	from frappe.model import get_permitted_fields
+	context = frappe.flags.company_editor
+	native_budget(context.deadline)
+	kind, child = "Sales Taxes and Charges Template", "Sales Taxes and Charges"
+	candidates = frappe.get_all(kind, filters={"is_default":1,"company":args["company"]}, fields=["name"], limit_page_length=2)
+	if len(candidates) > 1:
+		raise Denied(403)
+	if not candidates:
+		if args["tax_template"]:
+			raise Denied(403)
+		return {"taxes_and_charges":None,"taxes":None}
+	name = candidates[0].name
+	if args["tax_template"] and args["tax_template"] != name:
+		raise Denied(403)
+	# This operation uses one REPEATABLE READ/READ ONLY snapshot. The bounded
+	# child admission and native get_doc cannot observe different tax row sets.
+	bounded = frappe.get_all(child, filters={"parent":name,"parenttype":kind,"parentfield":"taxes"}, fields=["name"], limit_page_length=33)
+	if not 1 <= len(bounded) <= 32:
+		raise Denied(403)
+	native_budget(context.deadline)
+	template = frappe.get_doc(kind,name)
+	template.check_permission("read")
+	parent_fields = get_permitted_fields(kind,permission_type="read")
+	if not {"company","is_default","disabled","tax_category"}.issubset(parent_fields) or not native_table_read(kind,"taxes",child) or template.company != args["company"] or template.is_default != 1 or template.disabled != 0 or template.tax_category or len(template.taxes) != len(bounded):
+		raise Denied(403)
+	company = frappe.get_doc("Company",args["company"])
+	company.check_permission("read")
+	if "default_currency" not in get_permitted_fields("Company",permission_type="read"):
+		raise Denied(403)
+	fields = {"charge_type","account_head","cost_center","description","rate","included_in_print_rate","included_in_paid_amount","dont_recompute_tax","set_by_item_tax_template","is_tax_withholding_account"}
+	if any(not fields.issubset(get_permitted_fields(child,parenttype=parent,permission_type="read")) for parent in (kind,"Sales Invoice")):
+		raise Denied(403)
+	value = frappe.call(get_default_taxes_and_charges,**args)
+	if args["tax_template"]:
+		if value is not None:
+			raise Denied(503)
+		rows=[row.as_dict() for row in template.taxes]
+	else:
+		rows=value.get("taxes") if isinstance(value,dict) else None
+	if not args["tax_template"] and (not isinstance(value,dict) or set(value) != {"taxes_and_charges","taxes"} or value["taxes_and_charges"] != name or not isinstance(value["taxes"],list) or len(value["taxes"]) != len(bounded)):
+		raise Denied(503)
+	projected=[]
+	for row in rows:
+		native_budget(context.deadline)
+		if not isinstance(row,dict) or row.get("charge_type") != "On Net Total" or any(row.get(key) not in (None,"",0) for key in ("row_id","project","included_in_print_rate","included_in_paid_amount","dont_recompute_tax","set_by_item_tax_template","is_tax_withholding_account")):
+			raise Denied(403)
+		rate=row.get("rate")
+		if type(rate) not in (int,float) or not math.isfinite(rate) or not 0<=rate<=100 or not isinstance(row.get("description"),str) or len(row["description"].encode())>500 or any(char in row["description"] for char in "<>\x00"):
+			raise Denied(403)
+		for field,target in (("account_head","Account"),("cost_center","Cost Center")):
+			df=frappe.get_meta(child).get_field(field)
+			key=row.get(field)
+			if not df or df.fieldtype!="Link" or df.options!=target or not isinstance(key,str) or not 1<=len(key.encode())<=140:
+				raise Denied(403)
+			linked=frappe.get_doc(target,key)
+			linked.check_permission("read")
+			needed={"company","is_group","disabled"}|({"account_currency","account_type"} if target=="Account" else set())
+			if not needed.issubset(get_permitted_fields(target,permission_type="read")) or linked.company!=args["company"] or linked.is_group!=0 or linked.disabled!=0:
+				raise Denied(403)
+			if target=="Account" and ((linked.account_currency or company.default_currency)!=company.default_currency or linked.account_type!="Tax"):
+				raise Denied(403)
+		projected.append({"charge_type":"On Net Total","account_head":row["account_head"],"cost_center":row["cost_center"],"description":row["description"],"rate":rate,**{key:0 for key in fields if key not in ("charge_type","account_head","cost_center","description","rate")}})
+	return None if args["tax_template"] else {"taxes_and_charges":name,"taxes":projected}
+
+
+def read_invoice_initialization(method):
+	import frappe
+	context = frappe.flags.company_editor
+	frappe.db.rollback()
+	frappe.db.sql("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY" if method in (DEFAULT_TAXES,DIMENSIONS) else "SET TRANSACTION READ ONLY")
+	native_budget(context.deadline)
+	try:
+		args = invoice_initialization_guard(method)
+		value = invoice_initialization_value(method, args)
+	finally:
+		frappe.db.rollback()
+	native_budget(context.deadline)
+	recheck_before_commit(context)
+	# Re-read the bounded configuration/Check at the final permission boundary.
+	# A changed native configuration cannot publish the earlier empty projection.
+	frappe.db.rollback()
+	frappe.db.sql("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY" if method in (DEFAULT_TAXES,DIMENSIONS) else "SET TRANSACTION READ ONLY")
+	native_budget(context.deadline)
+	try:
+		args = invoice_initialization_guard(method)
+		fresh = invoice_initialization_value(method, args)
+		if fresh != value:
+			raise Denied(403)
+		return fresh
+	finally:
+		frappe.db.rollback()
