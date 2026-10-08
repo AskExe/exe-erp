@@ -99,7 +99,21 @@ class Browser:
 			elif parsed.hostname == 'auth.platform.example.test' and parsed.path == '/logout':
 				status, body = 200, b'<h1>Controlled Auth logout landing</h1><p>Genuine parent seam is separately unqualified.</p>'
 				headers = [{'name': 'Content-Type', 'value': 'text/html'}]
-			REQUESTS.append({'host': parsed.hostname, 'path': parsed.path, 'method': request['method'], 'status': status})
+			shape = parse_qs(parsed.query)
+			if request.get('postData'):
+				try:
+					posted=json.loads(request['postData'])
+					if isinstance(posted,dict):
+						shape.update({key:[value] for key,value in posted.items()})
+				except ValueError:
+					shape.update(parse_qs(request['postData']))
+			public_keys=sorted(key for key in shape if isinstance(key,str) and key.isidentifier() and len(key)<=64)[:40]
+			selectors={}
+			for key in ('doctype','reference_doctype'):
+				value=shape.get(key,[None])[0]
+				if value in ('Customer','Sales Invoice','Sales Invoice Item','Sales Taxes and Charges','Account','Cost Center','Company','Item','UOM','Currency','Customer Group','Territory','Price List'):
+					selectors[key]=value
+			REQUESTS.append({'host': parsed.hostname, 'path': parsed.path, 'method': request['method'], 'status': status,'argument_keys':public_keys,'public_native_selectors':selectors})
 			if len(REQUESTS) > 1000:
 				raise RuntimeError('Native browser request cap')
 			await self.send('Fetch.fulfillRequest', {'requestId': identifier, 'responseCode': status, 'responseHeaders': headers, 'body': base64.b64encode(body).decode()}, session)

@@ -135,6 +135,8 @@ class Authority(BaseHTTPRequestHandler):
 					STATE['calls'] += 1
 					if STATE['calls'] == STATE['permission_at']:
 						fixture.mutate(CONFIG.site, lambda: frappe.db.set_value('Custom DocPerm', {'parent': 'Customer', 'role': WRITER}, 'write', 0))
+					if STATE['calls'] == STATE.get('party_at'):
+						fixture.mutate(CONFIG.site, lambda: frappe.db.set_value('Account', STATE['party_account'], 'disabled', 1))
 					if STATE['calls'] == STATE.get('tax_at'):
 						fixture.mutate(CONFIG.site, lambda: frappe.db.set_value('Sales Taxes and Charges', STATE['tax_row'], 'rate', 7))
 					if STATE['calls'] == STATE['revoke_at']:
@@ -313,7 +315,8 @@ class NativeEditor(unittest.TestCase):
 
 	def test_native_invoice_initialization_empty_configuration_and_permission_ceiling(self):
 		company='Editor '+ARGS.plane
-		cases=[(editor.ROUND_OFF,{'company':company,'account_list':'[]'},None),(editor.ROUNDING_SETTING,{},0),(editor.DIMENSIONS,{},[[],{}]),(editor.DEFAULT_TAXES,{'company':company,'master_doctype':'Sales Taxes and Charges Template','tax_template':''},'stock-default'),(editor.COMPANY_ADDRESS,{'name':company,'existing_address':''},None)]
+		customer='ACL-'+ARGS.plane+'-visible'
+		cases=[(editor.PARTY_ACCOUNT,{'company':company,'party_type':'Customer','party':customer},'native-account'),(editor.LOYALTY_PROGRAMS,{'customer':customer},[]),(editor.ROUND_OFF,{'company':company,'account_list':'[]'},None),(editor.ROUNDING_SETTING,{},0),(editor.DIMENSIONS,{},[[],{}]),(editor.DEFAULT_TAXES,{'company':company,'master_doctype':'Sales Taxes and Charges Template','tax_template':''},'stock-default'),(editor.COMPANY_ADDRESS,{'name':company,'existing_address':''},None)]
 		fixture.connect(CONFIG.site)
 		try:
 			stock=frappe.get_doc('Sales Taxes and Charges Template',frappe.db.get_value('Sales Taxes and Charges Template',{'company':company,'is_default':1},'name'))
@@ -326,6 +329,9 @@ class NativeEditor(unittest.TestCase):
 			self.assertEqual(response.status_code,200,method)
 			if method == editor.ROUNDING_SETTING:
 				self.assertIn(response.get_json()['message'],(0,1))
+			elif method == editor.PARTY_ACCOUNT:
+				self.assertTrue(response.get_json()['message'])
+				party_account=response.get_json()['message']
 			elif method == editor.DEFAULT_TAXES:
 				value=response.get_json()['message']
 				self.assertTrue(value['taxes_and_charges'])
@@ -336,6 +342,30 @@ class NativeEditor(unittest.TestCase):
 			else:
 				self.assertEqual(response.get_json().get('message'),expected)
 			self.assertEqual(self.call('/api/method/'+method,'POST',{**args,'extra':'unadmitted'}).status_code,400)
+		party_args=cases[0][1]
+		self.assertEqual(self.call('/api/method/'+editor.PARTY_ACCOUNT,'POST',{**party_args,'party_type':'Supplier'}).status_code,400)
+		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Customer',customer,'loyalty_program','Unsupported program'))
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.LOYALTY_PROGRAMS,'POST',{'customer':customer}).status_code,403)
+		finally:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Customer',customer,'loyalty_program',None))
+		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Account',party_account,'disabled',1))
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.PARTY_ACCOUNT,'POST',party_args).status_code,403)
+		finally:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Account',party_account,'disabled',0))
+		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('DocField',{'parent':'Customer','fieldname':'loyalty_program'},'permlevel',1))
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.LOYALTY_PROGRAMS,'POST',{'customer':customer}).status_code,403)
+		finally:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('DocField',{'parent':'Customer','fieldname':'loyalty_program'},'permlevel',0))
+		STATE['party_account']=party_account
+		STATE['party_at']=STATE['calls']+2
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.PARTY_ACCOUNT,'POST',party_args).status_code,403)
+		finally:
+			STATE['party_at']=0
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Account',party_account,'disabled',0))
 		# Actual stock rows/permissions remain installed. Unsupported native
 		# configurations deny, then the operator restores the original values.
 		fixture.connect(CONFIG.site)
@@ -346,7 +376,7 @@ class NativeEditor(unittest.TestCase):
 			self.assertTrue(other)
 		finally:
 			fixture.close()
-		args=cases[3][1]
+		args=next(args for method,args,_ in cases if method == editor.DEFAULT_TAXES)
 		# The shipped reapplication callback returns None for this exact default.
 		reapplied=self.call('/api/method/'+editor.DEFAULT_TAXES,'POST',{**args,'tax_template':stock_default})
 		self.assertEqual(reapplied.status_code,200)

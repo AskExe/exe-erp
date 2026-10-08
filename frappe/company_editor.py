@@ -46,7 +46,9 @@ ROUNDING_SETTING = "erpnext.controllers.taxes_and_totals.get_rounding_tax_settin
 DIMENSIONS = "erpnext.accounts.doctype.accounting_dimension.accounting_dimension.get_dimensions"
 DEFAULT_TAXES = "erpnext.controllers.accounts_controller.get_default_taxes_and_charges"
 COMPANY_ADDRESS = "erpnext.setup.doctype.company.company.get_default_company_address"
-INVOICE_INITIALIZERS = frozenset((ROUND_OFF, ROUNDING_SETTING, DIMENSIONS, DEFAULT_TAXES, COMPANY_ADDRESS))
+PARTY_ACCOUNT = "erpnext.accounts.party.get_party_account"
+LOYALTY_PROGRAMS = "erpnext.accounts.doctype.sales_invoice.sales_invoice.get_loyalty_programs"
+INVOICE_INITIALIZERS = frozenset((ROUND_OFF, ROUNDING_SETTING, DIMENSIONS, DEFAULT_TAXES, COMPANY_ADDRESS, PARTY_ACCOUNT, LOYALTY_PROGRAMS))
 CALCULATORS = frozenset((PARTY_CALCULATOR, ITEM_CALCULATOR, PRICE_CALCULATOR, RULE_CALCULATOR))
 PARTY_ARGUMENTS = frozenset(("party", "party_type", "company", "posting_date", "price_list", "currency", "doctype", "fetch_payment_terms_template", "company_address"))
 ITEM_ARGUMENTS = frozenset(("item_code", "barcode", "serial_no", "batch_no", "set_warehouse", "warehouse", "customer", "quotation_to", "supplier", "currency", "is_internal_supplier", "is_internal_customer", "update_stock", "conversion_rate", "price_list", "price_list_currency", "plc_conversion_rate", "company", "order_type", "is_pos", "is_return", "is_subcontracted", "ignore_pricing_rule", "doctype", "name", "project", "qty", "net_rate", "base_net_rate", "stock_qty", "conversion_factor", "weight_per_unit", "uom", "weight_uom", "manufacturer", "stock_uom", "pos_profile", "cost_center", "tax_category", "item_tax_template", "child_doctype", "child_docname", "use_serial_batch_fields", "serial_and_batch_bundle"))
@@ -1348,6 +1350,20 @@ def invoice_initialization_guard(method):
 		if not df or df.fieldtype != "Link" or df.options != "Address" or "company_address" not in fields:
 			raise Denied(403)
 		company = args["name"]
+	elif method in (PARTY_ACCOUNT, LOYALTY_PROGRAMS):
+		expected = {"company", "party_type", "party"} if method == PARTY_ACCOUNT else {"customer"}
+		if set(args) != expected or (method == PARTY_ACCOUNT and args["party_type"] != "Customer"):
+			raise Denied(400)
+		customer = args["party"] if method == PARTY_ACCOUNT else args["customer"]
+		if not isinstance(customer, str) or not 1 <= len(customer.encode()) <= 140 or any(ord(c) < 32 for c in customer):
+			raise Denied(400)
+		for field, target in (("customer", "Customer"), ("debit_to", "Account")) if method == PARTY_ACCOUNT else (("customer", "Customer"),):
+			df = frappe.get_meta("Sales Invoice").get_field(field)
+			if not df or df.fieldtype != "Link" or df.options != target or field not in fields:
+				raise Denied(403)
+		frappe.get_doc("Customer", customer).check_permission("read")
+		if method == PARTY_ACCOUNT:
+			company = args["company"]
 	elif method in (DIMENSIONS, ROUNDING_SETTING):
 		if args:
 			raise Denied(400)
@@ -1376,6 +1392,8 @@ def invoice_initialization_value(method, args):
 	context = frappe.flags.company_editor
 	current(context)
 	native_budget(context.deadline)
+	if method in (PARTY_ACCOUNT, LOYALTY_PROGRAMS):
+		return invoice_party_value(method, args)
 	if method == DIMENSIONS:
 		if frappe.get_all("Accounting Dimension", fields=["name"], limit_page_length=1) or frappe.get_all("Accounting Dimension Detail", fields=["name"], limit_page_length=1):
 			raise Denied(403)
@@ -1407,6 +1425,56 @@ def invoice_initialization_value(method, args):
 			raise Denied(503)
 		return value
 	raise Denied(404)
+
+
+
+def invoice_party_value(method, args):
+	"""Closed native Customer callbacks; no loyalty adoption or posted-ledger fallback."""
+	import frappe
+	from frappe.model import get_permitted_fields
+	customer = frappe.get_doc("Customer", args["party"] if method == PARTY_ACCOUNT else args["customer"])
+	customer.check_permission("read")
+	if method == LOYALTY_PROGRAMS:
+		if "loyalty_program" not in get_permitted_fields("Customer", permission_type="read") or customer.loyalty_program or frappe.get_all("Loyalty Program", fields=["name"], limit_page_length=1):
+			raise Denied(403)
+		from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_loyalty_programs
+		value = get_loyalty_programs(customer.name)
+		if value != []:
+			raise Denied(503)
+		return value
+	company = frappe.get_doc("Company", args["company"])
+	company.check_permission("read")
+	if not {"default_currency", "default_receivable_account"} <= set(get_permitted_fields("Company", permission_type="read")) or "customer_group" not in get_permitted_fields("Customer", permission_type="read"):
+		raise Denied(403)
+	group = frappe.get_doc("Customer Group", customer.customer_group)
+	group.check_permission("read")
+	# Stock Party Account lookups are single-row. Refuse ambiguous matching
+	# children and enforce each actual parent Table and child field permission.
+	candidate = None
+	for parent in (customer, group):
+		if not native_table_read(parent.doctype, "accounts", "Party Account") or not {"company", "account"} <= set(get_permitted_fields("Party Account", parenttype=parent.doctype, permission_type="read")):
+			raise Denied(403)
+		rows = frappe.get_all("Party Account", filters={"parenttype":parent.doctype,"parent":parent.name,"company":company.name}, fields=["account", "parentfield"], limit_page_length=2)
+		if len(rows) > 1 or any(row["parentfield"] != "accounts" for row in rows):
+			raise Denied(403)
+		if candidate is None and rows:
+			candidate = rows[0]["account"]
+	candidate = candidate or company.default_receivable_account
+	if not isinstance(candidate, str) or not 1 <= len(candidate.encode()) <= 140:
+		raise Denied(403)
+	# No posted ledger selection or alternative party-type fallback in beta.
+	if frappe.db.sql('SELECT 1 FROM "tabGL Entry" WHERE docstatus=1 AND company=%s AND party_type=\'Customer\' AND party=%s LIMIT 1',(company.name,customer.name)):
+		raise Denied(403)
+	account = frappe.get_doc("Account", candidate)
+	account.check_permission("read")
+	if not {"company", "is_group", "disabled", "account_type", "account_currency"} <= set(get_permitted_fields("Account", permission_type="read")) or account.company != company.name or account.is_group or account.disabled or account.account_type != "Receivable" or (account.account_currency or company.default_currency) != company.default_currency:
+		raise Denied(403)
+	native_budget(frappe.flags.company_editor.deadline)
+	from erpnext.accounts.party import get_party_account
+	value = get_party_account("Customer", customer.name, company.name)
+	if value != candidate:
+		raise Denied(403)
+	return value
 
 
 def default_native_taxes(args):
