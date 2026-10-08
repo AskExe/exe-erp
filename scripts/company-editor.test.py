@@ -79,6 +79,19 @@ class EditorControls(unittest.TestCase):
 				query.return_value = rows
 				self.denied(editor.assert_site_configuration, 503)
 
+	def test_hosted_native_link_metadata_uses_zero_flag_and_tree_filters_only_on_closed_fields(self):
+		metadata={'name':'Sales Invoice','fields':[{'fieldname':'currency','fieldtype':'Link','options':'Currency','ignore_user_permissions':None},{'fieldname':'territory','fieldtype':'Link','options':'Territory'},{'fieldname':'shipping_rule','fieldtype':'Link','options':'Shipping Rule','ignore_user_permissions':1}]}
+		import copy
+		frappe.flags={'company_editor':None}
+		self.assertEqual(editor.form_meta_ceiling(copy.deepcopy(metadata)),metadata)
+		frappe.flags={'company_editor':self.context}
+		with mock.patch.object(editor,'current'):
+			result=editor.form_meta_ceiling(copy.deepcopy(metadata))
+			self.assertEqual(result['fields'][0]['ignore_user_permissions'],0)
+			self.assertEqual(result['fields'][1]['filters'],{'is_group':0})
+			self.assertEqual(result['fields'][2]['ignore_user_permissions'],1)
+			self.assertIsNone(metadata['fields'][0]['ignore_user_permissions'])
+
 	def test_hosted_full_form_ceiling_keeps_ordinary_metadata_and_native_role_ceiling(self):
 		ordinary = {'name':'Customer', 'quick_entry':1}
 		frappe.flags = {}
@@ -466,6 +479,16 @@ class EditorControls(unittest.TestCase):
 			self.denied(lambda: editor.bounded_calculator_scalars(args, form=form), 400)
 
 
+	def test_hosted_serial_default_ceiling_preserves_ordinary_and_rejects_stock_dto(self):
+		boot = {"user": {"defaults": {"use_serial_batch_fields": 1, "company": "Native Company"}}}
+		editor.boot_ceiling(boot)
+		self.assertEqual(boot["user"]["defaults"], {"use_serial_batch_fields": 0, "company": "Native Company"})
+		self.denied(lambda: editor.bounded_calculator_scalars({"qty": 1, "use_serial_batch_fields": 1}), 400)
+		frappe.flags = {}
+		ordinary = {"user": {"defaults": {"use_serial_batch_fields": 1}}}
+		editor.boot_ceiling(ordinary)
+		self.assertEqual(ordinary, {"user": {"defaults": {"use_serial_batch_fields": 1}}})
+
 	def test_actual_native_metadata_snapshot_is_request_scoped_and_v1_unchanged(self):
 		module = ast.parse((ROOT / 'frappe/model/meta.py').read_text())
 		function = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'get_meta')
@@ -610,7 +633,7 @@ class EditorControls(unittest.TestCase):
 				self.denied(lambda:editor.price_list_projection({**result,'children':[change]},object(),ctx),403)
 			self.denied(lambda:editor.price_list_projection({**result,'parent':{'price_list_currency':'EUR','plc_conversion_rate':1}},object(),ctx),503)
 
-	def test_sales_settings_is_one_current_workflow_boolean_without_singleton_role_promotion(self):
+	def test_sales_settings_are_closed_current_workflow_booleans_without_singleton_role_promotion(self):
 		class Dot(dict):
 			__getattr__=dict.get
 		model=types.ModuleType('frappe.model')
@@ -621,6 +644,8 @@ class EditorControls(unittest.TestCase):
 		with mock.patch.dict(sys.modules,{'frappe.model':model}), mock.patch.object(editor,'native_table_read',return_value=True):
 			editor.sales_settings_guard()
 			self.assertEqual([call.args[0] for call in frappe.has_permission.call_args_list],['Sales Invoice','Sales Invoice'])
+			frappe.form_dict['field']='confirm_before_resetting_posting_date'
+			editor.sales_settings_guard()
 			frappe.form_dict['field']='arbitrary-private-field'
 			self.denied(editor.sales_settings_guard,400)
 			frappe.form_dict['field']='fetch_valuation_rate_for_internal_transaction'
@@ -985,7 +1010,7 @@ class EditorControls(unittest.TestCase):
 			self.assertEqual(editor.read_invoice_initialization(editor.DIMENSIONS),[[],{}])
 			current.assert_called_once()
 			self.assertEqual(frappe.db.rollback.call_count,4)
-			self.assertEqual(frappe.db.sql.call_args_list,[mock.call('SET TRANSACTION READ ONLY')]*2)
+			self.assertEqual(frappe.db.sql.call_args_list,[mock.call('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')]*2)
 		with mock.patch.object(editor,'native_budget'),mock.patch.object(editor,'invoice_initialization_guard',return_value={}),mock.patch.object(editor,'invoice_initialization_value',side_effect=[[[],{}],[['changed'],{}]]),mock.patch.object(editor,'recheck_before_commit'):
 			self.denied(lambda:editor.read_invoice_initialization(editor.DIMENSIONS),403)
 		with mock.patch.object(editor,'native_budget'),mock.patch.object(editor,'invoice_initialization_guard',return_value={}),mock.patch.object(editor,'invoice_initialization_value',side_effect=RuntimeError('controlled native failure')):
@@ -1049,6 +1074,21 @@ class EditorControls(unittest.TestCase):
 					reset()
 					state['row'][key]=value
 					self.denied(run,403)
+
+	def test_stored_marker_normalized_without_foreign_owner_or_parent_admission(self):
+		child=types.SimpleNamespace(name='owned-child',owner='stored-owner')
+		stored=types.SimpleNamespace(owner='stored-owner',docstatus=0,check_permission=lambda _:None,get=lambda *_:[child])
+		frappe.get_doc=lambda *_:stored
+		frappe.get_meta=lambda _:types.SimpleNamespace(get_table_fields=lambda:[types.SimpleNamespace(fieldname='items',options='Sales Invoice Item')])
+		payload={'doctype':'Sales Invoice','name':'owned-parent','owner':'stored-owner','items':[{'doctype':'Sales Invoice Item','name':'owned-child','parent':'owned-parent','parenttype':'Sales Invoice','parentfield':'items','owner':'stored-owner','__islocal':1}]}
+		normalized=json.loads(editor.validate_save(json.dumps(payload)))
+		self.assertEqual(normalized['items'][0]['__islocal'],0)
+		self.assertEqual(payload['items'][0]['__islocal'],1)
+		for key,value in [('name','foreign-child'),('owner',None),('owner','forged'),('parent','foreign-parent'),('parentfield','other')]:
+			bad={**payload,'items':[{**payload['items'][0],key:value}]}
+			self.denied(lambda:editor.validate_save(json.dumps(bad)),403)
+		bad={**payload,'items':[payload['items'][0],payload['items'][0]]}
+		self.denied(lambda:editor.validate_save(json.dumps(bad)),400)
 
 if __name__ == '__main__':
 	unittest.main()

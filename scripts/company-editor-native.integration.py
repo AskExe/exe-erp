@@ -64,6 +64,14 @@ def sanitized_trace(frame, event, arg):
 					location = tb.tb_frame
 					if '/frappe-bench/apps/' in location.f_code.co_filename:
 						locations.append({'file': Path(location.f_code.co_filename).name, 'function': location.f_code.co_name, 'line': tb.tb_lineno, 'class': type(error).__name__, 'cause': cause})
+						if Path(location.f_code.co_filename).name == 'company_editor.py' and location.f_code.co_name == 'canonical_document' and tb.tb_lineno == 358:
+							row = location.f_locals.get('row', {})
+							original = location.f_locals.get('original', {})
+							field = location.f_locals.get('field')
+							name = row.get('name') if isinstance(row,dict) else None
+							stored = original.get(name) if isinstance(original,dict) else None
+							locations[-1]['canonical_child_flags'] = {'item':getattr(field,'options',None)=='Sales Invoice Item','tax':getattr(field,'options',None)=='Sales Taxes and Charges','local':bool(row.get('__islocal')),'named':bool(name),'new_prefix':bool(isinstance(name,str) and name.startswith('new-' + field.options.lower().replace(' ','-') + '-')),'stored_name':stored is not None,'stored_owner_equal':bool(stored is not None and row.get('owner')==stored.owner)}
+
 					tb = tb.tb_next
 				TRACE.extend(locations[-12:])
 				error = error.__cause__ or error.__context__
@@ -190,7 +198,7 @@ def write_setup(site, plane):
 			grant = frappe.db.get_value('Custom DocPerm', {'parent': kind, 'role': WRITER}, ['read', 'write', 'create'], as_dict=True)
 			if not grant or any(grant[key] != 1 for key in ('read', 'write', 'create')):
 				raise ValueError('Actual native writer grant absent')
-		for kind in ('Company', 'Item', 'Item Price', 'Price List', 'Account', 'Cost Center', 'UOM', 'Currency', 'Customer Group', 'Territory', 'Payment Terms Template', 'Payment Term', 'Sales Taxes and Charges Template', 'Item Group', 'Warehouse'):
+		for kind in ('Company', 'Item', 'Item Price', 'Price List', 'Account', 'Cost Center', 'UOM', 'Currency', 'Customer Group', 'Territory', 'Payment Terms Template', 'Payment Term', 'Sales Taxes and Charges Template', 'Item Group', 'Warehouse', 'Project'):
 			fixture.add_permission(kind, WRITER, ptype='read')
 		from frappe.permissions import update_permission_property
 		update_permission_property('Item Price', WRITER, 0, 'write', 1)
@@ -316,7 +324,7 @@ class NativeEditor(unittest.TestCase):
 	def test_native_invoice_initialization_empty_configuration_and_permission_ceiling(self):
 		company='Editor '+ARGS.plane
 		customer='ACL-'+ARGS.plane+'-visible'
-		cases=[(editor.PARTY_ACCOUNT,{'company':company,'party_type':'Customer','party':customer},'native-account'),(editor.LOYALTY_PROGRAMS,{'customer':customer},[]),(editor.ROUND_OFF,{'company':company,'account_list':'[]'},None),(editor.ROUNDING_SETTING,{},0),(editor.DIMENSIONS,{},[[],{}]),(editor.DEFAULT_TAXES,{'company':company,'master_doctype':'Sales Taxes and Charges Template','tax_template':''},'stock-default'),(editor.COMPANY_ADDRESS,{'name':company,'existing_address':''},None)]
+		cases=[(editor.PARTY_ACCOUNT,{'company':company,'party_type':'Customer','party':customer},'native-account'),(editor.LOYALTY_PROGRAMS,{'customer':customer},[]),(editor.ROUND_OFF,{'company':company,'account_list':'[]'},None),(editor.ROUNDING_SETTING,{},0),(editor.DIMENSIONS,{},[[],{}]),(editor.DIMENSIONS,{'with_cost_center_and_project':'true'},[[{'fieldname':'cost_center','document_type':'Cost Center'},{'fieldname':'project','document_type':'Project'}],{}]),(editor.DEFAULT_TAXES,{'company':company,'master_doctype':'Sales Taxes and Charges Template','tax_template':''},'stock-default'),(editor.COMPANY_ADDRESS,{'name':company,'existing_address':''},None)]
 		fixture.connect(CONFIG.site)
 		try:
 			stock=frappe.get_doc('Sales Taxes and Charges Template',frappe.db.get_value('Sales Taxes and Charges Template',{'company':company,'is_default':1},'name'))
@@ -342,6 +350,11 @@ class NativeEditor(unittest.TestCase):
 			else:
 				self.assertEqual(response.get_json().get('message'),expected)
 			self.assertEqual(self.call('/api/method/'+method,'POST',{**args,'extra':'unadmitted'}).status_code,400)
+		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Custom DocPerm',{'parent':'Project','role':WRITER},'read',0))
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.DIMENSIONS,'POST',{'with_cost_center_and_project':'true'}).status_code,403)
+		finally:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Custom DocPerm',{'parent':'Project','role':WRITER},'read',1))
 		party_args=cases[0][1]
 		self.assertEqual(self.call('/api/method/'+editor.PARTY_ACCOUNT,'POST',{**party_args,'party_type':'Supplier'}).status_code,400)
 		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Customer',customer,'loyalty_program','Unsupported program'))
@@ -1057,7 +1070,18 @@ if __name__ == '__main__':
 					# Dedicated browser forwarding preserves original host/origin and
 					# HTTPS semantics; this wrapper exists only in the owned fixture.
 					environ['wsgi.url_scheme'] = 'https'
-					return static(environ, start_response)
+					# Owned finite diagnostics for the two current scalar DTO refusals.
+					# No request/exception text, locals, SQL or credential projection.
+					diagnose = environ.get('PATH_INFO') in ('/api/method/' + editor.ITEM_CALCULATOR, '/api/method/' + editor.RULE_CALCULATOR, '/api/method/' + editor.PRICE_CALCULATOR)
+					if diagnose:
+						TRACE.clear()
+						sys.settrace(sanitized_trace)
+					try:
+						return static(environ, start_response)
+					finally:
+						if diagnose:
+							sys.settrace(None)
+							print(json.dumps({'owned_calculator_frames': TRACE[-36:]}), file=sys.stderr)
 				web = make_server('0.0.0.0', 8000 if ARGS.plane == 'a' else 8001, owned_https, threaded=True, request_handler=Quiet)
 				ready = Path('/tmp/owned-browser-' + ARGS.plane + '.json')
 				ready.write_text(json.dumps({'origin': CONFIG.origin, 'scope': 'actual native browser; controlled HTTP Core'}))

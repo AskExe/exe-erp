@@ -34,7 +34,7 @@ OUTPUT = Path(sys.argv[2]).resolve()
 OUTPUT.mkdir(mode=0o700, exist_ok=False)
 END = time.monotonic() + 105
 OUTPUT_LIMIT = int(os.environ['ERP_BROWSER_OUTPUT_LIMIT'])
-REQUESTS, FAILURES = [], []
+REQUESTS, FAILURES, OBSERVATIONS = [], [], []
 CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
 
@@ -113,7 +113,32 @@ class Browser:
 				value=shape.get(key,[None])[0]
 				if value in ('Customer','Sales Invoice','Sales Invoice Item','Sales Taxes and Charges','Account','Cost Center','Company','Item','UOM','Currency','Customer Group','Territory','Price List'):
 					selectors[key]=value
-			REQUESTS.append({'host': parsed.hostname, 'path': parsed.path, 'method': request['method'], 'status': status,'argument_keys':public_keys,'public_native_selectors':selectors})
+			row={'host': parsed.hostname, 'path': parsed.path, 'method': request['method'], 'status': status,'argument_keys':public_keys,'public_native_selectors':selectors}
+			# Private owned diagnostics: fixed public DTO field names/classes only,
+			# never string contents, business rows, credentials or raw request bytes.
+			if parsed.path in ('/api/method/erpnext.stock.get_item_details.get_item_details','/api/method/erpnext.accounts.doctype.pricing_rule.pricing_rule.apply_pricing_rule'):
+				def scalar_class(value):
+					if value is None:
+						return 'null'
+					if type(value) is bool:
+						return 'boolean'
+					if type(value) in (int,float):
+						return 'zero' if value==0 else 'one' if value==1 else 'numeric'
+					if isinstance(value,str):
+						return 'empty' if not value else 'string'
+					return 'structured'
+				try:
+					parameter='ctx' if parsed.path.endswith('.get_item_details') else 'args'
+					context=json.loads(shape.get(parameter,[''])[0])
+					doc=json.loads(shape.get('doc',[''])[0])
+					fixed=('is_internal_supplier','is_internal_customer','update_stock','is_pos','is_return','ignore_pricing_rule','is_subcontracted','use_serial_batch_fields','conversion_rate','plc_conversion_rate','qty','net_rate','base_net_rate','stock_qty','conversion_factor','weight_per_unit','uom','weight_uom','stock_uom','warehouse','pos_profile')
+					if isinstance(context,dict) and isinstance(doc,dict):
+						row['public_dto_classes']={key:scalar_class(context[key]) if key in context else 'absent' for key in fixed}
+						row['public_document_flag_classes']={key:scalar_class(doc[key]) if key in doc else 'absent' for key in fixed[:8]}
+						row['public_row_count']=min(101,len(context.get('items',[]))) if isinstance(context.get('items'),list) else None
+				except (ValueError,TypeError):
+					row['public_dto_parse']='refused'
+			REQUESTS.append(row)
 			if len(REQUESTS) > 1000:
 				raise RuntimeError('Native browser request cap')
 			await self.send('Fetch.fulfillRequest', {'requestId': identifier, 'responseCode': status, 'responseHeaders': headers, 'body': base64.b64encode(body).decode()}, session)
@@ -138,7 +163,7 @@ class Browser:
 		raise RuntimeError('Native DOM condition not reached')
 
 	async def snapshot(self, name, session):
-		value = await self.evaluate("({title:document.title,url:location.href,text:document.body.innerText.slice(0,6000),native_ready:Boolean(window.frappe?.app?.link_preview),route:window.frappe?.get_route?.(),list_kind:window.cur_list?.doctype,form_kind:window.cur_frm?.doctype,ajax_count:window.frappe?.request?.ajax_count})", session)
+		value = await self.evaluate("({title:document.title,url:location.href,text:document.body.innerText.slice(0,6000),native_ready:Boolean(window.frappe?.app?.link_preview),route:window.frappe?.get_route?.(),list_kind:window.cur_list?.doctype,form_kind:window.cur_frm?.doctype,ajax_count:window.frappe?.request?.ajax_count,item_query_registered:typeof window.cur_frm?.fields_dict?.items?.grid?.get_field('item_code')?.get_query==='function',item_control_query_registered:typeof window.cur_frm?.fields_dict?.items?.grid?.grid_rows?.[0]?.columns?.item_code?.field?.get_query==='function'||typeof window.cur_frm?.fields_dict?.items?.grid?.grid_rows?.[0]?.columns?.item_code?.field?.df?.get_query==='function'})", session)
 		# Remove query values from retained URL (callback state is never evidence).
 		value['url'] = value['url'].split('?')[0]
 		(OUTPUT / (name + '.json')).write_text(json.dumps(value, indent=2))
@@ -155,9 +180,14 @@ class Browser:
 		for current,other in ((records[0],records[1]),(records[1],records[0])):
 			for kind,name in (('Customer',other['customer']),('Sales Invoice',other['invoice'])):
 				path='/api/method/frappe.desk.form.load.getdoc?'+urlencode({'doctype':kind,'name':name})
-				status=await self.evaluate('fetch('+json.dumps(path)+',{credentials:"same-origin"}).then(r=>r.status)',current['session'])
-				if status not in (401,403,404):
-					raise RuntimeError('Foreign native record read was not denied')
+				# Native names are company-local; an identical invoice name is an
+				# own-namespace alias, never authority to the other company's row.
+				alias = kind == 'Sales Invoice' and name == current['invoice']
+				expected = {'name':current['invoice'],'customer':current['customer'],'po_no':'Browser Edited '+current['plane'].upper(),'item_code':'Editor-Service-'+current['plane']}
+				observed=await self.evaluate('(async()=>{const r=await fetch('+json.dumps(path)+',{credentials:"same-origin"});if([401,403,404].includes(r.status))return {denied:true};if(r.status!==200)return {denied:false};const b=await r.json();if(Object.keys(b).length===1&&Object.hasOwn(b,"message")&&Array.isArray(b.message)&&b.message.length===0)return {denied:true,empty_message_only:true};if(!Array.isArray(b.docs))return {denied:false};const d=b.docs[0],e='+json.dumps(expected)+';return {denied:b.docs.length===0,own_alias:b.docs.length===1&&d.doctype==="Sales Invoice"&&d.name===e.name&&d.customer===e.customer&&d.po_no===e.po_no&&d.docstatus===0&&Array.isArray(d.items)&&d.items.length===1&&d.items[0].item_code===e.item_code&&d.items[0].qty===2};})()',current['session'])
+				OBSERVATIONS.append({'operation':'native-isolation','kind':kind,'alias':alias,'denied':observed.get('denied') is True,'own_alias':observed.get('own_alias') is True,'empty_message_only':observed.get('empty_message_only') is True})
+				if not (observed.get('own_alias') if alias else observed.get('denied')):
+					raise RuntimeError('Foreign native record isolation failed')
 			# Visible mounted native switcher reaches the configured central landing.
 			await self.evaluate("(()=>{const button=document.querySelector('exe-service-switcher')?.shadowRoot?.querySelector('.exe-ss-logout');if(!button)throw Error('Mounted native logout missing');button.click();})()",current['session'])
 			await self.wait("location.origin==='https://auth.platform.example.test' && location.pathname==='/logout'",current['session'])
@@ -205,6 +235,7 @@ class Browser:
 		await self.wait("window.cur_list?.doctype==='Sales Invoice' && frappe.get_route()?.[0]==='List' && frappe.get_route()?.[1]==='Sales Invoice' && location.pathname.startsWith('/desk/sales-invoice') && Boolean(cur_list.page?.btn_primary?.[0]?.offsetParent) && !frappe.request.ajax_count",session)
 		await self.evaluate("cur_list.page.btn_primary[0].click()",session)
 		await self.wait("window.cur_frm?.doctype==='Sales Invoice' && Boolean(cur_frm.fields_dict.customer.$input?.[0])",session)
+		await self.wait("typeof cur_frm.fields_dict.items.grid.get_field('item_code').get_query==='function' && !frappe.request.ajax_count",session)
 		await self.snapshot('invoice-new-'+plane,session)
 		await self.evaluate("(()=>{const input=cur_frm.fields_dict.customer.$input[0];input.focus();input.value="+json.dumps(name)+";input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();})()",session)
 		await self.wait("cur_frm.doc.customer==="+json.dumps(name)+" && cur_frm.doc.company==="+json.dumps('Editor '+plane)+" && cur_frm.doc.debit_to && cur_frm.doc.currency==='USD'",session)
@@ -216,14 +247,19 @@ class Browser:
 		await self.wait("cur_frm.doc.doctype==='Sales Invoice' && !cur_frm.doc.__islocal && !cur_frm.doc.__unsaved && cur_frm.doc.docstatus===0",session)
 		invoice=await self.evaluate('cur_frm.doc.name',session)
 		await self.snapshot('invoice-created-'+plane,session)
-		await self.evaluate("(()=>{const input=cur_frm.fields_dict.po_no.$input[0];if(!input.offsetParent)cur_frm.fields_dict.po_no.$wrapper.closest('.form-section').find('.section-head')[0]?.click();})()",session)
+		await self.evaluate("(()=>{const tab=cur_frm.layout.tab_link_container.find('.nav-link[data-fieldname=more_info_tab]').filter(':visible')[0];if(!tab?.offsetParent)throw Error('Missing visible native More Info tab');tab.click();})()",session)
+		await self.evaluate("(()=>{const section=cur_frm.fields_dict.po_no.section;if(section.body.hasClass('hide')){const head=section.head[0];if(!head?.offsetParent)throw Error('Missing visible native PO section');head.click();}})()",session)
+		await self.wait("Boolean(cur_frm.fields_dict.po_no.$input?.[0]?.offsetParent)",session)
 		await self.evaluate("(()=>{const input=cur_frm.fields_dict.po_no.$input[0];if(!input.offsetParent)throw Error('PO input not visible');input.focus();input.value="+json.dumps('Browser Edited '+label)+";input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();})()",session)
 		await self.wait("cur_frm.doc.po_no==="+json.dumps('Browser Edited '+label)+" && cur_frm.doc.__unsaved",session)
+		await self.evaluate("(()=>{const tab=cur_frm.layout.tab_link_container.find('.nav-link[data-fieldname=__details]').filter(':visible')[0];if(!tab?.offsetParent)throw Error('Missing visible native Details tab');tab.click();})()",session)
 		await self.evaluate("(()=>{const row=cur_frm.fields_dict.items.grid.grid_rows[0];const cell=row.row.find('[data-fieldname=qty]')[0];if(!cell)throw Error('Missing visible quantity cell');cell.click();})()",session)
 		await self.wait("Boolean(cur_frm.fields_dict.items.grid.grid_rows[0].columns.qty?.field?.$input?.[0])",session)
 		await self.evaluate("(()=>{const input=cur_frm.fields_dict.items.grid.grid_rows[0].columns.qty.field.$input[0];if(!input.offsetParent)throw Error('Quantity input not visible');input.focus();input.value='2';input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.blur();})()",session)
 		await self.wait("cur_frm.doc.items[0].qty===2 && cur_frm.doc.items[0].rate===100 && !frappe.request.ajax_count && cur_frm.doc.__unsaved",session)
 		await self.evaluate("cur_frm.page.btn_primary[0].click()",session)
+		await self.wait("!cur_frm.doc.__unsaved || Boolean(Array.from(document.querySelectorAll('.modal')).find(d=>d.getClientRects().length&&getComputedStyle(d).visibility==='visible'&&d.querySelector('.frappe-confirm-message')?.textContent.trim()===\"Posting Date will change to today's date as Edit Posting Date and Time is unchecked. Are you sure want to proceed?\"))",session)
+		await self.evaluate("(()=>{const dialog=Array.from(document.querySelectorAll('.modal')).find(d=>d.getClientRects().length&&getComputedStyle(d).visibility==='visible'&&d.querySelector('.frappe-confirm-message')?.textContent.trim()===\"Posting Date will change to today's date as Edit Posting Date and Time is unchecked. Are you sure want to proceed?\");if(dialog){const yes=dialog.querySelector('.btn-primary');if(!yes?.offsetParent||yes.textContent.trim()!=='Yes')throw Error('Missing visible native posting date confirmation');yes.click();}})()",session)
 		await self.wait("!cur_frm.doc.__unsaved && cur_frm.doc.items[0].qty===2 && cur_frm.doc.po_no==="+json.dumps('Browser Edited '+label),session)
 		await self.evaluate('window.__owned_native_pre_reload = true',session)
 		await self.send('Page.reload',session=session)
@@ -321,10 +357,10 @@ async def main():
 		except Exception as error:
 			closure['error'] = type(error).__name__
 			outcome = {'passed': False, 'class': type(error).__name__}
-		(OUTPUT / 'result.json').write_text(json.dumps({'outcome': outcome, 'requests': REQUESTS, 'failures': FAILURES, 'chrome': closure}, indent=2))
+		(OUTPUT / 'result.json').write_text(json.dumps({'outcome': outcome, 'requests': REQUESTS, 'failures': FAILURES, 'observations': OBSERVATIONS, 'chrome': closure}, indent=2))
 		if sum(path.stat().st_size for path in OUTPUT.iterdir() if path.is_file()) > OUTPUT_LIMIT:
 			outcome = {'passed': False, 'class': 'OutputBudget'}
-			(OUTPUT / 'result.json').write_text(json.dumps({'outcome': outcome, 'requests': REQUESTS, 'failures': FAILURES, 'chrome': closure}, indent=2))
+			(OUTPUT / 'result.json').write_text(json.dumps({'outcome': outcome, 'requests': REQUESTS, 'failures': FAILURES, 'observations': OBSERVATIONS, 'chrome': closure}, indent=2))
 		print(json.dumps({'outcome': outcome, 'output': str(OUTPUT)}))
 	if not outcome or not outcome.get('passed'):
 		sys.exit(1)
