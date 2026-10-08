@@ -73,6 +73,7 @@ frappe.call = function (opts) {
 	}
 
 	var callback = function (data, response_text) {
+		if (frappe.company_editor_terminal) return;
 		if (data.task_id) {
 			// async call, subscribe
 			frappe.realtime.subscribe(data.task_id, opts);
@@ -289,6 +290,7 @@ frappe.request.call = function (opts) {
 
 	return $.ajax(ajax_args)
 		.done(function (data, textStatus, xhr) {
+			if (frappe.company_editor_terminal) return;
 			try {
 				if (typeof data === "string") data = JSON.parse(data);
 
@@ -339,6 +341,7 @@ frappe.request.call = function (opts) {
 			}
 		})
 		.fail(function (xhr, textStatus) {
+			if (frappe.company_editor_terminal) return;
 			try {
 				if (
 					xhr.getResponseHeader("content-type") == "application/json" &&

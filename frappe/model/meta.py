@@ -80,6 +80,9 @@ def get_meta(doctype: "str | DocType", cached: bool = True) -> "_Meta":
 	    Meta object for the given doctype.
 	"""
 	company = bool(frappe.flags.get("company_session"))
+	editor_snapshot = frappe.local.request_cache.setdefault("company_editor_meta", {}) if frappe.flags.get("company_editor") else None
+	if cached and isinstance(doctype, str) and editor_snapshot is not None and doctype in editor_snapshot:
+		return editor_snapshot[doctype]
 	if (
 		cached
 		and not company
@@ -89,6 +92,8 @@ def get_meta(doctype: "str | DocType", cached: bool = True) -> "_Meta":
 		return meta
 
 	meta = Meta(doctype)
+	if editor_snapshot is not None:
+		editor_snapshot[meta.name] = meta
 
 	key = f"doctype_meta::{meta.name}"
 	if not company:

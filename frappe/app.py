@@ -103,12 +103,17 @@ def after_response_wrapper(app):
 def application(request: Request):
 	if _company_config is not None:
 		return frappe.company_session.application(request, _company_config, _sites_path)
+	return native_application(request)
+
+
+def native_application(request, company_context=None):
 	response = None
 
 	try:
-		init_request(request)
+		init_request(request, company_context)
 
-		validate_auth()
+		if company_context is None:
+			validate_auth()
 
 		if request.method == "OPTIONS":
 			response = Response()
@@ -148,7 +153,15 @@ def application(request: Request):
 		else:
 			raise NotFound
 
+		if company_context is not None:
+			from frappe.company_editor import recheck_before_commit
+			recheck_before_commit(company_context)
+
 	except Exception as e:
+		if company_context is not None:
+			if db := getattr(frappe.local, "db", None):
+				db.rollback(chain=True)
+			raise
 		response = e.get_response(request.environ) if isinstance(e, HTTPException) else handle_exception(e)
 		if db := getattr(frappe.local, "db", None):
 			db.rollback(chain=True)
@@ -162,7 +175,8 @@ def application(request: Request):
 		# try..catch block like this finally block needs to be handled appropriately.
 
 		try:
-			run_after_request_hooks(request, response)
+			if company_context is None:
+				run_after_request_hooks(request, response)
 		except Exception:
 			# We can not handle exceptions safely here.
 			frappe.logger().error("Failed to run after request hook", exc_info=True)
@@ -181,13 +195,13 @@ def run_after_request_hooks(request, response):
 		frappe.call(after_request_task, response=response, request=request)
 
 
-def init_request(request):
+def init_request(request, company_context=None):
 	frappe.local.request = request
 	frappe.local.request.after_response = CallbackManager()
 
 	frappe.local.is_ajax = frappe.get_request_header("X-Requested-With") == "XMLHttpRequest"
 
-	site = _site or request.headers.get("X-Frappe-Site-Name") or get_site_name(request.host)
+	site = company_context.config.site if company_context is not None else (_site or request.headers.get("X-Frappe-Site-Name") or get_site_name(request.host))
 	frappe.init(site, sites_path=_sites_path, force=True)
 
 	if not (frappe.local.conf and frappe.local.conf.db_name):
@@ -209,6 +223,10 @@ def init_request(request):
 		request.max_content_length = cint(frappe.local.conf.get("max_file_size")) or 25 * 1024 * 1024
 	make_form_dict(request)
 
+	if company_context is not None:
+		from frappe.company_editor import initialize_native_request
+		initialize_native_request(company_context)
+		return
 	if request.method != "OPTIONS":
 		frappe.local.http_request = HTTPRequest()
 

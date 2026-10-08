@@ -154,6 +154,9 @@ class ExeServiceSwitcher extends HTMLElement {
   }
 
   async _logout() {
+    if (window.frappe?.boot?.company_editor?.version === 2) {
+      return window.frappe.company_editor_logout();
+    }
     if (this._signingOut) return;
     const button = this._shadow.querySelector(".exe-ss-logout");
     const status = this._shadow.querySelector(".exe-ss-logout-status");

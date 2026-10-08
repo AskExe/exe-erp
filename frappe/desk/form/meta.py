@@ -32,7 +32,7 @@ ASSET_KEYS = (
 
 def get_meta(doctype, cached=True) -> "FormMeta":
 	# don't cache for developer mode as js files, templates may be edited
-	cached = cached and not frappe.conf.developer_mode
+	cached = cached and not frappe.conf.developer_mode and not frappe.flags.get("company_editor")
 	key = f"doctype_form_meta::{doctype}"
 	if cached:
 		meta = frappe.client_cache.get_value(key)
@@ -79,6 +79,9 @@ class FormMeta(Meta):
 		# add masked fields (per-user, per-meta)
 		d["masked_fields"] = [df.fieldname for df in self.get_masked_fields()]
 
+		if frappe.flags.get("company_editor"):
+			from frappe.company_editor import form_meta_ceiling
+			return form_meta_ceiling(d)
 		return d
 
 	def add_code(self):

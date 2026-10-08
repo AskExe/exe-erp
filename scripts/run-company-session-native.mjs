@@ -1,24 +1,35 @@
 // Ordinary local fixture. OwnedContainers is byte-exact Core d622048 helper.
 // Real native sites/ACL; central envelopes remain controlled. No pulls/builds.
+// For editor assets first run build-company-editor-assets.py on a clean source
+// worktree; pass its real bench/sites/assets output as ERP_NATIVE_ASSETS.
 import {OwnedContainers} from './lib/owned-containers.mjs'
 import {spawnSync,execFileSync} from 'node:child_process'
 import {randomBytes,createHash} from 'node:crypto'
-import {mkdtempSync,readFileSync,writeFileSync,statfsSync} from 'node:fs'
+import {mkdtempSync,readFileSync,writeFileSync,statfsSync,readdirSync,statSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join,resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
 if(process.env.ERP_NATIVE_EXECUTE!=='true')throw Error('Local fixture execution remains explicitly held')
-const httpMode=process.env.ERP_NATIVE_HTTP==='true'
+const editorMode=process.env.ERP_NATIVE_EDITOR==='true'
+const browserMode=process.env.ERP_NATIVE_BROWSER==='true'
+const calculatorProbe=process.env.ERP_NATIVE_CALCULATOR_PROBE==='true'
+if(calculatorProbe&&(!editorMode||browserMode))throw Error('Closed calculator probe requires native editor only')
+if(browserMode&&!editorMode)throw Error('Browser requires explicit editor fixture')
+const httpMode=editorMode||process.env.ERP_NATIVE_HTTP==='true'
 const source=resolve(fileURLToPath(new URL('..',import.meta.url)))
 const output=mkdtempSync(join(tmpdir(),'erp-native-acl-'))
 const suffix=randomBytes(16).toString('hex'),prefix='erp-native-acl-'+suffix,network=prefix+'-net'
 const a='erp.acl-a-'+suffix.slice(0,12)+'.example.test',b='erp.acl-b-'+suffix.slice(0,12)+'.example.test'
 const pgImage='pgvector/pgvector@sha256:00ba258a66dac104fd5171074a0084462a64a1369d8513f3d0a634e2f24d15bc'
 const redisImage='redis@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99'
-const erpImage='sha256:b386cb66e7352036bc374f6d29475f74018c5ee6283a1fd8488a6dad019821e2'
+const erpImage=editorMode?'sha256:ff02bb69085e8205e47dc715d8c7031ae2736aeef20b9d0c5d9ace2223978e33':'sha256:b386cb66e7352036bc374f6d29475f74018c5ee6283a1fd8488a6dad019821e2'
 const dbPassword=randomBytes(24).toString('hex'),adminPassword=randomBytes(24).toString('hex')
 const ids=[],volumes=new Set(),records=[];let raw=0,networkCreated=false,primary=null,secondary=[],cleaning=false,outputOverflow=false
+const assets=process.env.ERP_NATIVE_ASSETS?resolve(process.env.ERP_NATIVE_ASSETS):null
+if(editorMode&&!assets)throw Error('Actual current-source built assets required')
+const assetBytes=assets?Number(execFileSync('du',['-sk',assets],{encoding:'utf8'}).trim().split(/\s/)[0])*1024:0
+const assetsManifest=assets?createHash('sha256').update(readFileSync(join(assets,'assets.json'))).digest('hex'):null
 const sourceBytes=Number(execFileSync('du',['-sk',source],{encoding:'utf8'}).trim().split(/\s/)[0])*1024
 const setupEnd=Date.now()+300000
 let phaseEnd=setupEnd
@@ -38,7 +49,7 @@ const owned=new OwnedContainers(args=>run(args).text)
 const create=args=>{const id=owned.create(args);ids.push(id);return id}
 function guard(){
  const disk=statfsSync(output);if(disk.bavail*disk.bsize<20*1024**3)throw Error('Fixture disk free floor20GiB')
- let bytes=1024**2+sourceBytes // Full retained output and complete readonly Source.
+ let bytes=1024**2+sourceBytes+assetBytes+(browserMode?64*1024**2:0) // Full retained output and complete readonly Source.
  for(const id of ids){
   const inspected=JSON.parse(run(['inspect','--size',id]).text)[0]
   bytes+=inspected.SizeRw??0
@@ -63,36 +74,77 @@ async function ready(id,args){
  throw Error('Owned prerequisite not ready')
 }
 const sourcePaths=['frappe/app.py','frappe/company_session.py','frappe/core/doctype/system_settings/system_settings.py','frappe/core/doctype/user_permission/user_permission.py','frappe/model/document.py','frappe/model/meta.py','frappe/permissions.py','frappe/utils/background_jobs.py','frappe/utils/scheduler.py','frappe/utils/task_queue.py','apps/erpnext/erpnext/exe_auth/hosted_site.py','apps/erpnext/erpnext/exe_auth/test_hosted_site.py','scripts/company-session-native.integration.py','scripts/company-session-native-setup.py']
-if(httpMode)sourcePaths.push('scripts/company-session-wsgi.integration.py')
+if(editorMode)sourcePaths.push('frappe/database/postgres/database.py','frappe/auth.py','frappe/sessions.py','frappe/handler.py','frappe/desk/form/meta.py','frappe/company_editor.py','apps/erpnext/erpnext/stock/doctype/price_list/price_list.py','apps/erpnext/erpnext/controllers/queries.py','apps/erpnext/erpnext/accounts/doctype/pricing_rule/utils.py','apps/erpnext/erpnext/accounts/doctype/pricing_rule/pricing_rule.py','frappe/public/js/frappe/model/perm.js','frappe/company_editor_access.py','company-editor-access.manifest.json','scripts/company-editor-native.integration.py','scripts/company-editor-browser.py')
+else if(httpMode)sourcePaths.push('scripts/company-session-wsgi.integration.py')
 const sourcePins=Object.fromEntries(sourcePaths.map(p=>[p,createHash('sha256').update(readFileSync(join(source,p))).digest('hex')]))
 try{
  guard();for(const image of [pgImage,redisImage,erpImage])run(['image','inspect',image])
- run(['network','create','--internal',network]);networkCreated=true
+ run(['network','create',...(browserMode?[]:['--internal']),network]);networkCreated=true
  const pg=create(['run','-d','--name',prefix+'-pg','--network',network,'--network-alias','postgres','--memory=512m','--pids-limit=64','-e','POSTGRES_USER=fixture','-e','POSTGRES_PASSWORD='+dbPassword,'-e','POSTGRES_DB=fixture',pgImage])
  const redis=create(['run','-d','--name',prefix+'-redis','--network',network,'--network-alias','redis','--memory=128m','--pids-limit=32',redisImage,'redis-server','--save','','--appendonly','no'])
  await ready(pg,['pg_isready','-U','fixture','-d','fixture']);await ready(redis,['redis-cli','ping'])
- const erp=create(['run','-d','--name',prefix+'-erp','--network',network,'--user=frappe','--memory=1g','--pids-limit=128','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges',
+ const erp=create(['run','-d','--name',prefix+'-erp','--network',network,'--user=frappe','--memory=1g','--pids-limit=128','--read-only',...(browserMode?['--publish','127.0.0.1::8000','--publish','127.0.0.1::8001']:[]),'--cap-drop=ALL','--security-opt=no-new-privileges',
   '--tmpfs','/tmp:rw,nosuid,size=64m','--tmpfs','/home/frappe/frappe-bench/sites:rw,uid=1000,gid=1000,size=256m',
   '--tmpfs','/home/frappe/frappe-bench/logs:rw,uid=1000,gid=1000,size=64m','--tmpfs','/home/frappe/logs:rw,uid=1000,gid=1000,size=64m',
   '--mount','type=bind,src='+source+',dst=/home/frappe/frappe-bench/apps/frappe,readonly',
   '--mount','type=bind,src='+join(source,'apps/erpnext')+',dst=/home/frappe/frappe-bench/apps/erpnext,readonly',
+  ...(assets?['--mount','type=bind,src='+assets+',dst=/opt/company-native-assets,readonly']:[]),
   '-e','PYTHONDONTWRITEBYTECODE=1','--entrypoint=/bin/sleep',erpImage,'infinity'])
  guard()
  const remaining=setupEnd-Date.now();if(remaining<=0)throw Error('Fixture setup deadline')
  run(['exec','-e','NATIVE_ACL_FIXTURE_ID='+suffix,'-e','NATIVE_ACL_SITE_A='+a,'-e','NATIVE_ACL_SITE_B='+b,'-e','NATIVE_ACL_DB_PASSWORD='+dbPassword,'-e','NATIVE_ACL_ADMIN_PASSWORD='+adminPassword,
   erp,'/home/frappe/frappe-bench/env/bin/python','-B','/home/frappe/frappe-bench/apps/frappe/scripts/company-session-native-setup.py'],remaining)
+ if(assets)run(['exec',erp,'/home/frappe/frappe-bench/env/bin/python','-B','-c',"from pathlib import Path; Path('/home/frappe/frappe-bench/sites/assets').symlink_to('/opt/company-native-assets')"])
+ if(editorMode)run(['exec','--workdir','/home/frappe/frappe-bench/sites',erp,'/home/frappe/frappe-bench/env/bin/python','-B','/home/frappe/frappe-bench/apps/frappe/scripts/company-editor-native.integration.py','--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,'--plane','a','--prepare-only'],Math.max(1,setupEnd-Date.now()))
  guard()
  phaseEnd=Date.now()+120000
- for(const plane of httpMode?['a','b']:[null]){
+ if(browserMode){
+  const sites={}
+  for(const plane of ['a','b']){
+   run(['exec','-d','--workdir','/home/frappe/frappe-bench/sites',erp,'/bin/sh','-c',
+    'exec "$@" > /tmp/owned-browser-'+plane+'.stdout 2>/tmp/owned-browser-'+plane+'.stderr','owned-native-browser',
+    '/home/frappe/frappe-bench/env/bin/python','-B','/home/frappe/frappe-bench/apps/frappe/scripts/company-editor-native.integration.py',
+    '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,'--plane',plane,'--browser-serve','--prepared'])
+   let ready=false
+   for(let count=0;count<75;count++){
+    const receipt=run(['exec',erp,'cat','/tmp/owned-browser-'+plane+'.json'],5000,true)
+    if(receipt.status===0){ready=true;break}
+    await new Promise(resolve=>setTimeout(resolve,200))
+   }
+   if(!ready)throw Error('Owned native browser server not ready')
+   const host=plane==='a'?a:b
+   const port=run(['port',erp,(plane==='a'?'8000':'8001')+'/tcp']).text.trim()
+   if(!/^127\.0\.0\.1:[0-9]{1,5}$/.test(port))throw Error('Owned loopback port required')
+   sites[host]={origin:'https://'+host,endpoint:'http://'+port,client:plane==='a'?'erp-a':'erp-b'}
+  }
+  const browserConfig=join(output,'browser-config.json')
+  writeFileSync(browserConfig,JSON.stringify({sites}),{mode:0o600})
+  const python=process.env.ERP_NATIVE_BROWSER_PYTHON||'python3'
+  const browser=spawnSync(python,[join(source,'scripts/company-editor-browser.py'),browserConfig,join(output,'browser')],{encoding:null,timeout:Math.max(1,phaseEnd-Date.now()),maxBuffer:1024**2,env:{...process.env,ERP_NATIVE_BROWSER_EXECUTE:'true',ERP_BROWSER_OUTPUT_LIMIT:String(Math.max(0,1024**2-raw-65536))}})
+  const stdout=Buffer.from(browser.stdout??''),stderr=Buffer.from(browser.stderr??'');raw+=stdout.length+stderr.length
+  writeFileSync(join(output,'browser.stdout'),stdout);writeFileSync(join(output,'browser.stderr'),stderr)
+  const browserArtifacts=join(output,'browser')
+  if(readdirSync(browserArtifacts).some(name=>statSync(join(browserArtifacts,name)).isDirectory()))throw Error('Owned browser profile cleanup unproved')
+  raw+=readdirSync(browserArtifacts).reduce((sum,name)=>sum+statSync(join(browserArtifacts,name)).size,0)
+  if(raw>1024**2){outputOverflow=true;throw Error('Complete browser output exceeds1MiB')}
+  for(const plane of ['a','b']){
+   run(['exec',erp,'cat','/tmp/owned-browser-'+plane+'.stdout'],5000,true)
+   run(['exec',erp,'cat','/tmp/owned-browser-'+plane+'.stderr'],5000,true)
+  }
+  if(browser.error||browser.status!==0)throw Error('Owned browser assertion failed')
+ }else{
+ for(const plane of process.env.ERP_NATIVE_DIAGNOSE==='true'||calculatorProbe?['a']:httpMode?['a','b']:[null]){
   run(['exec','--workdir','/home/frappe/frappe-bench/sites',erp,'/home/frappe/frappe-bench/env/bin/python','-B',
-   '/home/frappe/frappe-bench/apps/frappe/scripts/'+(httpMode?'company-session-wsgi.integration.py':'company-session-native.integration.py'),
-   '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,...(plane?['--plane',plane]:[])],120000)
+   '/home/frappe/frappe-bench/apps/frappe/scripts/'+(editorMode?'company-editor-native.integration.py':httpMode?'company-session-wsgi.integration.py':'company-session-native.integration.py'),
+   '--sites-path','/home/frappe/frappe-bench/sites','--site-a',a,'--site-b',b,'--fixture-id',suffix,...(plane?['--plane',plane]:[]),...(editorMode&&process.env.ERP_NATIVE_DIAGNOSE==='true'?['--diagnostic']:[]),...(calculatorProbe?['--calculator-probe']:[]),...(editorMode?['--prepared']:[])],120000)
+ }
  }
  guard()
 }catch(error){primary={class:error.constructor.name,message:error.message};process.exitCode=1}
 finally{
  cleaning=true
  phaseEnd=Date.now()+60000
+ if(browserMode&&ids.length===3){for(const plane of ['a','b']){for(const stream of ['stdout','stderr']){try{run(['exec',ids[2],'cat','/tmp/owned-browser-'+plane+'.'+stream],5000,true)}catch(error){secondary.push({stage:'browser-diagnostics',class:error.constructor.name})}}}}
  try{owned.removeAll()}catch(error){secondary.push({stage:'container-cleanup',message:error.message});process.exitCode=1}
  for(const id of ids){try{const absent=run(['inspect',id],10000,true);if(absent.status===0||!absent.stderr.includes('No such object'))throw Error('Container remains or absence unproved')}catch(error){secondary.push({stage:'container-absence',id,message:error.message});process.exitCode=1}}
  for(const name of volumes){try{const absent=run(['volume','inspect',name],10000,true);if(absent.status===0||!absent.stderr.includes(': no such volume'))throw Error('Volume remains or absence unproved')}catch(error){secondary.push({stage:'volume-absence',name,message:error.message});process.exitCode=1}}
@@ -100,6 +152,6 @@ finally{
  const postPins=Object.fromEntries(sourcePaths.map(p=>[p,createHash('sha256').update(readFileSync(join(source,p))).digest('hex')]))
  if(JSON.stringify(postPins)!==JSON.stringify(sourcePins)){secondary.push({stage:'source-stability'});process.exitCode=1}
  if(outputOverflow){secondary.push({stage:'complete-raw-budget'});process.exitCode=1}
- writeFileSync(join(output,'result.json'),JSON.stringify({scope:httpMode?'actual ERP WSGI/private HTTP/native ACL; controlled central authority':'actual native ERP ACL; controlled central envelopes',primary,secondary,ids,volumes:[...volumes],network,raw,sourceBytes,sourcePins,postPins,records},null,2))
+ writeFileSync(join(output,'result.json'),JSON.stringify({scope:editorMode?'actual ERP native editor/session/persistence; controlled private HTTP authority':httpMode?'actual ERP WSGI/private HTTP/native ACL; controlled central authority':'actual native ERP ACL; controlled central envelopes',primary,secondary,ids,volumes:[...volumes],network,raw,sourceBytes,assetBytes,assetsManifest,sourcePins,postPins,records},null,2))
  console.log(JSON.stringify({passed:!primary&&!secondary.length,output,primary,secondary,containers:ids.length,raw}))
 }

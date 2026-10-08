@@ -130,6 +130,8 @@ class Config:
 	browser_enabled: bool = False
 	auth_origin: str = ""
 	flow_secret: str = field(default="", repr=False)
+	editor_enabled: bool = False
+	editor_entitlement_kind: str = ""
 
 
 def load_config():
@@ -174,6 +176,8 @@ def load_config():
 		"BROWSER_ENABLED",
 		"AUTH_ORIGIN",
 		"FLOW_SECRET_FILE",
+		"EDITOR_ENABLED",
+		"EDITOR_ENTITLEMENT_KIND",
 	}
 	if any(key.startswith("ERP_COMPANY_") and key[12:] not in allowed for key in os.environ):
 		raise ValueError("Unknown company adapter configuration")
@@ -267,6 +271,15 @@ def load_config():
 			raise ValueError("Distinct native flow credential required")
 	elif get("AUTH_ORIGIN") or get("FLOW_SECRET_FILE"):
 		raise ValueError("Partial disabled company browser configuration")
+	editor = get("EDITOR_ENABLED") or "false"
+	if editor not in ("true", "false"):
+		raise ValueError("Editor admission must be explicit")
+	editor_kind = get("EDITOR_ENTITLEMENT_KIND")
+	if editor == "true":
+		if browser != "true" or editor_kind not in ("beta", "subscription"):
+			raise ValueError("Editor requires fixed browser entitlement kind")
+	elif editor_kind:
+		raise ValueError("Partial disabled editor configuration")
 	return Config(
 		company,
 		site,
@@ -282,6 +295,8 @@ def load_config():
 		browser == "true",
 		auth_origin,
 		flow_secret,
+		editor == "true",
+		editor_kind,
 	)
 
 
@@ -316,7 +331,11 @@ def company_access(value, binding=None):
 # END GENERATED COMPANY ACCESS V1
 
 def envelope(value, config):
-	authority = company_access(value, {
+	validator = company_access
+	if config.editor_enabled:
+		from frappe.company_editor import editor_envelope
+		return editor_envelope(value, config)[1]
+	authority = validator(value, {
 		"company_id": config.company_id,
 		"product": "erp",
 		"binding_id": config.binding_id,
@@ -580,7 +599,7 @@ def request_policy(request, config):
 	return ("read", (doctype, name), params, cookies[0])
 
 
-def native_user(config, value, fresh_roles=False):
+def native_user(config, value, fresh_roles=False, *, set_principal=True):
 	import frappe
 
 	user = envelope(value, config)
@@ -588,7 +607,8 @@ def native_user(config, value, fresh_roles=False):
 	identity = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
 	if not identity or identity.enabled != 1 or identity.user_type != "System User":
 		raise Denied(403)
-	frappe.set_user(user)
+	if set_principal:
+		frappe.set_user(user)
 	if fresh_roles:
 		# Callback-only bounded current Has Role lookup, never Redis membership cache.
 		roles = frappe.db.get_values("Has Role", {"parenttype": "User", "parent": user}, "role", pluck=True, cache=False, limit=101)
@@ -692,6 +712,9 @@ def application(request, config, sites_path):
 	# Required even for browser start and pre-native denial by after_response_wrapper.
 	frappe.local.request = request
 	frappe.local.request.after_response = CallbackManager()
+	if config.editor_enabled and request.path not in ("/company-session/start", "/company-session/callback"):
+		from frappe.company_editor import application as editor_application
+		return editor_application(request, config, sites_path)
 	if request.path in ("/company-session/start", "/company-session/callback") and config.browser_enabled:
 		return browser_application(request, config, sites_path)
 	status, data, clear = 200, None, False
@@ -751,7 +774,7 @@ def application(request, config, sites_path):
 
 
 def flow_binding(config):
-	return {
+	return {**({"authority_version": 2, "entitlement_kind": config.editor_entitlement_kind} if config.editor_enabled else {}),
 		"version": 1, "company_id": config.company_id, "site": config.site,
 		"binding_id": config.binding_id, "generation_id": config.generation_id,
 		"audience": config.audience, "client_id": config.client_id,
@@ -776,7 +799,8 @@ def browser_request(request, config):
 		if not part.strip():
 			continue
 		name, sep, value = part.strip().partition("=")
-		if not sep or name not in (COOKIE, FLOW_COOKIE) or name in cookies or len(value) > 2048:
+		allowed = (COOKIE, FLOW_COOKIE, "sid", "user_id", "full_name", "user_image", "user_lang", "system_user") if config.editor_enabled else (COOKIE, FLOW_COOKIE)
+		if not sep or name not in allowed or name in cookies or len(value) > 2048:
 			raise Denied(401)
 		if name == COOKIE and not SESSION.fullmatch(value):
 			raise Denied(401)
@@ -873,11 +897,15 @@ def browser_application(request, config, sites_path):
 			value = private_call(config, "introspect", result["session_token"])
 			check()
 			envelope(value, config)
-			callback_native_user(config, value, request, sites_path)
+			if config.editor_enabled:
+				from frappe.company_editor import callback_native_session
+				callback_native_session(config, value, result["session_token"], request, sites_path, mono_deadline)
+			else:
+				callback_native_user(config, value, request, sites_path)
 			check()
 			session, expires, flow = result["session_token"], result["expires_in"], ""
 			# Staged producer completion, not a replacement ERP UI or native Desk admission.
-			location = config.origin + "/company-session/status"
+			location = config.origin + ("/desk" if config.editor_enabled else "/company-session/status")
 		check()
 	except Denied as error:
 		status = error.status
@@ -886,6 +914,9 @@ def browser_application(request, config, sites_path):
 	response = Response("" if location and status == 200 else '{"error":"unavailable"}', status=303 if location and status == 200 else status, content_type="application/json")
 	response.headers.update({"Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "frame-ancestors 'self'"})
 	if status == 200:
+		if config.editor_enabled and session:
+			import frappe
+			frappe.local.cookie_manager.flush_cookies(response)
 		response.headers["Location"] = location
 		if session:
 			response.set_cookie(COOKIE, session, max_age=expires, path="/", secure=True, httponly=True, samesite="Lax")

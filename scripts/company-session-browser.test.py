@@ -53,7 +53,7 @@ def request(path="/company-session/start", query="", cookie="", **headers):
 class BrowserTests(unittest.TestCase):
 	def setUp(self):
 		self.trace, self.used, self.provider_failure, self.value = [], False, None, envelope()
-		self.transaction_active, self.role_queries = False, []
+		self.transaction_active, self.role_queries, self.closed = False, [], 0
 		self.identity = types.SimpleNamespace(enabled=1, user_type="System User")
 		self.roles = ["All", "Desk User", "Sales User"]
 		self.frappe = types.ModuleType("frappe")
@@ -76,7 +76,10 @@ class BrowserTests(unittest.TestCase):
 			self.assertTrue(self.transaction_active)
 			self.role_queries.append((kind, filters, field, kw))
 			return self.roles
-		self.frappe.db = types.SimpleNamespace(begin=begin, rollback=rollback, get_values=get_values, get_value=lambda kind, name, fields, **kw: self.identity if kind == "User" else 0)
+		def close():
+			self.assertFalse(self.transaction_active)
+			self.closed += 1
+		self.frappe.db = types.SimpleNamespace(begin=begin, rollback=rollback, close=close, get_values=get_values, get_value=lambda kind, name, fields, **kw: self.identity if kind == "User" else 0)
 		utils = types.ModuleType("frappe.utils")
 		class ControlledCallbackManager:
 			# SDK boundary, not native wrapper execution: required callable interface.
@@ -268,13 +271,16 @@ class BrowserTests(unittest.TestCase):
 				self.assertEqual((target.path, target.query), ("/company-session/status", ""))
 				token = result.cookies[adapter.COOKIE][0]
 				self.trace.clear()
+				self.closed = 0
 				status = self.status_call(request(target.path, cookie=adapter.COOKIE + "=" + token, **metadata))
 				self.assertEqual(status.status_code, 200)
 				self.assertEqual(json.loads(status.body), {"data": {"authenticated": True, "company_id": config().company_id}})
-				self.assertEqual([item[1] for item in self.trace if item[0] == "provider"], ["introspect"])
+				self.assertEqual([item[1] for item in self.trace if item[0] == "provider"], ["introspect", "introspect"])
 				self.assertIn(("user", "reader@example.test"), self.trace)
 				self.assertIn(("begin", {"read_only": True}), self.trace)
-				self.assertEqual(self.trace[-1], ("rollback",))
+				self.assertEqual(self.trace[-2], ("rollback",))
+				self.assertEqual(self.trace[-1][0:2], ("provider", "introspect"))
+				self.assertEqual(self.closed, 1)
 				self.assertFalse(status.cookies)
 
 	def test_status_navigation_requires_explicit_metadata_and_own_session(self):

@@ -146,7 +146,7 @@ def get():
 	from frappe.utils.change_log import get_change_log
 
 	bootinfo = None
-	if not getattr(frappe.conf, "disable_session_cache", None):
+	if not frappe.flags.get("company_editor") and not getattr(frappe.conf, "disable_session_cache", None):
 		# check if cache exists
 		bootinfo = frappe.cache.hget("bootinfo", frappe.session.user)
 		if bootinfo:
@@ -156,7 +156,8 @@ def get():
 	if not bootinfo:
 		# if not create it
 		bootinfo = get_bootinfo()
-		frappe.cache.hset("bootinfo", frappe.session.user, bootinfo)
+		if not frappe.flags.get("company_editor"):
+			frappe.cache.hset("bootinfo", frappe.session.user, bootinfo)
 		try:
 			frappe.cache.ping()
 		except redis.exceptions.ConnectionError:
@@ -199,6 +200,10 @@ def get():
 	bootinfo.has_app_updates = has_app_update_notifications()
 	bootinfo.show_external_link_warning = frappe.get_system_settings("show_external_link_warning")
 
+	if frappe.flags.get("company_editor"):
+		from frappe.company_editor import boot_ceiling
+		boot_ceiling(bootinfo)
+
 	return bootinfo
 
 
@@ -221,7 +226,7 @@ def generate_csrf_token():
 
 
 class Session:
-	__slots__ = ("_update_in_cache", "data", "full_name", "sid", "time_diff", "user", "user_type")
+	__slots__ = ("_update_in_cache", "company_binding", "data", "full_name", "sid", "time_diff", "user", "user_type")
 
 	def __init__(
 		self,
@@ -231,6 +236,7 @@ class Session:
 		user_type: str | None = None,
 		session_end: str | None = None,
 		audit_user: str | None = None,
+		company_binding: dict | None = None,
 	):
 		self.sid = cstr(
 			frappe.form_dict.pop("sid", None) or unquote(frappe.request.cookies.get("sid", "Guest"))
@@ -241,6 +247,7 @@ class Session:
 		self.data = frappe._dict({"data": frappe._dict({})})
 		self.time_diff = None
 		self._update_in_cache = False
+		self.company_binding = company_binding
 
 		# set local session
 		frappe.local.session = self.data
@@ -292,6 +299,11 @@ class Session:
 					"user_type": self.user_type,
 				}
 			)
+
+		# Bind trusted company context before native session persistence.
+		if self.company_binding is not None:
+			self.data.data.company_binding = self.company_binding
+			self.data.data.csrf_token = frappe.generate_hash()
 
 		# insert session
 		if self.user != "Guest":

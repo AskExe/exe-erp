@@ -20,6 +20,7 @@ import "./frappe/ui/sidebar/sidebar_card.js";
 import "./frappe/ui/link_preview.js";
 
 import "./frappe/request.js";
+import "./frappe/utils/logout.js";
 import "./frappe/socketio_client.js";
 import "./frappe/broadcast.js";
 import "./frappe/utils/utils.js";

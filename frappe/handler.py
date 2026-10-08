@@ -65,11 +65,39 @@ def handle():
 
 def execute_cmd(cmd, from_async=False):
 	"""execute a request as python module"""
+	if frappe.flags.get("company_editor"):
+		from frappe.company_editor import method_guard
+		method_guard(cmd)
+		from frappe.company_editor import (
+			CALCULATORS,
+			LINK_METHODS,
+			LIST_SETTINGS,
+			SALES_SETTINGS,
+			TAX_TEMPLATE,
+			calculate,
+			read_link,
+			read_list_settings,
+			read_sales_setting,
+			read_tax_template,
+		)
+		if cmd == TAX_TEMPLATE:
+			return read_tax_template()
+		if cmd == SALES_SETTINGS:
+			return read_sales_setting()
+		if cmd in LINK_METHODS:
+			return read_link(cmd)
+		if cmd == LIST_SETTINGS:
+			return read_list_settings()
+		if cmd in CALCULATORS:
+			return calculate(cmd)
 	cmd = frappe.override_whitelisted_method(cmd)
 
 	# via server script
 	server_script = get_server_script_map().get("_api", {}).get(cmd)
 	if server_script:
+		if frappe.flags.get("company_editor"):
+			from frappe.company_session import Denied
+			raise Denied(403)
 		return run_server_script(server_script)
 
 	try:

@@ -327,6 +327,13 @@ def item_query(
 		.offset(start)
 	)
 
+	if frappe.flags.get("company_editor"):
+		from frappe.company_editor import canonical_link_name
+		canonical = canonical_link_name("Item")
+		if canonical is not None:
+			# Party Specific Item filters may replace filters["name"]. Keep
+			# both their restrictions and this independent exact-name fence.
+			query = query.where(item.name == canonical)
 	return query.run(as_dict=as_dict)
 
 

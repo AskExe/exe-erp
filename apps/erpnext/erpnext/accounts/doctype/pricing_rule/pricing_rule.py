@@ -390,6 +390,13 @@ def update_pricing_rule_uom(pricing_rule, args):
 
 
 def get_pricing_rule_for_item(args, doc=None, for_validate=False):
+	if frappe.flags.get("company_editor") is not None:
+		from frappe.company_editor import Denied, rule_free_admission
+		rule_free_admission()
+		# Native validation can otherwise load previously applied cached rules
+		# before get_pricing_rules; no rule capability is admitted in this beta.
+		if args.get("pricing_rules"):
+			raise Denied(403)
 	from erpnext.accounts.doctype.pricing_rule.utils import (
 		get_applied_pricing_rules,
 		get_pricing_rule_items,

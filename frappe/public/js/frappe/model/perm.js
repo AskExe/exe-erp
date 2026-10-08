@@ -44,10 +44,28 @@ $.extend(frappe.perm, {
 		// (with ownership and user perms applied) else cached doctype perms
 
 		if (doc && !doc.__islocal) {
-			return frappe.perm._get_perm(doctype, doc);
+			return frappe.perm.company_editor_ceiling(doctype, frappe.perm._get_perm(doctype, doc));
 		}
 
-		return (frappe.perm.doctype_perm[doctype] ??= frappe.perm._get_perm(doctype));
+		return frappe.perm.company_editor_ceiling(
+			doctype,
+			(frappe.perm.doctype_perm[doctype] ??= frappe.perm._get_perm(doctype))
+		);
+	},
+
+	company_editor_ceiling: (doctype, permissions) => {
+		const editor = frappe.boot?.company_editor;
+		if (!editor) return permissions;
+		const writable = editor.version === 2 && editor.writable_doctypes?.includes(doctype);
+		return permissions.map((native) => {
+			const limited = { ...native };
+			for (const right of frappe.perm.rights) {
+				if (!["read", "select"].includes(right) && !(writable && ["write", "create"].includes(right))) {
+					limited[right] = 0;
+				}
+			}
+			return limited;
+		});
 	},
 
 	_get_perm: (doctype, doc) => {

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "contract": "company-editor-access-v2",
+  "version": 2,
+  "enabled": false,
+  "v1PolicySha256": "790e6bc8d9b78c31d33fa4fce3b57717c952d225b078eef442726daf6c9ec85c",
+  "sourceSha256": "b9013887d93f41a9f02cdad6ce40a276b035c034cb197f98215831e54adc3328",
+  "artifacts": {
+    "company-editor-access.cjs": {
+      "sha256": "e8fc116362589fe6da12705f452f347324ad91bba1bb8fe4f3365c82b19fce7d"
+    },
+    "company-editor-access.njs.js": {
+      "sha256": "a92749bff5a201bede2f2ef5bf156ce4a81bf964cda772c53434d29f2e99bfe9"
+    },
+    "company-editor-access.py": {
+      "sha256": "b4e57d4bff23259b62fb7c2a7645a6440529f73d30f03e2fe88f8016b9533309"
+    },
+    "company-editor-access.fixtures.json": {
+      "sha256": "2c11c406ca39712ba270e7a046f82800403a3711965893effd8fe82dced9a248"
+    }
+  }
+}
