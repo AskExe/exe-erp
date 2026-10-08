@@ -49,3 +49,28 @@ console.log('6 native UI permission ceiling controls PASS; controlled module, no
  legacy.logout();assert.equal(methodName,'logout');assert.equal(location.href,'/login');
  console.log('hosted native Desk/switcher/logout failure/terminal/idempotence and standalone controls PASS');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+// Execute the actual native404 branch; reject optional denied calls without route retargeting.
+{
+const source=readFileSync(require('node:path').join(__dirname,'../frappe/public/js/frappe/request.js'),'utf8');
+const body=source.slice(source.indexOf('\t\t404: function (xhr) {'),source.indexOf('\t\t403: function (xhr) {'));
+function probe(version,url,args={}) {
+ let rejected=0, messages=[];
+ const opts={url,args,error_callback:()=>rejected++};
+ const frappe={boot:version===undefined?{}:{company_editor:{version}},msgprint:value=>messages.push(value)};
+ const fn=vm.runInNewContext('({'+body+'})[404]',{opts,frappe,__:s=>s});fn({});
+ assert.equal(rejected,1);return messages;
+}
+const methods=['frappe.translate.get_boot_translations','frappe.core.doctype.session_default_settings.session_default_settings.get_session_default_values','frappe.core.doctype.background_task.background_task.get_recent_tasks','frappe.desk.desktop.get_onboarding_data','frappe.desk.search.get_link_title','frappe.model.utils.user_settings.save','frappe.desk.doctype.route_history.route_history.deferred_insert'];
+for(const method of methods){
+ const url='/api/method/'+method;
+ assert.equal(probe(2,url).length,0);
+ for(const version of [undefined,1,99])assert.equal(probe(version,url)[0].re_route,true);
+ assert.equal(probe(2,url+'?unknown=1')[0].re_route,true);
+}
+const page='/api/method/frappe.desk.desk_page.getpage';
+assert.equal(probe(2,page,{name:'desktop'}).length,0);
+for(const name of [undefined,'other-page','Desktop'])assert.equal(probe(2,page,{name})[0].re_route,true);
+for(const url of ['/api/method/frappe.desk.form.load.getdoc','/api/method/frappe.desk.form.save.savedocs','/api/method/frappe.client.delete','/api/method/unknown'])assert.equal(probe(2,url)[0].re_route,true);
+console.log('43 actual native404 branch controls PASS: exact ancillary rejection only; business/unknown/default-off/v1 messages retained');
+}

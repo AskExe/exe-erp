@@ -905,7 +905,7 @@ def browser_application(request, config, sites_path):
 			check()
 			session, expires, flow = result["session_token"], result["expires_in"], ""
 			# Staged producer completion, not a replacement ERP UI or native Desk admission.
-			location = config.origin + ("/desk" if config.editor_enabled else "/company-session/status")
+			location = config.origin + ("/desk/customer" if config.editor_enabled else "/company-session/status")
 		check()
 	except Denied as error:
 		status = error.status

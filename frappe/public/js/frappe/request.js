@@ -137,6 +137,22 @@ frappe.request.call = function (opts) {
 			opts.error_callback && opts.error_callback();
 		},
 		404: function (xhr) {
+			// These ancillary native callbacks remain denied by the hosted server.
+			// Reject their caller without an unrelated modal/history transition.
+			const hosted_ancillary = new Set([
+				"/api/method/frappe.translate.get_boot_translations",
+				"/api/method/frappe.core.doctype.session_default_settings.session_default_settings.get_session_default_values",
+				"/api/method/frappe.core.doctype.background_task.background_task.get_recent_tasks",
+				"/api/method/frappe.desk.desktop.get_onboarding_data",
+				"/api/method/frappe.desk.search.get_link_title",
+				"/api/method/frappe.model.utils.user_settings.save",
+				"/api/method/frappe.desk.doctype.route_history.route_history.deferred_insert",
+			]);
+			const hosted_desktop = opts.url === "/api/method/frappe.desk.desk_page.getpage" && opts.args?.name === "desktop";
+			if (frappe.boot?.company_editor?.version === 2 && (hosted_ancillary.has(opts.url) || hosted_desktop)) {
+				opts.error_callback && opts.error_callback();
+				return;
+			}
 			frappe.msgprint({
 				title: __("Not found"),
 				indicator: "red",
