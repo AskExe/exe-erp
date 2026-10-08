@@ -42,8 +42,8 @@ WRITER = 'Company Editor Fixture Writer'
 def sanitized_trace(frame, event, arg):
 	# Owned harness only: no exception text, locals, SQL, headers or credentials.
 	if event == 'call':
-		return sanitized_trace if (frame.f_code.co_filename.endswith('/company_editor.py') and frame.f_code.co_name in ('application', 'calculator_guard', 'calculator_projection', 'price_list_guard', 'rules_projection', 'apply_rules', 'rule_free_admission', 'read_tax_template', 'tax_template_guard', 'sales_settings_guard')) or (frame.f_code.co_filename.endswith('/model/document.py') and frame.f_code.co_name in ('check_permission', 'load_from_db')) or (frame.f_code.co_filename.endswith('/app.py') and frame.f_code.co_name == 'native_application') else None
-	if event == 'exception' and ((Path(frame.f_code.co_filename).name == 'company_editor.py' and frame.f_code.co_name in ('application', 'calculator_guard', 'calculator_projection', 'price_list_guard', 'rules_projection', 'apply_rules', 'rule_free_admission', 'read_tax_template', 'tax_template_guard', 'sales_settings_guard')) or (frame.f_code.co_filename.endswith('/model/document.py') and frame.f_code.co_name in ('check_permission', 'load_from_db')) or (frame.f_code.co_filename.endswith('/app.py') and frame.f_code.co_name == 'native_application')):
+		return sanitized_trace if (frame.f_code.co_filename.endswith('/company_editor.py') and frame.f_code.co_name in ('application', 'calculator_guard', 'calculator_projection', 'price_list_guard', 'rules_projection', 'apply_rules', 'rule_free_admission', 'read_tax_template', 'tax_template_guard', 'sales_settings_guard', 'invoice_initialization_guard', 'invoice_initialization_value')) or (frame.f_code.co_filename.endswith('/model/document.py') and frame.f_code.co_name in ('check_permission', 'load_from_db')) or (frame.f_code.co_filename.endswith('/app.py') and frame.f_code.co_name == 'native_application') else None
+	if event == 'exception' and ((Path(frame.f_code.co_filename).name == 'company_editor.py' and frame.f_code.co_name in ('application', 'calculator_guard', 'calculator_projection', 'price_list_guard', 'rules_projection', 'apply_rules', 'rule_free_admission', 'read_tax_template', 'tax_template_guard', 'sales_settings_guard', 'invoice_initialization_guard', 'invoice_initialization_value')) or (frame.f_code.co_filename.endswith('/model/document.py') and frame.f_code.co_name in ('check_permission', 'load_from_db')) or (frame.f_code.co_filename.endswith('/app.py') and frame.f_code.co_name == 'native_application')):
 		name = arg[0].__name__
 		if name.isidentifier() and len(name) <= 64:
 			prior_type = next((row for row in TRACE if 'permission_doctype' in row and row.get('class') == name), None)
@@ -135,6 +135,8 @@ class Authority(BaseHTTPRequestHandler):
 					STATE['calls'] += 1
 					if STATE['calls'] == STATE['permission_at']:
 						fixture.mutate(CONFIG.site, lambda: frappe.db.set_value('Custom DocPerm', {'parent': 'Customer', 'role': WRITER}, 'write', 0))
+					if STATE['calls'] == STATE.get('tax_at'):
+						fixture.mutate(CONFIG.site, lambda: frappe.db.set_value('Sales Taxes and Charges', STATE['tax_row'], 'rate', 7))
 					if STATE['calls'] == STATE['revoke_at']:
 						STATE['revoked'].add(token)
 					status = 403 if token in STATE['revoked'] else 200
@@ -237,7 +239,7 @@ def verify_prepared_sites():
 
 class NativeEditor(unittest.TestCase):
 	def setUp(self):
-		STATE.update(token='exs_' + ('a' if ARGS.plane == 'a' else 'c') * 43, revoked=set(), reader=False, calls=0, revoke_at=0, errors=[], foreign=False, permission_at=0)
+		STATE.update(token='exs_' + ('a' if ARGS.plane == 'a' else 'c') * 43, revoked=set(), reader=False, calls=0, revoke_at=0, errors=[], foreign=False, permission_at=0, tax_at=0, tax_row=None)
 		self.client = Client(APP.application, Response, use_cookies=False)
 		self.cookies = {}
 		self.csrf = None
@@ -246,14 +248,14 @@ class NativeEditor(unittest.TestCase):
 	def tearDown(self):
 		self.assertEqual(STATE['errors'], [])
 
-	def call(self, path, method='GET', data=None, headers=None, host=None):
+	def call(self, path, method='GET', data=None, headers=None, host=None, trace=False):
 		cookie = '; '.join(k + '=' + v for k, v in self.cookies.items())
 		TRACE.clear()
 		PROFILE.clear()
 		PROFILE_START.clear()
 		started = time.monotonic()
 		# Trace is opt-in: an instrumented request is not latency/persistence proof.
-		if os.environ.get("OWNED_NATIVE_TRACE") == "true" or ARGS.diagnostic or ARGS.calculator_probe:
+		if trace or os.environ.get("OWNED_NATIVE_TRACE") == "true" or ARGS.diagnostic or ARGS.calculator_probe:
 			sys.settrace(sanitized_trace)
 		if ARGS.diagnostic:
 			sys.setprofile(native_profile)
@@ -262,7 +264,7 @@ class NativeEditor(unittest.TestCase):
 		try:
 			response = self.client.open(path, method=method, base_url='https://' + (host or CONFIG.site), data=data,
 				headers={'Cookie': cookie, 'Origin': CONFIG.origin, **({'X-Frappe-CSRF-Token': self.csrf} if self.csrf else {}), **(headers or {})},
-				environ_overrides={'RAW_URI': path})
+				environ_overrides={'RAW_URI': path, **({'CONTENT_LENGTH':'0'} if method == 'POST' and data == {} else {})})
 		finally:
 			sys.settrace(None)
 			sys.setprofile(None)
@@ -311,15 +313,69 @@ class NativeEditor(unittest.TestCase):
 
 	def test_native_invoice_initialization_empty_configuration_and_permission_ceiling(self):
 		company='Editor '+ARGS.plane
-		cases=[(editor.ROUND_OFF,{'company':company,'account_list':'[]'},None),(editor.ROUNDING_SETTING,{},0),(editor.DIMENSIONS,{},[[],{}]),(editor.DEFAULT_TAXES,{'company':company,'master_doctype':'Sales Taxes and Charges Template','tax_template':''},{'taxes_and_charges':None,'taxes':None}),(editor.COMPANY_ADDRESS,{'name':company,'existing_address':''},None)]
+		cases=[(editor.ROUND_OFF,{'company':company,'account_list':'[]'},None),(editor.ROUNDING_SETTING,{},0),(editor.DIMENSIONS,{},[[],{}]),(editor.DEFAULT_TAXES,{'company':company,'master_doctype':'Sales Taxes and Charges Template','tax_template':''},'stock-default'),(editor.COMPANY_ADDRESS,{'name':company,'existing_address':''},None)]
+		fixture.connect(CONFIG.site)
+		try:
+			stock=frappe.get_doc('Sales Taxes and Charges Template',frappe.db.get_value('Sales Taxes and Charges Template',{'company':company,'is_default':1},'name'))
+			account=frappe.get_doc('Account',stock.taxes[0].account_head)
+			print('OWNED_STOCK_TAX_ACCOUNT_FENCES '+json.dumps({'currency_empty':not bool(account.account_currency),'currency_equal':account.account_currency==frappe.get_doc('Company',company).default_currency,'type_tax':account.account_type=='Tax'}),flush=True)
+		finally:
+			fixture.close()
 		for method,args,expected in cases:
-			response=self.call('/api/method/'+method,'POST',args)
-			self.assertEqual(response.status_code,200)
+			response=self.call('/api/method/'+method,'POST',args,trace=True)
+			self.assertEqual(response.status_code,200,method)
 			if method == editor.ROUNDING_SETTING:
 				self.assertIn(response.get_json()['message'],(0,1))
+			elif method == editor.DEFAULT_TAXES:
+				value=response.get_json()['message']
+				self.assertTrue(value['taxes_and_charges'])
+				self.assertEqual(len(value['taxes']),1)
+				self.assertEqual(value['taxes'][0]['charge_type'],'On Net Total')
+				self.assertEqual(value['taxes'][0]['rate'],6)
+				stock_default=value['taxes_and_charges']
 			else:
 				self.assertEqual(response.get_json().get('message'),expected)
 			self.assertEqual(self.call('/api/method/'+method,'POST',{**args,'extra':'unadmitted'}).status_code,400)
+		# Actual stock rows/permissions remain installed. Unsupported native
+		# configurations deny, then the operator restores the original values.
+		fixture.connect(CONFIG.site)
+		try:
+			template=frappe.get_doc('Sales Taxes and Charges Template',stock_default)
+			tax_row=template.taxes[0].name
+			other=frappe.db.get_value('Sales Taxes and Charges Template',{'company':company,'is_default':0},'name')
+			self.assertTrue(other)
+		finally:
+			fixture.close()
+		args=cases[3][1]
+		# The shipped reapplication callback returns None for this exact default.
+		reapplied=self.call('/api/method/'+editor.DEFAULT_TAXES,'POST',{**args,'tax_template':stock_default})
+		self.assertEqual(reapplied.status_code,200)
+		self.assertIsNone(reapplied.get_json().get('message'))
+		self.assertEqual(self.call('/api/method/'+editor.DEFAULT_TAXES,'POST',{**args,'tax_template':other}).status_code,403)
+		for kind,name,field,value,original in [('Sales Taxes and Charges',tax_row,'rate',101,6),('Sales Taxes and Charges Template',other,'is_default',1,0)]:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value(kind,name,field,value))
+			try:
+				self.assertEqual(self.call('/api/method/'+editor.DEFAULT_TAXES,'POST',args).status_code,403)
+			finally:
+				fixture.mutate(CONFIG.site,lambda:frappe.db.set_value(kind,name,field,original))
+		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Custom DocPerm',{'parent':'Sales Taxes and Charges Template','role':WRITER},'read',0))
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.DEFAULT_TAXES,'POST',args).status_code,404)
+		finally:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Custom DocPerm',{'parent':'Sales Taxes and Charges Template','role':WRITER},'read',1))
+		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('DocField',{'parent':'Sales Taxes and Charges','fieldname':'rate'},'permlevel',1))
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.DEFAULT_TAXES,'POST',args).status_code,403)
+		finally:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('DocField',{'parent':'Sales Taxes and Charges','fieldname':'rate'},'permlevel',0))
+		STATE['tax_row']=tax_row
+		STATE['tax_at']=STATE['calls']+2
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.DEFAULT_TAXES,'POST',args).status_code,403)
+		finally:
+			STATE['tax_at']=0
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Sales Taxes and Charges',tax_row,'rate',6))
+		self.assertEqual(self.call('/api/method/'+editor.DEFAULT_TAXES,'POST',args).get_json()['message']['taxes'][0]['rate'],6)
 		STATE['reader']=True
 		self.cookies,self.csrf={},None
 		try:
@@ -342,7 +398,7 @@ class NativeEditor(unittest.TestCase):
 		finally:
 			fixture.mutate(CONFIG.site,lambda:frappe.db.delete('Accounting Dimension',{'name':name}))
 		self.assertEqual(self.call('/api/method/'+editor.DIMENSIONS,'POST',{}).get_json()['message'],[[],{}])
-		print('OWNED_NATIVE_INVOICE_INITIALIZATION_EMPTY_AND_CURRENT_PERMISSION '+ARGS.plane)
+		print('OWNED_NATIVE_INVOICE_INITIALIZATION_STOCK_DEFAULT_AND_CURRENT_PERMISSION '+ARGS.plane)
 
 	def test_customer_create_edit_reload_and_desk_boot(self):
 		settings = self.call("/api/method/" + editor.LIST_SETTINGS, "POST", {"doctype":"Customer"})

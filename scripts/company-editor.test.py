@@ -992,5 +992,63 @@ class EditorControls(unittest.TestCase):
 			with self.assertRaises(RuntimeError):
 				editor.read_invoice_initialization(editor.DIMENSIONS)
 
+
+	def test_stock_default_tax_projection_uses_actual_helper_with_native_acl_and_bounds(self):
+		class Doc(types.SimpleNamespace):
+			def check_permission(value,kind):
+				self.assertEqual(kind,'read')
+				if value.denied:
+					raise editor.Denied(403)
+		class Row(dict):
+			def as_dict(value):
+				return dict(value)
+		fields={'company','is_default','disabled','tax_category','default_currency','charge_type','account_head','cost_center','description','rate','included_in_print_rate','included_in_paid_amount','dont_recompute_tax','set_by_item_tax_template','is_tax_withholding_account','is_group','account_currency','account_type'}
+		state={}
+		def reset():
+			row=Row(charge_type='On Net Total',account_head='TaxAccount',cost_center='Center',description='ST 6% @ 6.0',rate=6)
+			state.update(candidates=[types.SimpleNamespace(name='StockDefault')],children=[{'name':'native-row'}],row=row,fields=set(fields),calls=[],selected='')
+			state['docs']={'StockDefault':Doc(denied=False,company='native-company',is_default=1,disabled=0,tax_category=None,taxes=[row]),'native-company':Doc(denied=False,default_currency='USD'),'TaxAccount':Doc(denied=False,company='native-company',is_group=0,disabled=0,account_currency='USD',account_type='Tax'),'Center':Doc(denied=False,company='native-company',is_group=0,disabled=0)}
+		model=self.initialization_fixture(editor.DEFAULT_TAXES,{'company':'native-company','master_doctype':'Sales Taxes and Charges Template','tax_template':''})
+		model.get_permitted_fields=lambda *args,**kwargs:state['fields']
+		def all_(kind,**kwargs):
+			state['calls'].append((kind,kwargs))
+			return state['candidates'] if kind=='Sales Taxes and Charges Template' else state['children']
+		frappe.get_all=all_
+		frappe.get_doc=lambda kind,name:state['docs'][name]
+		frappe.get_meta=lambda kind:types.SimpleNamespace(get_field=lambda field:types.SimpleNamespace(fieldtype='Link',options='Account' if field=='account_head' else 'Cost Center'))
+		frappe.call=lambda fn,**kwargs:None if kwargs['tax_template'] else {'taxes_and_charges':'StockDefault','taxes':[state['row']]}
+		modules={name:types.ModuleType(name) for name in ['erpnext','erpnext.controllers','erpnext.controllers.accounts_controller']}
+		modules['frappe.model']=model
+		modules['erpnext.controllers.accounts_controller'].get_default_taxes_and_charges=mock.Mock()
+		def run():
+			return editor.default_native_taxes({'company':'native-company','master_doctype':'Sales Taxes and Charges Template','tax_template':state['selected']})
+		with mock.patch.dict(sys.modules,modules),mock.patch.object(editor,'native_budget'),mock.patch.object(editor,'native_table_read',return_value=True):
+			reset()
+			result=run()
+			self.assertEqual(result['taxes'][0]['rate'],6)
+			self.assertNotIn('name',result['taxes'][0])
+			self.assertEqual([call[1]['limit_page_length'] for call in state['calls']],[2,33])
+			for empty in (None,''):
+				state['docs']['TaxAccount'].account_currency=empty
+				self.assertEqual(run()['taxes'][0]['rate'],6)
+			reset()
+			state['selected']='StockDefault'
+			self.assertIsNone(run())
+			state['selected']='foreign'
+			self.denied(run,403)
+			reset()
+			state['candidates']=[]
+			self.assertEqual(run(),{'taxes_and_charges':None,'taxes':None})
+			mutations=[lambda:state.update(candidates=state['candidates']*2),lambda:state.update(children=[{}]*33),lambda:setattr(state['docs']['StockDefault'],'company','CompanyB'),lambda:setattr(state['docs']['TaxAccount'],'denied',True),lambda:setattr(state['docs']['TaxAccount'],'account_currency','EUR'),lambda:setattr(state['docs']['TaxAccount'],'account_type','Receivable'),lambda:state.update(fields=state['fields']-{'rate'})]
+			for mutate in mutations:
+				reset()
+				mutate()
+				self.denied(run,403)
+			for key,value in [('charge_type','On Previous Row Total'),('included_in_print_rate',1),('project','foreign'),('row_id','1'),('rate',True),('rate',float('nan')),('rate',101),('description','<script>')]:
+				with self.subTest(key=key,value=value):
+					reset()
+					state['row'][key]=value
+					self.denied(run,403)
+
 if __name__ == '__main__':
 	unittest.main()

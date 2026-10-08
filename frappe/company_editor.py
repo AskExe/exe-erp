@@ -1335,7 +1335,7 @@ def invoice_initialization_guard(method):
 			raise Denied(400)
 		company = args["company"]
 	elif method == DEFAULT_TAXES:
-		if set(args) != {"master_doctype", "tax_template", "company"} or args["master_doctype"] != "Sales Taxes and Charges Template" or args["tax_template"] != "":
+		if set(args) != {"master_doctype", "tax_template", "company"} or args["master_doctype"] != "Sales Taxes and Charges Template" or not isinstance(args["tax_template"],str) or len(args["tax_template"].encode())>140:
 			raise Denied(400)
 		df = frappe.get_meta("Sales Invoice").get_field("taxes_and_charges")
 		if not df or df.fieldtype != "Link" or df.options != args["master_doctype"] or "taxes_and_charges" not in fields or not native_table_read("Sales Invoice", "taxes", "Sales Taxes and Charges"):
@@ -1368,7 +1368,7 @@ def invoice_initialization_guard(method):
 def invoice_initialization_value(method, args):
 	"""Fresh bounded empty-configuration admission precedes the stock functions.
 
-	Configured dimensions, default sales-tax templates, company addresses and
+	Configured dimensions, advanced sales-tax templates, company addresses and
 	regional round-off overrides are outside this initial adopted-site subset.
 	No row identifiers or dynamic hooks are projected by these checks.
 	"""
@@ -1387,13 +1387,7 @@ def invoice_initialization_value(method, args):
 			raise Denied(503)
 		return value
 	if method == DEFAULT_TAXES:
-		if frappe.get_all("Sales Taxes and Charges Template", filters={"is_default":1,"company":args["company"]}, fields=["name"], limit_page_length=1):
-			raise Denied(403)
-		from erpnext.controllers.accounts_controller import get_default_taxes_and_charges
-		value = frappe.call(get_default_taxes_and_charges, **args)
-		if value != {"taxes_and_charges":None,"taxes":None}:
-			raise Denied(503)
-		return value
+		return default_native_taxes(args)
 	if method == COMPANY_ADDRESS:
 		# Exact company relationship, enabled native Address only, bounded to one
 		# existence row. Do not call the stock unbounded Dynamic Link lookup.
@@ -1415,11 +1409,83 @@ def invoice_initialization_value(method, args):
 	raise Denied(404)
 
 
+def default_native_taxes(args):
+	"""Stock default template, bounded simple noninclusive net-total tax rows."""
+	import math
+
+	from erpnext.controllers.accounts_controller import get_default_taxes_and_charges
+
+	import frappe
+	from frappe.model import get_permitted_fields
+	context = frappe.flags.company_editor
+	native_budget(context.deadline)
+	kind, child = "Sales Taxes and Charges Template", "Sales Taxes and Charges"
+	candidates = frappe.get_all(kind, filters={"is_default":1,"company":args["company"]}, fields=["name"], limit_page_length=2)
+	if len(candidates) > 1:
+		raise Denied(403)
+	if not candidates:
+		if args["tax_template"]:
+			raise Denied(403)
+		return {"taxes_and_charges":None,"taxes":None}
+	name = candidates[0].name
+	if args["tax_template"] and args["tax_template"] != name:
+		raise Denied(403)
+	# This operation uses one REPEATABLE READ/READ ONLY snapshot. The bounded
+	# child admission and native get_doc cannot observe different tax row sets.
+	bounded = frappe.get_all(child, filters={"parent":name,"parenttype":kind,"parentfield":"taxes"}, fields=["name"], limit_page_length=33)
+	if not 1 <= len(bounded) <= 32:
+		raise Denied(403)
+	native_budget(context.deadline)
+	template = frappe.get_doc(kind,name)
+	template.check_permission("read")
+	parent_fields = get_permitted_fields(kind,permission_type="read")
+	if not {"company","is_default","disabled","tax_category"}.issubset(parent_fields) or not native_table_read(kind,"taxes",child) or template.company != args["company"] or template.is_default != 1 or template.disabled != 0 or template.tax_category or len(template.taxes) != len(bounded):
+		raise Denied(403)
+	company = frappe.get_doc("Company",args["company"])
+	company.check_permission("read")
+	if "default_currency" not in get_permitted_fields("Company",permission_type="read"):
+		raise Denied(403)
+	fields = {"charge_type","account_head","cost_center","description","rate","included_in_print_rate","included_in_paid_amount","dont_recompute_tax","set_by_item_tax_template","is_tax_withholding_account"}
+	if any(not fields.issubset(get_permitted_fields(child,parenttype=parent,permission_type="read")) for parent in (kind,"Sales Invoice")):
+		raise Denied(403)
+	value = frappe.call(get_default_taxes_and_charges,**args)
+	if args["tax_template"]:
+		if value is not None:
+			raise Denied(503)
+		rows=[row.as_dict() for row in template.taxes]
+	else:
+		rows=value.get("taxes") if isinstance(value,dict) else None
+	if not args["tax_template"] and (not isinstance(value,dict) or set(value) != {"taxes_and_charges","taxes"} or value["taxes_and_charges"] != name or not isinstance(value["taxes"],list) or len(value["taxes"]) != len(bounded)):
+		raise Denied(503)
+	projected=[]
+	for row in rows:
+		native_budget(context.deadline)
+		if not isinstance(row,dict) or row.get("charge_type") != "On Net Total" or any(row.get(key) not in (None,"",0) for key in ("row_id","project","included_in_print_rate","included_in_paid_amount","dont_recompute_tax","set_by_item_tax_template","is_tax_withholding_account")):
+			raise Denied(403)
+		rate=row.get("rate")
+		if type(rate) not in (int,float) or not math.isfinite(rate) or not 0<=rate<=100 or not isinstance(row.get("description"),str) or len(row["description"].encode())>500 or any(char in row["description"] for char in "<>\x00"):
+			raise Denied(403)
+		for field,target in (("account_head","Account"),("cost_center","Cost Center")):
+			df=frappe.get_meta(child).get_field(field)
+			key=row.get(field)
+			if not df or df.fieldtype!="Link" or df.options!=target or not isinstance(key,str) or not 1<=len(key.encode())<=140:
+				raise Denied(403)
+			linked=frappe.get_doc(target,key)
+			linked.check_permission("read")
+			needed={"company","is_group","disabled"}|({"account_currency","account_type"} if target=="Account" else set())
+			if not needed.issubset(get_permitted_fields(target,permission_type="read")) or linked.company!=args["company"] or linked.is_group!=0 or linked.disabled!=0:
+				raise Denied(403)
+			if target=="Account" and ((linked.account_currency or company.default_currency)!=company.default_currency or linked.account_type!="Tax"):
+				raise Denied(403)
+		projected.append({"charge_type":"On Net Total","account_head":row["account_head"],"cost_center":row["cost_center"],"description":row["description"],"rate":rate,**{key:0 for key in fields if key not in ("charge_type","account_head","cost_center","description","rate")}})
+	return None if args["tax_template"] else {"taxes_and_charges":name,"taxes":projected}
+
+
 def read_invoice_initialization(method):
 	import frappe
 	context = frappe.flags.company_editor
 	frappe.db.rollback()
-	frappe.db.sql("SET TRANSACTION READ ONLY")
+	frappe.db.sql("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY" if method == DEFAULT_TAXES else "SET TRANSACTION READ ONLY")
 	native_budget(context.deadline)
 	try:
 		args = invoice_initialization_guard(method)
@@ -1431,7 +1497,7 @@ def read_invoice_initialization(method):
 	# Re-read the bounded configuration/Check at the final permission boundary.
 	# A changed native configuration cannot publish the earlier empty projection.
 	frappe.db.rollback()
-	frappe.db.sql("SET TRANSACTION READ ONLY")
+	frappe.db.sql("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY" if method == DEFAULT_TAXES else "SET TRANSACTION READ ONLY")
 	native_budget(context.deadline)
 	try:
 		args = invoice_initialization_guard(method)
