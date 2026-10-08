@@ -70,16 +70,20 @@ def execute_cmd(cmd, from_async=False):
 		method_guard(cmd)
 		from frappe.company_editor import (
 			CALCULATORS,
+			INVOICE_INITIALIZERS,
 			LINK_METHODS,
 			LIST_SETTINGS,
 			SALES_SETTINGS,
 			TAX_TEMPLATE,
 			calculate,
+			read_invoice_initialization,
 			read_link,
 			read_list_settings,
 			read_sales_setting,
 			read_tax_template,
 		)
+		if cmd in INVOICE_INITIALIZERS:
+			return read_invoice_initialization(cmd)
 		if cmd == TAX_TEMPLATE:
 			return read_tax_template()
 		if cmd == SALES_SETTINGS:

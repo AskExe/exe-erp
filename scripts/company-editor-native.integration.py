@@ -309,6 +309,41 @@ class NativeEditor(unittest.TestCase):
 		finally:
 			fixture.close()
 
+	def test_native_invoice_initialization_empty_configuration_and_permission_ceiling(self):
+		company='Editor '+ARGS.plane
+		cases=[(editor.ROUND_OFF,{'company':company,'account_list':'[]'},None),(editor.ROUNDING_SETTING,{},0),(editor.DIMENSIONS,{},[[],{}]),(editor.DEFAULT_TAXES,{'company':company,'master_doctype':'Sales Taxes and Charges Template','tax_template':''},{'taxes_and_charges':None,'taxes':None}),(editor.COMPANY_ADDRESS,{'name':company,'existing_address':''},None)]
+		for method,args,expected in cases:
+			response=self.call('/api/method/'+method,'POST',args)
+			self.assertEqual(response.status_code,200)
+			if method == editor.ROUNDING_SETTING:
+				self.assertIn(response.get_json()['message'],(0,1))
+			else:
+				self.assertEqual(response.get_json().get('message'),expected)
+			self.assertEqual(self.call('/api/method/'+method,'POST',{**args,'extra':'unadmitted'}).status_code,400)
+		STATE['reader']=True
+		self.cookies,self.csrf={},None
+		try:
+			self.login()
+			for method,args,_ in cases:
+				self.assertEqual(self.call('/api/method/'+method,'POST',args).status_code,403)
+		finally:
+			STATE['reader']=False
+			self.cookies,self.csrf={},None
+			self.login()
+		fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Custom DocPerm',{'parent':'Sales Invoice','role':WRITER},'create',0))
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.DIMENSIONS,'POST',{}).status_code,403)
+		finally:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.set_value('Custom DocPerm',{'parent':'Sales Invoice','role':WRITER},'create',1))
+		name='Owned-Dimension-'+ARGS.plane
+		fixture.mutate(CONFIG.site,lambda:frappe.db.sql('INSERT INTO "tabAccounting Dimension" (name,disabled) VALUES (%s,1)',(name,)))
+		try:
+			self.assertEqual(self.call('/api/method/'+editor.DIMENSIONS,'POST',{}).status_code,403)
+		finally:
+			fixture.mutate(CONFIG.site,lambda:frappe.db.delete('Accounting Dimension',{'name':name}))
+		self.assertEqual(self.call('/api/method/'+editor.DIMENSIONS,'POST',{}).get_json()['message'],[[],{}])
+		print('OWNED_NATIVE_INVOICE_INITIALIZATION_EMPTY_AND_CURRENT_PERMISSION '+ARGS.plane)
+
 	def test_customer_create_edit_reload_and_desk_boot(self):
 		settings = self.call("/api/method/" + editor.LIST_SETTINGS, "POST", {"doctype":"Customer"})
 		self.assertEqual(settings.status_code, 200)
@@ -623,12 +658,13 @@ class NativeEditor(unittest.TestCase):
 			self.assertNotIn('company_editor_currency',frappe.local.request_cache)
 			print('OWNED_NATIVE_APPLY_PRICE_WRITE_25006_ROLLBACK ' + ARGS.plane)
 			for operation,method,form,entry in (
+				('invoice-initialize','frappe.company_editor.invoice_initialization_value',{},lambda:editor.read_invoice_initialization(editor.DIMENSIONS)),
 				('calculate','erpnext.accounts.doctype.pricing_rule.pricing_rule.apply_pricing_rule',{'doc':json.dumps(payload),'args':json.dumps(price_ctx)},editor.apply_rules),
 				('tax-calculate','erpnext.stock.get_item_details.get_item_tax_template',{'ctx':json.dumps({'item_code':'Editor-Service-'+ARGS.plane,'company':'Editor '+ARGS.plane,'base_net_rate':100,'posting_date':date.today().isoformat()})},editor.read_tax_template),
 			):
 				frappe.flags.company_editor=editor.Context(CONFIG,value,STATE['token'],editor.session_binding(CONFIG,value,STATE['token']),time.monotonic()+9,operation)
 				frappe.local.form_dict=frappe._dict(form)
-				with mock.patch(method,lambda **_args:attempted_settings_write('Customer')):
+				with mock.patch(method,lambda *_pos,**_args:attempted_settings_write('Customer')):
 					with self.assertRaises(frappe.InReadOnlyMode) as denied:
 						entry()
 				error,codes,seen=denied.exception,[],set()
@@ -957,4 +993,4 @@ if __name__ == '__main__':
 			if thread.is_alive():
 				raise RuntimeError('Owned authority failed closure')
 		print('Scope: native callback/Desk/Customer and draft invoice persistence; controlled HTTP Core; plane ' + ARGS.plane)
-		sys.exit(0 if ARGS.browser_serve or (result.wasSuccessful() and result.testsRun == (1 if ARGS.calculator_probe else 10)) else 1)
+		sys.exit(0 if ARGS.browser_serve or (result.wasSuccessful() and result.testsRun == (1 if ARGS.calculator_probe else 11)) else 1)
