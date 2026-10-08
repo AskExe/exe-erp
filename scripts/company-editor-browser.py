@@ -110,6 +110,8 @@ class Browser:
 	async def evaluate(self, source, session):
 		result = await self.send('Runtime.evaluate', {'expression': source, 'returnByValue': True, 'awaitPromise': True}, session)
 		if result.get('exceptionDetails'):
+			details = result['exceptionDetails']
+			FAILURES.append({'operation': 'driver-evaluate', 'class': details.get('exception', {}).get('className'), 'line': details.get('lineNumber'), 'frames': [{'function': frame.get('functionName'), 'line': frame.get('lineNumber')} for frame in details.get('stackTrace', {}).get('callFrames', [])[:8]]})
 			raise RuntimeError('Native DOM assertion failed')
 		return result.get('result', {}).get('value')
 
@@ -122,7 +124,7 @@ class Browser:
 		raise RuntimeError('Native DOM condition not reached')
 
 	async def snapshot(self, name, session):
-		value = await self.evaluate("({title:document.title,url:location.href,text:document.body.innerText.slice(0,6000)})", session)
+		value = await self.evaluate("({title:document.title,url:location.href,text:document.body.innerText.slice(0,6000),native_ready:Boolean(window.frappe?.app?.link_preview),route:window.frappe?.get_route?.(),list_kind:window.cur_list?.doctype,form_kind:window.cur_frm?.doctype,ajax_count:window.frappe?.request?.ajax_count})", session)
 		# Remove query values from retained URL (callback state is never evidence).
 		value['url'] = value['url'].split('?')[0]
 		(OUTPUT / (name + '.json')).write_text(json.dumps(value, indent=2))
@@ -161,7 +163,7 @@ class Browser:
 		await self.send('Page.navigate', {'url': entry['origin'] + '/company-session/start'}, session)
 		await self.wait("location.pathname.startsWith('/desk') && Boolean(window.frappe?.app?.link_preview) && Boolean(frappe.get_route()?.length) && !frappe.request.ajax_count", session, 25)
 		await self.snapshot('desk-'+plane, session)
-		await self.wait("window.cur_list?.doctype === 'Customer' && frappe.get_route()?.[0]==='List' && frappe.get_route()?.[1]==='Customer' && location.pathname.startsWith('/desk/customer') && Boolean(cur_list.page.btn_primary?.[0]?.offsetParent) && !frappe.request.ajax_count", session)
+		await self.wait("window.cur_list?.doctype === 'Customer' && frappe.get_route()?.[0]==='List' && frappe.get_route()?.[1]==='Customer' && location.pathname.startsWith('/desk/customer') && Boolean(cur_list.page?.btn_primary?.[0]?.offsetParent) && !frappe.request.ajax_count", session)
 		await self.snapshot('customer-list-'+plane, session)
 		# Execute only the observed native New button. Missing RPCs are recorded
 		# before admitting any additional server capability.
@@ -185,8 +187,8 @@ class Browser:
 		await self.send('Page.reload', session=session)
 		await self.wait("!window.__owned_native_pre_reload && window.cur_frm?.doc.name===" + json.dumps(name) + " && cur_frm.doc.customer_name==="+json.dumps('Browser Edited '+label)+" && !cur_frm.doc.__unsaved", session, 20)
 		await self.snapshot('customer-edited-reloaded-'+plane, session)
-		await self.evaluate("frappe.set_route('List','Sales Invoice')",session)
-		await self.wait("window.cur_list?.doctype==='Sales Invoice' && frappe.get_route()?.[0]==='List' && frappe.get_route()?.[1]==='Sales Invoice' && location.pathname.startsWith('/desk/sales-invoice') && Boolean(cur_list.page.btn_primary?.[0]?.offsetParent) && !frappe.request.ajax_count",session)
+		await self.evaluate("(()=>{const link=[...document.querySelectorAll('.standard-sidebar-item a[href], .sidebar-item a[href], a[href]')].find(a=>a.offsetParent && a.getAttribute('href')==='/desk/sales-invoice');if(!link)throw Error('Missing visible native Sales Invoice link');link.click();})()",session)
+		await self.wait("window.cur_list?.doctype==='Sales Invoice' && frappe.get_route()?.[0]==='List' && frappe.get_route()?.[1]==='Sales Invoice' && location.pathname.startsWith('/desk/sales-invoice') && Boolean(cur_list.page?.btn_primary?.[0]?.offsetParent) && !frappe.request.ajax_count",session)
 		await self.evaluate("cur_list.page.btn_primary[0].click()",session)
 		await self.wait("window.cur_frm?.doctype==='Sales Invoice' && Boolean(cur_frm.fields_dict.customer.$input?.[0])",session)
 		await self.snapshot('invoice-new-'+plane,session)
