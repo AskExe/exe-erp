@@ -286,7 +286,7 @@ class NativeEditor(unittest.TestCase):
 		state = parse_qs(urlsplit(start.headers['Location']).query)['state'][0]
 		callback = self.call('/company-session/callback?' + urlencode({'code': 'exc_' + 'b' * 43, 'state': state}))
 		self.assertEqual(callback.status_code, 303)
-		self.assertEqual(callback.headers['Location'], CONFIG.origin + '/desk')
+		self.assertEqual(callback.headers['Location'], CONFIG.origin + '/desk/customer')
 		self.assertIn('sid', self.cookies)
 		fixture.connect(CONFIG.site)
 		try:

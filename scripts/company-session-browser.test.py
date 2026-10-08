@@ -173,6 +173,36 @@ class BrowserTests(unittest.TestCase):
 		self.assertEqual(result.cookies[adapter.COOKIE], (TOKEN, dict(max_age=900, path="/", secure=True, httponly=True, samesite="Lax")))
 		self.assertEqual(result.cookies[adapter.FLOW_COOKIE][1]["max_age"], 0)
 
+	def test_v2_callback_lands_on_fixed_native_customer_list_after_native_acceptance(self):
+		c = dataclasses.replace(config(), editor_enabled=True, editor_entitlement_kind="beta")
+		self.value = envelope()
+		self.value.pop("subscription_entitled")
+		self.value.update(version=2, access_entitled=True, entitlement_kind="beta", scopes=["erp:read", "erp:write"])
+		module = types.ModuleType("frappe.company_editor")
+		# V2 contract/native identity are independently exercised by editor controls.
+		module.editor_envelope = mock.Mock(return_value=(self.value, c.subjects[IDS[3]]))
+		def native_acceptance(*_args):
+			self.frappe.local.cookie_manager = types.SimpleNamespace(flush_cookies=lambda response: response.set_cookie("sid", "controlled-native-sid", path="/"))
+		accepted = mock.Mock(side_effect=native_acceptance)
+		module.callback_native_session = accepted
+		req = request("/company-session/callback", "code=" + CODE + "&state=" + STATE, adapter.FLOW_COOKIE + "=" + adapter.seal_flow(c, STATE, VERIFIER))
+		with mock.patch.dict(sys.modules, {"frappe.company_editor": module}):
+			result = self.call(req, c)
+		self.assertEqual(result.status_code, 303)
+		self.assertEqual(result.headers["Location"], c.origin + "/desk/customer")
+		accepted.assert_called_once()
+		self.assertEqual(accepted.call_args.args[:3], (c, self.value, TOKEN))
+		self.assertIs(accepted.call_args.args[3], req)
+		self.assertIn(adapter.COOKIE, result.cookies)
+		self.assertEqual(result.cookies["sid"][0], "controlled-native-sid")
+		self.used = False
+		accepted.reset_mock(side_effect=True)
+		accepted.side_effect = adapter.Denied(403)
+		with mock.patch.dict(sys.modules, {"frappe.company_editor": module}):
+			denied = self.call(req, c)
+		self.no_session(denied)
+		self.assertEqual(denied.status_code, 403)
+
 	def test_replayed_code_denies_without_new_native_work_or_cookies(self):
 		self.assertEqual(self.call(self.callback()).status_code, 303)
 		self.trace.clear()
