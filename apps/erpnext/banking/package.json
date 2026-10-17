@@ -69,6 +69,7 @@
     "axios": "1.20.0",
     "postcss": "^8.5.18",
     "react-router": "^8.3.0",
-    "socket.io-parser": "^4.2.7"
+    "socket.io-parser": "^4.2.7",
+    "source-map-js": "1.2.2"
   }
 }
