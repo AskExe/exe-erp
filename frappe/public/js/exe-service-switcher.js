@@ -60,10 +60,17 @@ class ExeServiceSwitcher extends HTMLElement {
   constructor() {
     super();
     this._shadow = this.attachShadow({ mode: "open" });
+    for (const type of ["pointerover", "focusin"]) {
+      this._shadow.addEventListener?.(type, (event) => {
+        const link = event.target.closest?.(".exe-ss-link:not(.exe-ss-active)");
+        if (link) this._warmOrigin(link.href);
+      });
+    }
   }
 
   connectedCallback() {
     this._render();
+    this._scheduleWarmth();
   }
 
   attributeChangedCallback() {
@@ -187,6 +194,75 @@ class ExeServiceSwitcher extends HTMLElement {
       button.disabled = false;
       status.textContent = "Could not sign out. Please try again.";
     }
+  }
+
+  _scheduleWarmth() {
+    if (!this.isConnected || this._warmTimer) return;
+    // One low-priority connection after the host settles; never load app HTML.
+    this._warmTimer = window.setTimeout(() => {
+      this._warmTimer = null;
+      if (!this.isConnected || document.visibilityState === "hidden") return;
+      const link = this._shadow.querySelector?.(".exe-ss-link:not(.exe-ss-active)");
+      if (link) this._warmOrigin(link.href);
+    }, 2000);
+  }
+
+  disconnectedCallback() {
+    window.clearTimeout(this._warmTimer);
+    this._warmTimer = null;
+  }
+
+  _warmOrigin(href) {
+    const connection = window.navigator?.connection;
+    if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || "")) return;
+    let url;
+    try { url = new URL(href); } catch { return; }
+    // Hints never follow callbacks or fetch a document, token, or private data.
+    if (url.protocol !== "https:" || url.username || url.password ||
+        url.pathname !== "/" || url.search || url.hash ||
+        url.origin === window.location.origin ||
+        !SERVICES.some((service) => this._serviceUrl(service.path) === url.origin)) return;
+    const warmed = ExeServiceSwitcher._warmedOrigins ||= new Set();
+    if (warmed.has(url.origin) || warmed.size >= 2) return;
+    warmed.add(url.origin);
+    const hint = document.createElement("link");
+    hint.rel = "preconnect";
+    hint.href = url.origin;
+    hint.crossOrigin = "anonymous";
+    document.head.appendChild(hint);
+    void this._warmWikiAssets(url.origin);
+  }
+
+  async _warmWikiAssets(origin) {
+    if (origin !== this._serviceUrl("wiki") || ExeServiceSwitcher._staticWarmStarted) return;
+    ExeServiceSwitcher._staticWarmStarted = true;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 5000);
+    const options = { credentials: "omit", mode: "cors", redirect: "error", signal: controller.signal };
+    try {
+      const response = await fetch(`${origin}/exe-boot-assets.json`, { ...options, cache: "no-cache" });
+      if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) return;
+      const text = await response.text();
+      if (text.length > 4096) return;
+      const manifest = JSON.parse(text);
+      if (manifest.version !== 1 || !Array.isArray(manifest.assets) || manifest.assets.length > 4) return;
+      let bytes = 0;
+      const paths = new Set();
+      for (const asset of manifest.assets) {
+        if (!/^\/assets\/[A-Za-z0-9_-]+-[A-Za-z0-9_-]{8,}\.(js|css)$/.test(asset.path) ||
+            !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 || paths.has(asset.path)) return;
+        paths.add(asset.path);
+        bytes += asset.bytes;
+      }
+      if (bytes > 2 * 1024 * 1024) return;
+      for (const path of paths) {
+        const asset = await fetch(`${origin}${path}`, { ...options, cache: "force-cache" });
+        if (!asset.ok) return;
+        // Finish the bounded public download without evaluating JavaScript.
+        await asset.arrayBuffer();
+      }
+    } catch { /* Missing index, CORS, offline, or timeout: ordinary navigation continues. */ }
+    finally { window.clearTimeout(timer); }
   }
 
   _escapeHtml(str) {
