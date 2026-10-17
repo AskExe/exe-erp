@@ -1,6 +1,15 @@
 #!/bin/bash
 set -eo pipefail
 
+# This managed image uses bench's uv package manager and omits venv pip.
+# Refuse bench's explicit opt-out before site creation or migrations.
+case "${BENCH_DISABLE_UV:-}" in
+    1|[Tt][Rr][Uu][Ee]|[Yy][Ee][Ss])
+        echo "This ERP image requires uv; BENCH_DISABLE_UV cannot disable it." >&2
+        exit 1
+        ;;
+esac
+
 # Company read transport is operator-bootstrapped off mode first. Never run
 # migrations, creation, workers or scheduler with browser company authority.
 case "${ERP_COMPANY_MODE:-false}" in

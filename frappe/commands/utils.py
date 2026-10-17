@@ -534,11 +534,13 @@ def jupyter(context: CliCtxObj):
 	"""Start an interactive jupyter notebook"""
 	installed_packages = (
 		r.split("==", 1)[0]
-		for r in subprocess.check_output([sys.executable, "-m", "pip", "freeze"], encoding="utf8")
+		for r in subprocess.check_output(
+			["uv", "pip", "freeze", "--python", sys.executable], encoding="utf8"
+		).splitlines()
 	)
 
 	if "jupyter" not in installed_packages:
-		subprocess.check_output([sys.executable, "-m", "pip", "install", "jupyter"])
+		subprocess.check_output(["uv", "pip", "install", "--python", sys.executable, "jupyter"])
 
 	site = get_site(context)
 	frappe.init(site)

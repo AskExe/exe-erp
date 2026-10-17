@@ -390,6 +390,31 @@ else
 fi
 rm -rf "${BOOT_DIR}"
 
+# The managed image omits venv pip. Explicit bench opt-outs must fail before
+# even entering the bench directory, and normal uv settings must still load.
+echo "case 11: pip opt-outs fail before bootstrap; uv settings remain supported"
+for disabled in 1 true TRUE yes YeS; do
+    if output=$(BENCH_DISABLE_UV="$disabled" FRAPPE_BENCH=/nonexistent-erp-fixture \
+        bash "$ENTRYPOINT" true 2>&1); then
+        result=0
+    else
+        result=$?
+    fi
+    if [ "$result" -eq 1 ] && [ "$output" = "This ERP image requires uv; BENCH_DISABLE_UV cannot disable it." ]; then
+        pass "BENCH_DISABLE_UV=$disabled refused before bootstrap"
+    else
+        fail "BENCH_DISABLE_UV=$disabled did not fail before bootstrap"
+    fi
+done
+for enabled in '' 0 false no; do
+    if BENCH_DISABLE_UV="$enabled" FRAPPE_BENCH="$REPO_ROOT" SITE_NAME=erp.fixture.test \
+        EXE_ERP_ENTRYPOINT_NO_MAIN=1 bash "$ENTRYPOINT"; then
+        pass "uv setting '$enabled' loads the managed entrypoint"
+    else
+        fail "uv setting '$enabled' rejected"
+    fi
+done
+
 echo
 if [ "${FAILURES}" -eq 0 ]; then
     echo "entrypoint admin-password regression: PASS"

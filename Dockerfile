@@ -57,6 +57,7 @@ ENV LANG=en_US.UTF-8 \
 #
 # To update: bump NODE_VERSION and refresh both checksums from
 #   https://nodejs.org/dist/${NODE_VERSION}/SHASUMS256.txt
+COPY scripts/install-runtime-npm.sh /tmp/install-runtime-npm.sh
 ARG NODE_VERSION=v24.18.0
 ARG NODE_SHA256_AMD64=55aa7153f9d88f28d765fcdad5ae6945b5c0f98a36881703817e4c450fa76742
 ARG NODE_SHA256_ARM64=58c9520501f6ae2b52d5b210444e24b9d0c029a58c5011b797bc1fe7105886f6
@@ -80,6 +81,8 @@ RUN set -eux; \
     tar -xJf "/tmp/${tarball}" -C /usr/local --strip-components=1 --no-same-owner; \
     rm -f "/tmp/${tarball}"; \
     node --version; \
+    bash /tmp/install-runtime-npm.sh; \
+    rm /tmp/install-runtime-npm.sh; \
     npm --version; \
     npm install -g yarn@1.22.22; \
     rm -rf /var/lib/apt/lists/*
@@ -129,7 +132,7 @@ RUN cd /opt/exe-erp-src/frappe && \
 WORKDIR /home/frappe
 
 # Install bench
-RUN pip install --no-cache-dir --user frappe-bench
+RUN pip install --no-cache-dir --user frappe-bench==5.31.0 uv==0.11.33
 
 # Add local pip bin to PATH
 ENV PATH="/home/frappe/.local/bin:${PATH}"
@@ -201,6 +204,17 @@ RUN cd /opt/exe-erp-src && \
         test -d "node_modules/$m" || { echo "FATAL: realtime dep '$m' missing from /opt/exe-erp-src/node_modules — websocket would crash-loop"; exit 1; }; \
     done && \
     echo "OK: realtime runtime deps present (socket.io, @redis/client, cookie)"
+
+# Bench 5.31 uses uv by default for package management; the managed entrypoint
+# rejects BENCH_DISABLE_UV. Remove the complete build-time pip distribution,
+# including its bundled code and supplier BOM, after all dependency installs.
+# Keep uv and verify bench's public pip command still addresses this environment.
+RUN uv pip uninstall --python /home/frappe/frappe-bench/env/bin/python pip && \
+    /home/frappe/frappe-bench/env/bin/python -c "import importlib.util, importlib.metadata; assert importlib.util.find_spec('pip') is None; assert not any(d.metadata['Name'].lower() == 'pip' for d in importlib.metadata.distributions())" && \
+    python -c "from bench.utils import use_uv; assert use_uv()" && \
+    uv --version && \
+    bench pip freeze > /tmp/bench-freeze.txt && \
+    test -s /tmp/bench-freeze.txt && rm /tmp/bench-freeze.txt
 
 # ── Stage 4: Final production image ─────────────────────────
 FROM base AS production
