@@ -75,5 +75,6 @@
   "volumes": [
     "exe-erp-sites"
   ],
-  "network": "exe-net"
+  "network": "exe-net",
+  "imageDigestNote": "Image digests are publication outputs, not build inputs. Use the verified release artifact for this version to obtain its multi-arch index digest; standalone Compose deployments must supply that digest as ERP_IMAGE_DIGEST. Do not assume the source manifest already contains the published digest."
 }
