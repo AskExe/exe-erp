@@ -222,19 +222,31 @@ class ExeServiceSwitcher extends HTMLElement {
         url.pathname !== "/" || url.search || url.hash ||
         url.origin === window.location.origin ||
         !SERVICES.some((service) => this._serviceUrl(service.path) === url.origin)) return;
+    const origin = this._staticOrigin(url.origin);
     const warmed = ExeServiceSwitcher._warmedOrigins ||= new Set();
-    if (warmed.has(url.origin) || warmed.size >= 2) return;
-    warmed.add(url.origin);
+    if (warmed.has(origin) || warmed.size >= 2) return;
+    warmed.add(origin);
     const hint = document.createElement("link");
     hint.rel = "preconnect";
-    hint.href = url.origin;
+    hint.href = origin;
     hint.crossOrigin = "anonymous";
     document.head.appendChild(hint);
     void this._warmWikiAssets(url.origin);
   }
 
+  _staticOrigin(origin) {
+    // Demo context is only a public-static routing hint, never authorization.
+    const demo = this.getAttribute("static-context") === "demo" ||
+      /^demo-(crm|wiki|erp|dashboard)\.askexe\.com$/.test(window.location.hostname);
+    // Only the known AskExe demo deployment has a declared alternate origin.
+    // Custom/configured domains retain their exact normal Wiki destination.
+    return demo && origin === "https://wiki.askexe.com"
+      ? "https://demo-wiki.askexe.com" : origin;
+  }
+
   async _warmWikiAssets(origin) {
     if (origin !== this._serviceUrl("wiki") || ExeServiceSwitcher._staticWarmStarted) return;
+    origin = this._staticOrigin(origin);
     ExeServiceSwitcher._staticWarmStarted = true;
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 5000);
