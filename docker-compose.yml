@@ -9,7 +9,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
     # digest for this version; Compose refuses an unset or empty value.
-    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
+    image: ghcr.io/askexe/exe-erp:v0.3.28@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -62,7 +62,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
     # digest for this version; Compose refuses an unset or empty value.
-    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
+    image: ghcr.io/askexe/exe-erp:v0.3.28@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -125,7 +125,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
     # digest for this version; Compose refuses an unset or empty value.
-    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
+    image: ghcr.io/askexe/exe-erp:v0.3.28@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -161,7 +161,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
     # digest for this version; Compose refuses an unset or empty value.
-    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
+    image: ghcr.io/askexe/exe-erp:v0.3.28@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -232,7 +232,7 @@ services:
     # Production: pull the published, immutable image only — never build from
     # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
     # digest for this version; Compose refuses an unset or empty value.
-    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
+    image: ghcr.io/askexe/exe-erp:v0.3.28@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -295,7 +295,7 @@ services:
 
   # -- Nginx reverse proxy ------------------------------------------------
   exe-erp-nginx:
-    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
+    image: ghcr.io/askexe/exe-erp:v0.3.28@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     security_opt:
       - no-new-privileges:true
     cap_drop:
