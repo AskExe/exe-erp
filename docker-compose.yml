@@ -7,9 +7,9 @@ services:
   # ── First-boot configurator (runs once, creates site) ──────
   exe-erp-configurator:
     # Production: pull the published, immutable image only — never build from
-    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
-    # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.27
+    # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
+    # digest for this version; Compose refuses an unset or empty value.
+    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -60,9 +60,9 @@ services:
   # ── Gunicorn backend ───────────────────────────────────────
   exe-erp:
     # Production: pull the published, immutable image only — never build from
-    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
-    # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.27
+    # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
+    # digest for this version; Compose refuses an unset or empty value.
+    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -123,9 +123,9 @@ services:
   # ── Socket.io for realtime events ──────────────────────────
   exe-erp-websocket:
     # Production: pull the published, immutable image only — never build from
-    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
-    # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.27
+    # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
+    # digest for this version; Compose refuses an unset or empty value.
+    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -159,9 +159,9 @@ services:
   # ── RQ worker for background jobs ──────────────────────────
   exe-erp-queue:
     # Production: pull the published, immutable image only — never build from
-    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
-    # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.27
+    # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
+    # digest for this version; Compose refuses an unset or empty value.
+    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -230,9 +230,9 @@ services:
   # ── Frappe scheduler (cron-like background tasks) ──────────
   exe-erp-scheduler:
     # Production: pull the published, immutable image only — never build from
-    # local context. Pinned to the multi-arch index digest (resolved 2026-06-30)
-    # so the tag cannot be silently re-pushed under us.
-    image: ghcr.io/askexe/exe-erp:v0.3.27
+    # local context. ERP_IMAGE_DIGEST must be the published multi-arch index
+    # digest for this version; Compose refuses an unset or empty value.
+    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     # Hardening: drop all Linux capabilities and block privilege escalation.
     security_opt:
       - no-new-privileges:true
@@ -295,7 +295,7 @@ services:
 
   # -- Nginx reverse proxy ------------------------------------------------
   exe-erp-nginx:
-    image: ghcr.io/askexe/exe-erp:v0.3.27
+    image: ghcr.io/askexe/exe-erp:v0.3.27@${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}
     security_opt:
       - no-new-privileges:true
     cap_drop:

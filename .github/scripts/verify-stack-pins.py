@@ -40,8 +40,8 @@ produced:
                  tag-only manifest.
 
   --phase compose  reconcile docker-compose.yml against stack.release.json.
-                 EVERY `ghcr.io/askexe/exe-erp` image the deploy manifest pins
-                 must be BYTE-IDENTICAL to the release manifest's `erp` ref.
+                 All six runtime roles must use the release tag with the mandatory
+                 ERP_IMAGE_DIGEST input, or match an already-pinned release ref.
                  This closes the gap behind the ERP login outage (bugs
                  129a0495 / 96e6b8b6): the release manifest was re-pinned to the
                  fixed image while docker-compose.yml — the file that runs on the
@@ -166,10 +166,9 @@ def check_post(components, version, built_digest, repo=REPO):
 # closed on any drift, so the one guarding unittest is no longer the only thing
 # standing between a compose-pin regression and production.
 #
-# This mirrors, byte for byte, the invariant asserted by the unittest in
-# apps/erpnext/erpnext/exe_auth/test_sso_cookie_contract.py — same regex, same
-# "compose ref must equal the released ref" rule — but runs it as a required
-# stdlib gate step in CI and at release, independent of the Frappe test runner.
+# Also consumed by the SSO deploy-manifest contract test. Producer manifests
+# acquire their digest after publication; runtime Compose requires that digest
+# as input and never falls back to a mutable tag.
 # ---------------------------------------------------------------------------
 
 # Every `image:` mapping value in the compose file. Group `val` is the raw
@@ -178,6 +177,10 @@ def check_post(components, version, built_digest, repo=REPO):
 # ones that already look like the ERP repo) is deliberate: a drifted service
 # whose ref is quoted or commented must still be SEEN, or the gate would pass
 # over the exact regression it exists to catch.
+RUNTIME_DIGEST_INPUT = "${ERP_IMAGE_DIGEST:?Set_ERP_IMAGE_DIGEST_to_published_multiarch_digest}"
+COMPOSE_ROLES = ("exe-erp-configurator", "exe-erp", "exe-erp-websocket",
+                 "exe-erp-queue", "exe-erp-scheduler", "exe-erp-nginx")
+
 COMPOSE_ANY_IMAGE_RE = re.compile(r"^[ \t]*image:[ \t]*(?P<val>\S.*?)[ \t]*$", re.MULTILINE)
 
 # The exact ERP repo, boundary-anchored: `exe-erp` must be followed by `:tag`,
@@ -254,20 +257,37 @@ def check_compose(components, version, compose_text, repo=REPO):
                          "moved or this extractor is broken; refusing to pass vacuously"))
         return failures
 
-    # 4. Every distinct compose ref must equal the canonical released ref as a
-    #    plain string (byte identity — a tag can be re-pointed, a digest cannot,
-    #    so `repo:tag` and `repo:tag@digest` are DIFFERENT pins). Any mismatch
-    #    means the compose pin lags stack.release.json and the host serves old
-    #    code after the fix merges (bugs 129a0495 / 96e6b8b6).
+    # Every expected runtime role must carry one ERP image; six matches alone
+    # must not let a renamed, removed, or foreign-image role pass.
+    roles = []
+    service = None
+    for line in compose_text.splitlines():
+        header = re.match(r"^  ([^\s:]+):", line)
+        if header:
+            service = header.group(1)
+        image = COMPOSE_ANY_IMAGE_RE.match(line)
+        if image and _ERP_REPO_RE.match(_clean_image_value(image.group("val"))):
+            roles.append(service or "")
+    if sorted(roles) != sorted(COMPOSE_ROLES):
+        failures.append(("docker-compose.yml", "expected exactly the six ERP roles: "
+                         + ", ".join(COMPOSE_ROLES)))
+
+    # The producer ref remains tag-only before the build. Runtime must append
+    # the required published digest input. Already-pinned literal refs remain
+    # valid only when byte-identical to the published manifest.
+    runtime_ref = f"{repo}:v{version}@{RUNTIME_DIGEST_INPUT}"
+    parsed = parse_ref(canonical)
+    allowed = {runtime_ref}
+    if parsed is not None and parsed[2] is not None:
+        allowed.add(canonical)
+    if len(set(compose_refs)) != 1:
+        failures.append(("docker-compose.yml", "all six roles must use one identical image ref"))
     for ref in sorted(set(compose_refs)):
-        if ref != canonical:
+        if ref not in allowed:
             failures.append(("docker-compose.yml",
-                             f"pins {ref!r}, which is NOT the released image "
-                             f"{canonical!r} from stack.release.json. exe-erp runs every "
-                             "role off ONE image; a compose pin that lags the manifest "
-                             "keeps the host serving old code after the fix merges — the "
-                             "exact shape of bugs 129a0495 / 96e6b8b6. Re-pin "
-                             "docker-compose.yml to the released ref."))
+                             f"pins {ref!r}; expected {runtime_ref!r} or the identical "
+                             "digest-pinned published manifest ref. All six roles "
+                             "must use this release and require an immutable digest."))
     return failures
 
 
@@ -357,7 +377,7 @@ def self_test():
         # Six services, mirroring docker-compose.yml (configurator, erp,
         # websocket, queue, scheduler, nginx), so a single drifted service is
         # exercised rather than deduped away.
-        body = "\n".join(f"  svc{i}:\n    image: {r}" for i, r in enumerate(refs))
+        body = "\n".join(f"  {i}:\n    image: {r}" for i, r in zip(COMPOSE_ROLES, refs))
         return f"services:\n{body}\n"
 
     good_ref = f"{REPO}:v{v}@{GOOD_DIGEST}"
@@ -393,8 +413,27 @@ def self_test():
     # --- must PASS (proves the gate is not simply always-red) ---
     case("compose: pins byte-identical to digest-pinned manifest PASSES",
          check_compose(pinned, v, _compose(*[good_ref] * 6)), False)
-    case("compose: tag-only compose equal to tag-only manifest PASSES pre-build",
-         check_compose(tag_only, v, _compose(*[f"{REPO}:v{v}"] * 6)), False)
+    case("compose: tag-only compose is refused even before publication",
+         check_compose(tag_only, v, _compose(*[f"{REPO}:v{v}"] * 6)), True)
+    runtime_ref = f"{REPO}:v{v}@{RUNTIME_DIGEST_INPUT}"
+    case("compose: mandatory runtime digest accepts tag-only producer manifest",
+         check_compose(tag_only, v, _compose(*[runtime_ref] * 6)), False)
+    case("compose: mandatory runtime digest accepts published producer manifest",
+         check_compose(pinned, v, _compose(*[runtime_ref] * 6)), False)
+    for suffix in ("${ERP_IMAGE_DIGEST}", "${ERP_IMAGE_DIGEST?required}",
+                   "${ERP_IMAGE_DIGEST:-" + GOOD_DIGEST + "}"):
+        case("compose: optional or empty-accepting digest input refused: " + suffix,
+             check_compose(tag_only, v, _compose(*[f"{REPO}:v{v}@{suffix}"] * 6)), True)
+    case("compose: missing runtime role is refused",
+         check_compose(tag_only, v, _compose(*[runtime_ref] * 5)), True)
+    case("compose: extra runtime role is refused",
+         check_compose(tag_only, v, _compose(*[runtime_ref] * 6)
+                       + f"  unexpected-role:\n    image: {runtime_ref}\n"), True)
+    case("compose: mixed literal and input refs are refused",
+         check_compose(pinned, v, _compose(runtime_ref, *[good_ref] * 5)), True)
+    case("compose: renamed runtime role is refused",
+         check_compose(tag_only, v, _compose(*[runtime_ref] * 6).replace(
+             "  exe-erp-nginx:", "  unknown-role:")), True)
     # Quoted refs and trailing comments are normalized before comparison, so a
     # correctly-pinned-but-quoted/commented compose still PASSES (no false-fail).
     case("compose: correct QUOTED + inline-commented pins PASS (normalized)",
