@@ -46,6 +46,7 @@ predate the SSO cookie fix.
 import json
 import os
 import re
+import runpy
 import unittest
 
 CANONICAL_COOKIE = "exe_access_token"
@@ -243,9 +244,13 @@ class TestDeployManifestShipsTheSsoFix(unittest.TestCase):
 		)
 
 	def testComposeMatchesPublishedReleaseFail(self):
-		"""Every service must pin exactly the image stack.release.json publishes."""
+		"""Every runtime role requires the published release's immutable image."""
 		released = _released_erp_image_ref()
-		mismatched = sorted({r for r in _compose_erp_image_refs() if r != released})
+		manifest = json.loads(_read(RELEASE_MANIFEST))
+		gate = runpy.run_path(os.path.join(_REPO_ROOT, ".github/scripts/verify-stack-pins.py"))
+		mismatched = gate["check_compose"](
+			manifest["components"], manifest["version"], _read(DEPLOY_MANIFEST)
+		)
 		self.assertEqual(
 			mismatched,
 			[],

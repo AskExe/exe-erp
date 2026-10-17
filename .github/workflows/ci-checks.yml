@@ -118,6 +118,9 @@ jobs:
         run: bash scripts/ci-concurrency-slot.sh
 
       - name: Validate docker-compose.yml
+        env:
+          # Syntax-check fixture only; no image is pulled or published.
+          ERP_IMAGE_DIGEST: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         run: |
           # docker-compose interpolates required vars (SITE_NAME, etc.) and
           # fails config validation if they are unset. Seed throwaway values
