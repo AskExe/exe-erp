@@ -135,7 +135,7 @@ calendars = ["Task", "Work Order", "Sales Order", "Holiday List", "ToDo"]
 website_generators = ["BOM", "Sales Partner"]
 
 website_context = {
-	"favicon": os.environ.get("EXE_APP_FAVICON_URL", "/assets/erpnext/images/erpnext-favicon.svg"),
+	"favicon": os.environ.get("EXE_APP_FAVICON_URL", "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-1"),
 	"splash_image": os.environ.get(
 		"EXE_APP_SPLASH_URL", "/assets/erpnext/images/erpnext-logo.svg?v=exe-gold-1"
 	),

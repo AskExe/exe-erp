@@ -411,9 +411,16 @@ frappe.Application = class Application {
 			$('link[type="image/x-icon"]').remove().attr("href") ||
 			$('link[rel="shortcut icon"]').attr("href") ||
 			$('link[rel="icon"]').attr("href") ||
-			"/assets/frappe/images/exe-erp-favicon.svg";
-		$('<link rel="shortcut icon" href="' + link + '" type="image/x-icon">').appendTo("head");
-		$('<link rel="icon" href="' + link + '" type="image/x-icon">').appendTo("head");
+			"/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-1";
+		if ([
+			"/assets/frappe/images/exe-erp-favicon.svg",
+			"/assets/frappe/images/frappe-favicon.svg",
+			"/assets/erpnext/images/erpnext-favicon.svg",
+		].includes(link.split("?")[0])) {
+			link = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-1";
+		}
+		$('<link rel="shortcut icon" href="' + link + '">').appendTo("head");
+		$('<link rel="icon" href="' + link + '">').appendTo("head");
 	}
 	trigger_primary_action() {
 		// to trigger change event on active input before triggering primary action

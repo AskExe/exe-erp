@@ -251,10 +251,18 @@ def get_website_settings(context=None):
 		context.theme = get_active_theme() or frappe._dict()
 
 	if not context.get("favicon"):
-		context["favicon"] = "/assets/frappe/images/exe-erp-favicon.svg"
+		context["favicon"] = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-1"
 
 	if settings.favicon and settings.favicon != "attach_files:":
 		context["favicon"] = settings.favicon
+
+	# Upgrade only bundled stock icons; uploaded customer favicons stay intact.
+	if (context.get("favicon") or "").split("?")[0] in {
+		"/assets/frappe/images/exe-erp-favicon.svg",
+		"/assets/frappe/images/frappe-favicon.svg",
+		"/assets/erpnext/images/erpnext-favicon.svg",
+	}:
+		context["favicon"] = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-1"
 
 	context["hide_login"] = settings.hide_login
 
