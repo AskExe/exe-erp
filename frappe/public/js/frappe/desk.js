@@ -411,14 +411,14 @@ frappe.Application = class Application {
 			$('link[type="image/x-icon"]').remove().attr("href") ||
 			$('link[rel="shortcut icon"]').attr("href") ||
 			$('link[rel="icon"]').attr("href") ||
-			"/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-2";
+			"/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-3";
 		if ([
 			"/assets/frappe/images/exe-erp-favicon.svg",
 			"/assets/frappe/images/exe-icons/exe-favicon.svg",
 			"/assets/frappe/images/frappe-favicon.svg",
 			"/assets/erpnext/images/erpnext-favicon.svg",
 		].includes(link.split("?")[0])) {
-			link = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-2";
+			link = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-3";
 		}
 		$('<link rel="shortcut icon" href="' + link + '">').appendTo("head");
 		$('<link rel="icon" href="' + link + '">').appendTo("head");
