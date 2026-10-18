@@ -574,4 +574,7 @@
 }
 .folder-icon {
     border: 1px solid var(--exe-accent, #f5d76e);
+    /* A quiet double rim connects groups with the terminal-line artwork. */
+    box-shadow: inset 0 0 0 3px var(--folder-icon-background-color),
+        inset 0 0 0 4px color-mix(in srgb, var(--exe-accent, #f5d76e) 18%, transparent);
 }

@@ -11,7 +11,7 @@ for (const app of ["frappe", "erpnext", "customer_app"]) {
     const frappe = { scrub: value => value.toLowerCase(), boot: { desktop_icon_urls: { [app]: { solid: [url] } } } };
     const getIcon = new Function("frappe", `return ({${method}}).get_desktop_icon`)(frappe);
     const receiver = { get_desktop_icon_by_label: () => ({ app }) };
-    assert.equal(getIcon.call(receiver, "Projects", "Solid"), "/" + url + (app === "customer_app" ? "" : "?v=exe-gold-1"));
+    assert.equal(getIcon.call(receiver, "Projects", "Solid"), "/" + url + (app === "customer_app" ? "" : "?v=exe-intelligence-2"));
     assert.equal(getIcon.call(receiver, "Missing", "Solid"), false);
   });
 }
