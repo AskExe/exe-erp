@@ -1494,6 +1494,23 @@ Object.assign(frappe.utils, {
 			"/assets/frappe/images/frappe-framework-logo.svg",
 			"/assets/erpnext/images/erpnext-logo.svg",
 		];
+		// Exact bundled legacy paths also serve persisted desktop image URLs.
+		const legacy_desktop_icons = [
+			"/assets/erpnext/desktop_icons/accounting.svg",
+			"/assets/erpnext/desktop_icons/asset.svg",
+			"/assets/erpnext/desktop_icons/buying.svg",
+			"/assets/erpnext/desktop_icons/crm.svg",
+			"/assets/erpnext/desktop_icons/erpnext_settings.svg",
+			"/assets/erpnext/desktop_icons/financials_reports.svg",
+			"/assets/erpnext/desktop_icons/manufacturing.svg",
+			"/assets/erpnext/desktop_icons/projects.svg",
+			"/assets/erpnext/desktop_icons/quality.svg",
+			"/assets/erpnext/desktop_icons/selling.svg",
+			"/assets/erpnext/desktop_icons/stock.svg",
+			"/assets/erpnext/desktop_icons/subcontracting.svg",
+			"/assets/erpnext/desktop_icons/support.svg",
+		];
+		if (legacy_desktop_icons.includes(url)) return `${url}?v=exe-intelligence-4`;
 		return stock_logos.includes(url) ? `${url}?v=exe-gold-1` : url;
 	},
 
@@ -1512,7 +1529,7 @@ Object.assign(frappe.utils, {
 			frappe.boot.desktop_icon_urls[app_name][variant].includes(icon_url)
 		) {
 			// First-party artwork changed; immutable asset caches need a new URL.
-			const brand_version = ["frappe", "erpnext"].includes(app_name) ? "?v=exe-intelligence-3" : "";
+			const brand_version = ["frappe", "erpnext"].includes(app_name) ? "?v=exe-intelligence-4" : "";
 			return `/${icon_url}${brand_version}`;
 		}
 		return exists;
