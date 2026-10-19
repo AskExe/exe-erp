@@ -1514,7 +1514,7 @@ Object.assign(frappe.utils, {
 		const stock_logo = stock_logos.find(
 			(path) => url === path || url === `${path}?v=exe-gold-1`
 		);
-		return stock_logo ? `${stock_logo}?v=exe-intelligence-5` : url;
+		return stock_logo ? `${stock_logo}?v=exe-intelligence-6` : url;
 	},
 
 	get_desktop_icon(icon_name, variant) {
