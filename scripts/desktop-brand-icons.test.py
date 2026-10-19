@@ -26,16 +26,15 @@ class DesktopBrandTests(unittest.TestCase):
 				self.assertEqual(paints, expected)
 				self.assertFalse(any("fill-opacity" in node.attrib for node in svg.iter()))
 
-	def test_landing_mark_keeps_the_e_shape_with_brand_colors(self):
-		svg = ET.parse(ROOT / "apps/erpnext/erpnext/public/images/erpnext-logo.svg").getroot()
-		self.assertEqual(svg.attrib["viewBox"], "0 0 118 118")
-		self.assertEqual([node.attrib.get("fill") for node in svg], ["#F5D76E", "#0F0E1A"])
-		self.assertEqual(len(list(svg)), 2)
-
-	def test_framework_stock_logo_uses_the_same_palette(self):
-		svg = ET.parse(ROOT / "frappe/public/images/frappe-framework-logo.svg").getroot()
-		self.assertEqual(svg.attrib["viewBox"], "0 0 50 50")
-		self.assertEqual([node.attrib.get("fill") for node in svg], ["#F5D76E", "#0F0E1A"])
+	def test_product_logos_share_the_canonical_exe_intelligence_artwork(self):
+		canonical = (ROOT / "frappe/public/images/exe-icons/exe-favicon.svg").read_bytes()
+		for relative in (
+			"apps/erpnext/erpnext/public/images/erpnext-logo.svg",
+			"frappe/public/images/frappe-framework-logo.svg",
+			"frappe/public/images/exe-erp-logo.svg",
+		):
+			with self.subTest(logo=relative):
+				self.assertEqual((ROOT / relative).read_bytes(), canonical)
 
 	def test_custom_image_branch_is_not_filtered_or_recolored(self):
 		template = (ROOT / "frappe/public/js/frappe/ui/desktop_icon.html").read_text()

@@ -243,7 +243,7 @@ frappe.ui.SidebarHeader = class SidebarHeader {
 			this.header_icon = desktop_icon_url;
 			this.header_icon = `<img src=${this.header_icon}></img>`;
 		} else if (desktop_icon && desktop_icon.logo_url) {
-			this.header_icon = desktop_icon.logo_url;
+			this.header_icon = frappe.utils.desktop_brand_image_url(desktop_icon.logo_url);
 			this.header_icon = `<img src=${this.header_icon}></img>`;
 		} else if (this.sidebar.sidebar_data) {
 			this.header_icon = this.sidebar.sidebar_data.header_icon;
@@ -254,7 +254,7 @@ frappe.ui.SidebarHeader = class SidebarHeader {
 		}
 	}
 	get_default_icon() {
-		return frappe.boot.app_data[0].app_logo_url;
+		return frappe.utils.desktop_brand_image_url(frappe.boot.app_data[0].app_logo_url);
 	}
 	get_desktop_icon_by_label(title, filters) {
 		if (!filters) {

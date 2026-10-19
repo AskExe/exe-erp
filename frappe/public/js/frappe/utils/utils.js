@@ -1511,7 +1511,10 @@ Object.assign(frappe.utils, {
 			"/assets/erpnext/desktop_icons/support.svg",
 		];
 		if (legacy_desktop_icons.includes(url)) return `${url}?v=exe-intelligence-4`;
-		return stock_logos.includes(url) ? `${url}?v=exe-gold-1` : url;
+		const stock_logo = stock_logos.find(
+			(path) => url === path || url === `${path}?v=exe-gold-1`
+		);
+		return stock_logo ? `${stock_logo}?v=exe-intelligence-5` : url;
 	},
 
 	get_desktop_icon(icon_name, variant) {

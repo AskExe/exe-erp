@@ -16,7 +16,7 @@ app_color = os.environ.get("EXE_APP_COLOR", "#7575FF")
 app_email = os.environ.get("EXE_APP_EMAIL", "")  # vendor-neutral; set via env
 app_license = os.environ.get("EXE_APP_LICENSE", "GNU General Public License (v3)")
 source_link = os.environ.get("EXE_APP_SOURCE_LINK", "")  # set to your source repo
-app_logo_url = os.environ.get("EXE_APP_LOGO_URL", "/assets/erpnext/images/erpnext-logo.svg?v=exe-gold-1")
+app_logo_url = os.environ.get("EXE_APP_LOGO_URL", "/assets/erpnext/images/erpnext-logo.svg?v=exe-intelligence-5")
 app_home = "/desk"
 
 add_to_apps_screen = [
@@ -137,7 +137,7 @@ website_generators = ["BOM", "Sales Partner"]
 website_context = {
 	"favicon": os.environ.get("EXE_APP_FAVICON_URL", "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-4"),
 	"splash_image": os.environ.get(
-		"EXE_APP_SPLASH_URL", "/assets/erpnext/images/erpnext-logo.svg?v=exe-gold-1"
+		"EXE_APP_SPLASH_URL", "/assets/erpnext/images/erpnext-logo.svg?v=exe-intelligence-5"
 	),
 }
 
