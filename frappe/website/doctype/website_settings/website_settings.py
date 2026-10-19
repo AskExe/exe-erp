@@ -251,7 +251,7 @@ def get_website_settings(context=None):
 		context.theme = get_active_theme() or frappe._dict()
 
 	if not context.get("favicon"):
-		context["favicon"] = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-3"
+		context["favicon"] = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-4"
 
 	if settings.favicon and settings.favicon != "attach_files:":
 		context["favicon"] = settings.favicon
@@ -263,7 +263,7 @@ def get_website_settings(context=None):
 		"/assets/frappe/images/frappe-favicon.svg",
 		"/assets/erpnext/images/erpnext-favicon.svg",
 	}:
-		context["favicon"] = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-3"
+		context["favicon"] = "/assets/frappe/images/exe-icons/exe-favicon.svg?v=exe-4"
 
 	context["hide_login"] = settings.hide_login
 
