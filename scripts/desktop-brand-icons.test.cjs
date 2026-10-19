@@ -50,3 +50,16 @@ test("bundled legacy desktop images refresh without changing custom URLs", () =>
     assert.equal(imageUrl(custom), custom);
   }
 });
+
+
+test("shell home marks match only known owned brands, never customer or module icons", () => {
+  const start = source.indexOf("is_default_desktop_brand(url) {");
+  const method = source.slice(start, source.indexOf("\n\tdesktop_brand_image_url(", start));
+  const isBrand = new Function(`return ({${method}}).is_default_desktop_brand`)();
+  for (const path of ["/assets/frappe/images/frappe-framework-logo.svg", "/assets/frappe/images/exe-erp-logo.svg", "/assets/erpnext/images/erpnext-logo.svg"]) {
+    for (const suffix of ["", "?v=exe-gold-1", "?v=exe-intelligence-5", "?v=exe-intelligence-6"]) assert.equal(isBrand(path + suffix), true);
+    for (const suffix of ["?custom=1", "?v=customer", "?v=exe-intelligence-6&custom=1"]) assert.equal(isBrand(path + suffix), false);
+    assert.equal(isBrand("https://customer.test" + path), false);
+  }
+  for (const custom of ["/files/company-logo.svg", "/assets/erpnext/desktop_icons/projects.svg", null, undefined]) assert.equal(isBrand(custom), false);
+});

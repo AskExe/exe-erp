@@ -1487,6 +1487,12 @@ Object.assign(frappe.utils, {
 		);
 	},
 
+	is_default_desktop_brand(url) {
+		// Match only owned shell marks; custom images, queries and module icons stay intact.
+		return typeof url === "string" &&
+			/^\/assets\/(?:frappe\/images\/(?:frappe-framework-logo|exe-erp-logo)|erpnext\/images\/erpnext-logo)\.svg(?:\?v=(?:exe-gold-1|exe-intelligence-[56]))?$/.test(url);
+	},
+
 	desktop_brand_image_url(url) {
 		// Persisted stock logo URLs also need the updated artwork. Customer
 		// uploads and externally hosted images retain their exact original URLs.

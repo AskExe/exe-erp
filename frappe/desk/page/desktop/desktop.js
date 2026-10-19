@@ -248,7 +248,19 @@ class DesktopPage {
 		this.awesomebar_setup = false;
 		$(frappe.render_template("desktop")).appendTo(this.page.body);
 		const brand_logo = $(this.page.body).find("#brand-logo");
-		brand_logo.attr("src", frappe.utils.desktop_brand_image_url(brand_logo.attr("src")));
+		// Desktop scripts can refresh while an open tab still uses the previous desk bundle.
+		const is_default_brand = frappe.utils.is_default_desktop_brand || ((url) =>
+			typeof url === "string" &&
+			/^\/assets\/(?:frappe\/images\/(?:frappe-framework-logo|exe-erp-logo)|erpnext\/images\/erpnext-logo)\.svg(?:\?v=(?:exe-gold-1|exe-intelligence-[56]))?$/.test(url));
+		if (is_default_brand(brand_logo.attr("src"))) {
+			brand_logo.replaceWith(
+				$('<a href="/desk" class="btn btn-default"></a>')
+					.attr("aria-label", __("Home"))
+					.html(frappe.utils.icon("home"))
+			);
+		} else {
+			brand_logo.attr("src", frappe.utils.desktop_brand_image_url?.(brand_logo.attr("src")) || brand_logo.attr("src"));
+		}
 		if (this.data !== undefined) {
 			this.render();
 		} else {
