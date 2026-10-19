@@ -23,6 +23,7 @@ test("persisted stock logos refresh while customer images remain byte-identical"
   for (const stock of ["/assets/frappe/images/frappe-framework-logo.svg", "/assets/erpnext/images/erpnext-logo.svg"]) {
     assert.equal(imageUrl(stock), stock + "?v=exe-intelligence-6");
     assert.equal(imageUrl(stock + "?v=exe-gold-1"), stock + "?v=exe-intelligence-6");
+    assert.equal(imageUrl(stock + "?v=exe-intelligence-5"), stock + "?v=exe-intelligence-6");
     assert.equal(imageUrl(imageUrl(stock)), imageUrl(stock));
   }
   for (const custom of ["/files/company-logo.svg", "https://customer.test/logo.svg", "/assets/frappe/images/frappe-framework-logo.svg?custom=1", null]) {

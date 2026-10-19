@@ -1512,7 +1512,8 @@ Object.assign(frappe.utils, {
 		];
 		if (legacy_desktop_icons.includes(url)) return `${url}?v=exe-intelligence-4`;
 		const stock_logo = stock_logos.find(
-			(path) => url === path || url === `${path}?v=exe-gold-1`
+			(path) =>
+				url === path || url === `${path}?v=exe-gold-1` || url === `${path}?v=exe-intelligence-5`
 		);
 		return stock_logo ? `${stock_logo}?v=exe-intelligence-6` : url;
 	},
