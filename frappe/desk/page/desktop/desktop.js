@@ -247,6 +247,8 @@ class DesktopPage {
 		$(this.page.body).empty();
 		this.awesomebar_setup = false;
 		$(frappe.render_template("desktop")).appendTo(this.page.body);
+		const brand_logo = $(this.page.body).find("#brand-logo");
+		brand_logo.attr("src", frappe.utils.desktop_brand_image_url(brand_logo.attr("src")));
 		if (this.data !== undefined) {
 			this.render();
 		} else {
